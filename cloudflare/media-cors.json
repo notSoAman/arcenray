@@ -1,0 +1,22 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "http://localhost:3000",
+          "https://arcenray.com",
+          "https://www.arcenray.com"
+        ],
+        "methods": ["GET", "HEAD"],
+        "headers": ["Range"]
+      },
+      "exposeHeaders": [
+        "ETag",
+        "Content-Length",
+        "Content-Range",
+        "Accept-Ranges"
+      ],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

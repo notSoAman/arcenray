@@ -1,0 +1,8 @@
+{
+  "projectRef": "ropbxsnjtejfomnpdllf",
+  "supabaseUrl": "https://ropbxsnjtejfomnpdllf.supabase.co",
+  "publishableKey": "sb_publishable_JsAfTfrz0ok-VzQlaf5H1g_5KYVrfvm",
+  "mediaUrl": "https://cdn.arcenray.com",
+  "publicBucket": "arcenray-media",
+  "privateUploadBucket": "arcenray-uploads"
+}

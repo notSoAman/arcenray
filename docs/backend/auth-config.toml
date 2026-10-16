@@ -1,0 +1,4 @@
+project_id = "arcenray"
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback", "https://arcenray.com/auth/callback", "https://www.arcenray.com/auth/callback"]

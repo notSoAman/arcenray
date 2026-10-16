@@ -81,7 +81,7 @@ Claude Code normally loads root `CLAUDE.md`, not necessarily `AGENTS.md` automat
 | Identity | **Supabase Auth** (Google OAuth and magic links as MVP choices) | Web via supported SSR client; mobile token/session storage via secure mechanisms. **No Clerk**. |
 | Live communication | **Supabase Realtime** + Postgres persistence/RLS | Chat delivery, ephemeral typing and presence. No custom Durable Objects by default. |
 | Media | **Cloudflare R2** | Main film MP4, hook clip, poster and compact profile picture. Direct authenticated, authorized uploads; no full movie bytes through serverless API functions. |
-| Semantic embeddings | **OpenAI `text-embedding-3-small`, 1536 dimensions**, server-side only | Index films and profiles. Provider changes require founder approval and coordinated dimension/index migration. |
+| Semantic embeddings | **Supabase Edge Runtime `gte-small`, 384 dimensions (English, max 512 tokens)**, server-side only | Index films and profiles. Provider changes require founder approval and coordinated dimension/index migration. |
 | Cloud operations | **Supabase Edge Functions** for narrow trusted actions; Cloudflare CDN/Workers only if justified | Avoid building a separate service/API layer by default. Host the web app on a platform compatible with the selected Next.js features; founder approves hosting. |
 | Product telemetry | Minimal consent-aware event capture; optional analytics only if approved | No user surveillance SDK added just for investor demos. |
 
@@ -126,8 +126,8 @@ All database changes must be created as **versioned migrations**. The live dashb
 
 ### Required conceptual entities
 
-- **`profiles`**: `id` linked to `auth.users`, name, unique handle, bio, **`roles text[]`** (multiple creative roles), `location_city`, `skills_gear text[]`, `profile_pic` asset reference, `onboarding_completed`, **`embedding vector(1536)`**, `taste_vector vector(1536)`, full-text index, storage quota and reserved/used bytes as needed. Prefer a canonical roles taxonomy plus extensible labels.
-- **`films`**: creator ownership, title, synopsis, genres, mood tags, city/location when meaningful, source (`r2_native`, `vimeo_embed`, `youtube_embed`), provider ID / external URL or internal asset key, `poster`, **mandatory discovery hook**, hook duration **`<= 30 seconds`**, film duration, visibility/publication/processing state, `embedding vector(1536)`, full-text index and timestamps. Do not require a native R2 video asset for external-linked films.
+- **`profiles`**: `id` linked to `auth.users`, name, unique handle, bio, **`roles text[]`** (multiple creative roles), `location_city`, `skills_gear text[]`, `profile_pic` asset reference, `onboarding_completed`, **`embedding vector(384)`**, `taste_vector vector(384)`, full-text index, storage quota and reserved/used bytes as needed. Prefer a canonical roles taxonomy plus extensible labels.
+- **`films`**: creator ownership, title, synopsis, genres, mood tags, city/location when meaningful, source (`r2_native`, `vimeo_embed`, `youtube_embed`), provider ID / external URL or internal asset key, `poster`, **mandatory discovery hook**, hook duration **`<= 30 seconds`**, film duration, visibility/publication/processing state, `embedding vector(384)`, full-text index and timestamps. Do not require a native R2 video asset for external-linked films.
 - **`film_credits`**: film, credited creative (if registered), role/department, claim/invitation status, **verification state and verifier/audit record**. A user cannot grant themselves a verified credit by changing client-supplied flags.
 - **`user_events`**: actor, event kind, film or target, meaningful dwell/watch data, timestamp, stable idempotency/deduplication identifier. Restrict and minimize tracking; no raw video/audio logging.
 - **`conversations`, `conversation_participants`, `messages`** (or an equivalently secure simple 1:1 design): participant membership, sender, message body, timestamps, optional attachment reference to a film/collaboration item, moderation/delete state where appropriate.
@@ -147,7 +147,7 @@ All database changes must be created as **versioned migrations**. The live dashb
 ### Stable service contracts (names are targets, not permission to break existing ones)
 
 - `presign-upload`: validates user/session, file type/size/intent, remaining quota and safe object path; returns short-lived presigned upload details. Verify completed upload **server-side** before declaring it published/charging final usage. Support large-file multipart/resumable upload if normal direct PUT cannot meet file-size/reliability needs. Prevent upload-intent races by reservation/transactional accounting.
-- `index-entity`: asynchronously computes a 1536-dimensional embedding for a film or profile **after authorization and relevant edits**; supports retries, deduplication and reindexing after verified credits change.
+- `index-entity`: asynchronously computes a 384-dimensional embedding for a film or profile **after authorization and relevant edits**; supports retries, deduplication and reindexing after verified credits change.
 - `update_user_taste_vector`: updates **only the authenticated user's** taste vector from a permitted event and an indexed film. Treat weights as tunable defaults, not immutable ML science.
 - `get_personalized_feed`: ranks publishable films for current user, filters blocked/unavailable/already-consumed content as appropriate, and has sensible cold-start/popularity/recency fallback.
 - `hybrid_search`: searches people/films across embeddings and full-text results with structured city/role/genre filters; initial scoring experiment **0.7 semantic / 0.3 text** after normalization. Never rely on vector match alone for exact filters.
@@ -223,7 +223,7 @@ Claude Code's collaborator owns the authoritative visual artifacts. Accepted des
 
 ## 8. Security, privacy, trust, and cost guardrails
 
-- **The founder holds account control.** Collaborators/agents receive only the minimum necessary permissions (prefer dev/staging projects and published non-secret config). No personal Cloudflare/Supabase/OpenAI account login sharing or service-role keys to frontend developers.
+- **The founder holds account control.** Collaborators/agents receive only the minimum necessary permissions (prefer dev/staging projects and published non-secret config). No personal Cloudflare/Supabase account login sharing or service-role keys to frontend developers.
 - Secrets belong in managed environment variables/secret stores. Never commit `.env*` containing secrets, Supabase service role keys, R2 secret keys, PATs, signing keys, OAuth client secrets, or production credentials. `.env.example` contains placeholders only.
 - Client-exposed Supabase publishable/anon keys are **not** substitutes for correct RLS; ensure `service_role` is server-only. Do not use privileged SDK instances in browser or mobile.
 - **No writes to production, deployment, schema push, changing auth providers, domain/DNS change, paid subscription, or creating a public bucket without explicit founder authorization.** Local/staging read/write access stays scoped to the task.
