@@ -43,6 +43,7 @@ All disposable live-test users and objects were removed.
 - Google OAuth credentials, production SMTP/deliverability, deployed frontend,
   pilot moderation/account/media deletion UX and private presence are later work.
 - Backend PR #1 merged into the default branch `codex/project-backup`.
-- Phase2 started on `codex/browser-media`: browser image preparation, video
-  preflight and direct-upload tasks for Claude to integrate. No product UI screens
-  or frontend deployment are included in this slice.
+- Phase2 browser image preparation, video preflight and direct-upload tasks merged
+  in PR #2. Claude can integrate them from the default branch. No product UI screens
+  or frontend deployment are included.
+- Collaborator instructions and prompts: `docs/COLLABORATOR_SETUP.md`.

@@ -11,9 +11,10 @@ transfer/verification states; cancellation; retries retain reservation/verified 
 TESTS: pnpm test, pnpm test:browser-media, pnpm lint, pnpm check-types, pnpm build.
 DO NOT TOUCH: UI routes/tokens, database/RLS/contracts, cloud resources or deployment.
 BLOCKERS: no implementation blocker for this slice; Claude still implements screens.
-The repository currently has no docs/design directory, apps/mobile workspace, or
-.github/workflows directory. The README links the supplied Claude design reference;
-this task does not assert visual fidelity or initialize those missing areas.
+At the start of this task, docs/design, apps/mobile and .github/workflows were absent.
+The collaborator handoff now records the design link in docs/design/README.md;
+actual design exports, mobile initialization and CI remain separate work.
+This task does not assert visual fidelity.
 
 ## Browser helpers
 

@@ -41,3 +41,6 @@ yarn-error.log*
 .env.*
 !.env.example
 .wrangler/
+
+# Per-developer Claude settings (never share machine-local approvals or credentials)
+.claude/settings.local.json
