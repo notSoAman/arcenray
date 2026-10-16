@@ -40,7 +40,7 @@ def s3_delete(bucket,key):
  key_sig=hm(hm(hm(hm(('AWS4'+secret).encode(),date),'auto'),'s3'),'aws4_request');sig=hmac.new(key_sig,string.encode(),hashlib.sha256).hexdigest()
  req=urllib.request.Request('https://'+host+path,method='DELETE',headers={'x-amz-content-sha256':empty,'x-amz-date':stamp,'Authorization':f'AWS4-HMAC-SHA256 Credential={access}/{scope}, SignedHeaders={signed}, Signature={sig}'})
  with urllib.request.urlopen(req,timeout=30) as r:assert r.status==204
-users=[];assets=[]
+users=[];assets=[];film=None
 try:
  for i in range(3):
   email='backend-smoke-'+uuid.uuid4().hex+'@example.invalid';password=uuid.uuid4().hex+'!A9'
@@ -106,4 +106,12 @@ finally:
  for u in reversed(users):
   try:api('/auth/v1/admin/users/'+u['id'],'DELETE')
   except Exception as e:print('Fixture user cleanup needs retry:',u['id'],type(e).__name__)
+ # Polymorphic private embedding rows have no entity FK; remove this run's orphans.
+ ids=[str(uuid.UUID(u['id'])) for u in users]
+ if film:ids.append(str(uuid.UUID(film['id'])))
+ if ids:
+  literals=','.join("'"+value+"'" for value in ids)
+  sql="delete from private.entity_embeddings e where entity_id in ("+literals+") and ((kind='profile' and not exists(select 1 from public.profiles p where p.id=e.entity_id)) or (kind='film' and not exists(select 1 from public.films f where f.id=e.entity_id)));"
+  result=subprocess.run(['pnpm','exec','supabase','db','query','--linked',sql],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+  if result.returncode:print('Fixture embedding cleanup needs retry')
  print('Disposable test cleanup attempted')

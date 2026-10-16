@@ -77,7 +77,8 @@ Prefer a local/staging database. `scripts/backend-smoke.py` is an explicit live 
 it creates confirmed disposable users, signs them in, tests cross-user denials,
 indexes through Supabase gte-small, uploads generated MP4/WebP fixtures straight to R2, verifies,
 publishes, checks CDN Range delivery and removes its own users/objects in finally.
-It requires Python3, FFmpeg and server credentials in environment variables:
+It requires Python3, FFmpeg, logged-in/linked Supabase CLI (for scoped private
+embedding fixture cleanup), and server credentials in environment variables:
 SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY, R2_ACCOUNT_ID,
 R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET_NAME,R2_UPLOAD_BUCKET_NAME,R2_PUBLIC_URL.
 With the root `.env.test` filled and Supabase CLI logged in, use `pnpm backend:smoke`.
