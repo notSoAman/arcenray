@@ -42,4 +42,7 @@ All disposable live-test users and objects were removed.
   (longer input is truncated). Recommendation quality still needs real-user evaluation.
 - Google OAuth credentials, production SMTP/deliverability, deployed frontend,
   pilot moderation/account/media deletion UX and private presence are later work.
-- The backend PR is for review and has not been merged into the default branch.
+- Backend PR #1 merged into the default branch `codex/project-backup`.
+- Phase2 started on `codex/browser-media`: browser image preparation, video
+  preflight and direct-upload tasks for Claude to integrate. No product UI screens
+  or frontend deployment are included in this slice.

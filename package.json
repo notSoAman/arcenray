@@ -8,9 +8,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "setup:web": "node scripts/setup-web.mjs",
-    "test": "pnpm --filter @repo/shared test && node --experimental-strip-types --test supabase/functions/_shared/media-inspection.test.ts",
+    "test": "pnpm --filter @repo/shared test && node --experimental-strip-types --test supabase/functions/_shared/media-inspection.test.ts && pnpm --filter web test",
     "backend:types": "node scripts/generate-db-types.mjs",
-    "backend:smoke": "node scripts/run-backend-smoke.mjs"
+    "backend:smoke": "node scripts/run-backend-smoke.mjs",
+    "test:browser-media": "node scripts/check-browser-media.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.6",

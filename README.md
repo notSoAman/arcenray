@@ -4,7 +4,8 @@ Creator-first filmmaking and music collaboration. Read [AGENTS.md](AGENTS.md) be
 
 ## Start the frontend
 
-Requires Node.js 24+ and pnpm 11.25.0. Until the backend PR is merged, clone/check out `codex/backend-foundation`.
+Requires Node.js 24+ and pnpm 11.25.0. The backend foundation is merged into the
+default branch, `codex/project-backup`.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -26,6 +27,7 @@ bucket; explicit publication copies verified objects server-side to the CDN buck
 
 - [Live validation status and pending provider setup](docs/backend/STATUS.md)
 - [Frontend integration and API examples](docs/backend/FRONTEND_HANDOFF.md)
+- [Browser media preparation and upload tasks](docs/architecture/browser-media.md)
 - [Setup, deployment, operations and known limits](docs/backend/SETUP.md)
 - [Database/API contract](docs/architecture/backend-contract.md)
 - [Applied migrations](supabase/migrations)
