@@ -10,8 +10,10 @@
   },
   "devDependencies": {
     "prettier": "3.9.6",
+    "supabase": "^2.121.0",
     "turbo": "^2.11.8",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "wrangler": "^4.151.0"
   },
   "packageManager": "pnpm@11.25.0",
   "engines": {
