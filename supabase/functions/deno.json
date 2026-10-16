@@ -1,0 +1,15 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.117.3",
+    "aws4fetch": "npm:aws4fetch@1.0.20",
+    "zod": "npm:zod@4.6.7"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["deno.window", "dom", "dom.iterable"]
+  },
+  "tasks": {
+    "check": "deno check */index.ts",
+    "test": "deno test _shared/*test.ts"
+  }
+}
