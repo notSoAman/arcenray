@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
-    "check-types": "next typegen && tsc --noEmit"
+    "check-types": "next typegen && tsc --noEmit",
+    "test": "node --experimental-strip-types lib/media/upload.test.ts"
   },
   "dependencies": {
     "@repo/ui": "workspace:*",

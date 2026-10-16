@@ -14,7 +14,7 @@ pnpm setup:web
 pnpm --filter web dev
 ```
 
-Use the backend foundation feature branch until its PR is merged. Public connection
+The backend foundation is merged into the default branch, `codex/project-backup`. Public connection
 settings live in `project.json`. Never request the founder's service-role/R2
 keys. Tests and account creation for development should use a staging/local project
 when possible; the configured hosted project is shared.
@@ -56,6 +56,11 @@ republish explicitly. Public media already distributed through the CDN is not
 revoked by changing draft metadata; private/unpublish delivery is a separate feature.
 
 ## Upload -> verify -> publish
+
+Use `apps/web/lib/media/prepare.ts` for image preparation/video preflight and
+`upload.ts` for direct uploads with progress/cancellation/retry. See
+[the browser media guide](../architecture/browser-media.md) for examples and limits.
+These helpers do not publish films automatically or implement any screen design.
 
 1. Compress/export the actual Blob before requesting an upload intent.
 2. `api.media.create({kind,bytes:blob.size,content_type:blob.type})`.
