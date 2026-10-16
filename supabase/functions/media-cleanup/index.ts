@@ -1,9 +1,17 @@
-import { serve, admin, checked, env, HttpError } from "../_shared/http.ts";
+import { z } from "zod";
+import {
+  serve,
+  admin,
+  checked,
+  env,
+  HttpError,
+  jsonBody,
+} from "../_shared/http.ts";
 import { r2 } from "../_shared/r2.ts";
 serve(async (req) => {
-  // Ops-only endpoint; never callable using the public key or a user JWT.
-  const supplied = req.headers.get("authorization") ?? "";
-  const expected = `Bearer ${env("SUPABASE_SERVICE_ROLE_KEY")}`;
+  // The platform verifies JWTs; this dedicated secret additionally restricts operations.
+  const supplied = req.headers.get("x-cleanup-secret") ?? "";
+  const expected = env("CLEANUP_SECRET");
   const a = new TextEncoder().encode(supplied),
     b = new TextEncoder().encode(expected);
   let diff = a.length ^ b.length;
@@ -11,6 +19,11 @@ serve(async (req) => {
     diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
   if (diff !== 0)
     throw new HttpError(401, "Operations authentication required");
+  const body = z
+    .object({ dry_run: z.boolean().optional() })
+    .strict()
+    .parse(await jsonBody(req));
+  if (body.dry_run === true) return { authenticated: true, dry_run: true };
   const assets = checked(await admin().rpc("backend_claim_expired_assets")) as {
     id: string;
     object_key: string;

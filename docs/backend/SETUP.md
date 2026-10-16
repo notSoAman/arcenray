@@ -29,13 +29,14 @@ pnpm exec supabase secrets set --project-ref ropbxsnjtejfomnpdllf --env-file /pa
 ```
 
 Never pass real secrets as command-line NAME=value arguments. Keep secret files out
-of the checkout, chmod600, and delete temporary copies after use. Cleanup uses the
-service-role JWT encrypted in Vault under `arcenray_cleanup_service_role`; rotate that
-Vault secret as well when rotating the service-role JWT. Collaborators do not need it.
+of the checkout, chmod600, and delete temporary copies after use. Cleanup uses both the service-role JWT encrypted in Vault under
+`arcenray_cleanup_service_role` and a dedicated operations secret
+(`CLEANUP_SECRET` in Edge secrets / `arcenray_cleanup_secret` in Vault). Rotate the
+corresponding Vault secret along with each server credential. Collaborators do not need it.
 
 ## Auth launch configuration
 
-Proposed callback allowlist (remote approval pending): http://localhost:3000/auth/callback,
+Approved and registered callback allowlist: http://localhost:3000/auth/callback,
 https://arcenray.com/auth/callback, https://www.arcenray.com/auth/callback.
 Current Site URL remains localhost for development. Change it to the approved deployed
 web host for launch. Email confirmation remains enabled. Google OAuth requires the
@@ -68,6 +69,8 @@ security assertions run transactionally, removing fixtures on completion:
 
 ```sh
 pnpm exec supabase db query --linked --file supabase/tests/backend-security.sql
+pnpm exec supabase db query --linked --file supabase/tests/media-lifecycle.sql
+pnpm exec supabase db query --linked --file supabase/tests/recommendations.sql
 ```
 
 Prefer a local/staging database. `scripts/backend-smoke.py` is an explicit live test:
@@ -77,13 +80,16 @@ publishes, checks CDN Range delivery and removes its own users/objects in finall
 It requires Python3, FFmpeg and server credentials in environment variables:
 SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY, R2_ACCOUNT_ID,
 R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET_NAME,R2_UPLOAD_BUCKET_NAME,R2_PUBLIC_URL.
-Run it only with founder authorization. It prints no tokens or signed URLs. Examine
+With the root `.env.test` filled and Supabase CLI logged in, use `pnpm backend:smoke`.
+The runner supplies default bucket names and obtains the server test key through the
+existing CLI login if that local field is blank; it never prints keys. Run it only
+with founder authorization. It prints no tokens or signed URLs. Examine
 provider BLOCKED lines: a passing core-media check does not prove semantic indexing
 when OpenAI credits are exhausted. Confirm cleanup output after failures.
 
 ## Cleanup and operational limits
 
-The prepared (approval-pending) 15-minute cleanup job invokes service-only media-cleanup using an encrypted
+The approved, enabled 15-minute cleanup job invokes service-only media-cleanup using an encrypted
 Vault credential. It claims expired pending uploads, deleting them before releasing
 quota; failed deletion keeps quota reserved for retry. It removes unattached verified
 uploads older than one day, and private originals already safely copied to the CDN.

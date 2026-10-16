@@ -1,40 +1,43 @@
-# Backend validation status — 2026-10-16
+# Backend validation status — 2026-10-17
 
-## Deployed
+## Connected and deployed
 
-- Supabase schema: 11 public application tables plus private quota/media/embedding/event/rate-limit state.
-- RLS, column grants, ownership/publish/credit/conversation RPCs; generated TypeScript types.
+- Supabase project `ropbxsnjtejfomnpdllf`: schema, RLS, column grants and API/RPCs.
 - Realtime publication: messages and conversation_participants.
-- Edge Functions: media-upload, index-entity, search, media-cleanup (JWT verified).
-- Server-side R2/OpenAI secrets installed.
-- Private arcenray-uploads bucket; public arcenray-media bucket with active CDN SSL.
-- Founder-approved CORS rules installed for localhost:3000, arcenray.com and www.arcenray.com.
-- Next.js SSR clients, secure PKCE callback and session-refresh proxy prepared in Git.
+- Six ordered migrations applied, including the dedicated cleanup authentication fix.
+- Four JWT-protected Edge Functions: media-upload, index-entity, search, media-cleanup.
+- Credentials from the Git-ignored root `.env.test` synced to server-side secrets.
+- R2 `arcenray-media` and private `arcenray-uploads`; supplied S3 key verified on both.
+- `cdn.arcenray.com` attached with active ownership/SSL and TLS1.2 minimum.
+- Approved origin-specific CORS and auth callback URLs installed.
+- Approved15-minute cleanup schedule resumed. Operations secret is encrypted in Vault
+  and stored in Edge secrets; incorrect secret is rejected.
+- Next.js SSR clients, PKCE callback, session proxy, shared SDK and frontend handoff in Git.
 
 ## Verified
 
-- Live disposable Auth users, automatic profile creation, profile edits and draft privacy.
-- Live one-to-one chat persistence/access; third-party reads and sender impersonation denied.
+- Full live flow: Auth -> profile -> draft -> direct R2 upload -> actual MP4/WebP
+  inspection -> profile image -> publication -> JavaScript CDN206 Range + origin CORS.
+- Chat persistence and participant access; third-user reads and impersonation denied.
+- Event ingestion and completed-film feed filtering.
 - Full-text fallback while OpenAI embeddings are unavailable.
-- Database security assertions passed with fixture rollback.
-- 14 local contract/media parser tests; Edge Deno typechecks; repository lint/types/build.
-- Supabase security advisor: zero findings. Performance advisor only reports unused
-  indexes expected on a new project with no application data.
+- Database authorization and media-lifecycle transaction tests with fixture rollback.
+- Real FFmpeg MP4/WebP fixtures plus14 local contract/parser tests.
+- Cleanup authentication-only check: incorrect secret401, valid secret200, no deletion.
+- First observed natural cleanup run after the fix returned HTTP200 with no timeout.
+- Synthetic-vector SQL tests passed for hybrid ranking, taste updates and deduplication.
+- Repository lint/types/build and Edge Deno typechecks.
+- Supabase security advisor previously reported zero findings; checked again after setup.
 
-## Pending external action
+The media smoke test now uses JavaScript fetch, matching the frontend runtime.
+The Python HTTP transport received403 for media while JavaScript returned206 for
+that same server-copied MP4; no Cloudflare security protections were disabled.
+All disposable live-test users and objects were removed.
 
-1. The supplied R2 S3 credential can access arcenray-media but receives403 on
-   arcenray-uploads. Grant object read/write/delete on both buckets (or replace the
-   Edge Function R2 credentials with a key scoped to both). The signed-upload endpoint
-   works, but the actual private-bucket PUT was denied. Complete upload/publication/
-   CDN playback and cleanup e2e verification is therefore pending.
-2. OpenAI returns429 `credit_balance_exhausted` / `insufficient_quota`. Add project
-   credit before semantic indexing and recommendation quality can be verified.
-3. Automatic approval review requires specific founder approval for the proposed
-   three auth callback URLs and15-minute cleanup schedule. Those remote changes are
-   not enabled yet; the scheduled_cleanup migration is prepared but unapplied.
-4. Google OAuth credentials, production SMTP/deliverability, a deployed frontend,
-   pilot moderation/account/media deletion UX and private presence need later setup.
+## Remaining setup
 
-All disposable users from live tests were removed. No credentials are committed.
-The backend feature branch is for review; it has not been merged into the default branch.
+- OpenAI returns429 `credit_balance_exhausted` / `insufficient_quota`. Add credits
+  before semantic indexing/quality can be verified. Full-text discovery remains usable.
+- Google OAuth credentials, production SMTP/deliverability, deployed frontend,
+  pilot moderation/account/media deletion UX and private presence are later work.
+- The backend PR is for review and has not been merged into the default branch.

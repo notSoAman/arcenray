@@ -2,7 +2,7 @@
 Creates temporary users; always removes them. No tokens or signed URLs are printed.
 Run via the setup guide; this script is never part of frontend code.
 """
-import os, json, uuid, pathlib, urllib.request, urllib.error, subprocess, tempfile, socket
+import os, json, uuid, pathlib, urllib.request, urllib.error, subprocess, tempfile, socket, xml.etree.ElementTree as ET
 # Cache DNS per process to avoid repeated resolver latency during disposable tests.
 _real_getaddrinfo=socket.getaddrinfo
 _dns={}
@@ -77,14 +77,16 @@ try:
    req=urllib.request.Request(reserved['upload_url'],method='PUT',data=data,headers=reserved['headers'])
    try:
     with urllib.request.urlopen(req,timeout=60) as res:assert res.status==200
-   except urllib.error.HTTPError as e:raise AssertionError('R2 direct upload failed HTTP '+str(e.code)) from None
+   except urllib.error.HTTPError as e:
+    try:code=ET.fromstring(e.read()).findtext('Code')
+    except ET.ParseError:code='unrecognized_error'
+    raise AssertionError(f'R2 direct upload failed HTTP {e.code}, code {code}') from None
    complete=fn('media-upload',{'action':'complete','asset_id':aid},a['token']);assert complete['status'] in ('uploaded','ready')
    if kind!='profile_picture':api('/rest/v1/films?id=eq.'+film['id'],'PATCH',{kind+'_asset_id':aid},a['token'],True)
   published=fn('media-upload',{'action':'publish','film_id':film['id']},a['token']);assert published['status']=='published'
   assert len(api('/rest/v1/films?id=eq.'+film['id'],token=b['token'],public=True))==1
   url=os.environ['R2_PUBLIC_URL']+'/'+published['film_key']
-  req=urllib.request.Request(url,headers={'Range':'bytes=0-15'})
-  with urllib.request.urlopen(req,timeout=60) as r:assert r.status==206 and len(r.read())==16
+  subprocess.run(['node','scripts/check-media-range.mjs'],env={**os.environ,'ARCENRAY_SMOKE_MEDIA_URL':url},check=True)
   print('PASS direct R2 upload, actual media inspection, profile picture, publication, CDN Range playback')
   api('/rest/v1/rpc/record_event','POST',{'p_film_id':film['id'],'p_kind':'film_complete','p_idempotency_key':str(uuid.uuid4()),'p_watch_seconds':1},b['token'],True)
   assert not any(f['id']==film['id'] for f in api('/rest/v1/rpc/get_personalized_feed','POST',{},b['token'],True))

@@ -9,7 +9,8 @@
     "check-types": "turbo run check-types",
     "setup:web": "node scripts/setup-web.mjs",
     "test": "pnpm --filter @repo/shared test && node --experimental-strip-types --test supabase/functions/_shared/media-inspection.test.ts",
-    "backend:types": "node scripts/generate-db-types.mjs"
+    "backend:types": "node scripts/generate-db-types.mjs",
+    "backend:smoke": "node scripts/run-backend-smoke.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.6",
