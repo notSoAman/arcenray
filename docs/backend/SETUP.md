@@ -10,7 +10,7 @@ See [current validation and pending setup](STATUS.md) before assuming a provider
 - R2 `arcenray-media`: deliberately published assets at `https://cdn.arcenray.com`.
 - Strict CORS allows localhost:3000, arcenray.com and www.arcenray.com only.
 - Edge Functions: media-upload, index-entity, search, media-cleanup. JWT verification
-  enabled; handlers additionally verify users with Auth. Cleanup is service-role only.
+  enabled; handlers additionally verify users with Auth. Cleanup additionally requires a dedicated operations secret; scheduled calls use a service-role JWT.
 
 Migrations are ordered, versioned and matched to remote history. Do not blindly
 reset or db push this shared project. Local Supabase requires Docker running.
