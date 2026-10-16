@@ -1,5 +1,6 @@
 # Frontend handoff for Claude Code
 
+Start with [the collaborator setup and copyable prompts](../COLLABORATOR_SETUP.md).
 Read root AGENTS.md and the design reference first. The design has welcome,
 following/discovery feeds, search, film/player, creator profiles, inbox and threads.
 Use its visual language; do not implement stories or copy every social feature.
@@ -27,7 +28,7 @@ exchanges PKCE codes and rejects external redirect targets. Protected pages stil
 need an authenticated user check; RLS is always the authorization boundary.
 
 ```ts
-import { createClient } from "@/lib/supabase/client"; // adjust alias to web tsconfig
+import { createClient } from "./lib/supabase/client"; // adjust relative path to this file
 import { createArcenrayClient } from "@repo/shared";
 const supabase = createClient();
 const api = createArcenrayClient(supabase);

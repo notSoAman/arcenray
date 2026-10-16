@@ -2,6 +2,9 @@
 
 Creator-first filmmaking and music collaboration. Read [AGENTS.md](AGENTS.md) before making changes; Claude Code starts with [CLAUDE.md](CLAUDE.md).
 
+For the frontend collaborator: [clone/setup, tools and copyable Claude prompts](docs/COLLABORATOR_SETUP.md).
+No `.env.test` or cloud admin keys are needed.
+
 ## Start the frontend
 
 Requires Node.js 24+ and pnpm 11.25.0. The backend foundation is merged into the
