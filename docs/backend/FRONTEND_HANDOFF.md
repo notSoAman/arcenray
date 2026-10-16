@@ -15,7 +15,7 @@ pnpm --filter web dev
 ```
 
 Use the backend foundation feature branch until its PR is merged. Public connection
-settings live in `project.json`. Never request the founder's service-role/R2/OpenAI
+settings live in `project.json`. Never request the founder's service-role/R2
 keys. Tests and account creation for development should use a staging/local project
 when possible; the configured hosted project is shared.
 
@@ -85,7 +85,8 @@ vector ranking when available; recency fallback otherwise, excluding completed/s
 films for that user. `api.search({query,kind:'all'|'film'|'profile',city?,role?,genre?})`
 returns `{results,mode:'hybrid'|'full_text'}`. The public `hybrid_search` RPC also
 works without a query embedding for full-text-only searches. Respect exact filters.
-OpenAI credits are currently exhausted: full-text fallback remains functional.
+Embeddings use Supabase built-in gte-small: English only, 384 dimensions, maximum
+512 input tokens. Longer text is truncated. Full-text fallback handles inference outages.
 
 `api.events.record({film_id,kind,idempotency_key,watch_seconds})` accepts hook_watch,
 film_complete, like, bookmark, skip. Reuse a UUID on retries. Taste updates are bounded

@@ -46,3 +46,14 @@ assets only; incoming uploads use a separate private bucket.
 Frontends use packages/shared typed SDK; generated database.types.ts is authoritative.
 
 Applied follow-up tables: private.api_usage. Ops-only backend_* RPCs are service-role-only, not frontend APIs. Complete film media stays private until an explicit publish action.
+
+## Approved embedding provider change — 2026-10-17
+
+Founder approved replacing the external embedding provider with Supabase Edge Runtime
+`gte-small`: 384 dimensions, mean pooling, normalized output, English only, maximum
+512 tokens (runtime truncation). No external inference credentials. Private embedding
+and taste columns use384 dimensions; public DTOs are unchanged. Migration
+20261016185726 aborts on nonempty old vectors; the current deployment had zero.
+Generated public DB types were refreshed and unchanged after formatting. Search keeps
+full-text fallback; indexing returns503 on inference failure and remains owner-only.
+Supabase function/runtime usage still applies. No Cloudflare or hosting changes.

@@ -4,7 +4,8 @@
 
 - Supabase project `ropbxsnjtejfomnpdllf`: schema, RLS, column grants and API/RPCs.
 - Realtime publication: messages and conversation_participants.
-- Six ordered migrations applied, including the dedicated cleanup authentication fix.
+- Seven ordered migrations applied, including cleanup authentication and the approved
+  switch to Supabase built-in gte-small (384 dimensions).
 - Four JWT-protected Edge Functions: media-upload, index-entity, search, media-cleanup.
 - Credentials from the Git-ignored root `.env.test` synced to server-side secrets.
 - R2 `arcenray-media` and private `arcenray-uploads`; supplied S3 key verified on both.
@@ -20,7 +21,8 @@
   inspection -> profile image -> publication -> JavaScript CDN206 Range + origin CORS.
 - Chat persistence and participant access; third-user reads and impersonation denied.
 - Event ingestion and completed-film feed filtering.
-- Full-text fallback while OpenAI embeddings are unavailable.
+- Real Supabase gte-small profile/film indexing, hybrid query inference, and published-film retrieval.
+- No external embedding API dependency; OpenAI key removed from Edge secrets and local test env.
 - Database authorization and media-lifecycle transaction tests with fixture rollback.
 - Real FFmpeg MP4/WebP fixtures plus14 local contract/parser tests.
 - Cleanup authentication-only check: incorrect secret401, valid secret200, no deletion.
@@ -36,8 +38,8 @@ All disposable live-test users and objects were removed.
 
 ## Remaining setup
 
-- OpenAI returns429 `credit_balance_exhausted` / `insufficient_quota`. Add credits
-  before semantic indexing/quality can be verified. Full-text discovery remains usable.
+- Embedding limitation accepted by founder: English only, maximum512 input tokens
+  (longer input is truncated). Recommendation quality still needs real-user evaluation.
 - Google OAuth credentials, production SMTP/deliverability, deployed frontend,
   pilot moderation/account/media deletion UX and private presence are later work.
 - The backend PR is for review and has not been merged into the default branch.

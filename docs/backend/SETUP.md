@@ -75,7 +75,7 @@ pnpm exec supabase db query --linked --file supabase/tests/recommendations.sql
 
 Prefer a local/staging database. `scripts/backend-smoke.py` is an explicit live test:
 it creates confirmed disposable users, signs them in, tests cross-user denials,
-indexes through OpenAI, uploads generated MP4/WebP fixtures straight to R2, verifies,
+indexes through Supabase gte-small, uploads generated MP4/WebP fixtures straight to R2, verifies,
 publishes, checks CDN Range delivery and removes its own users/objects in finally.
 It requires Python3, FFmpeg and server credentials in environment variables:
 SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY, R2_ACCOUNT_ID,
@@ -83,9 +83,8 @@ R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET_NAME,R2_UPLOAD_BUCKET_NAME,R2_PU
 With the root `.env.test` filled and Supabase CLI logged in, use `pnpm backend:smoke`.
 The runner supplies default bucket names and obtains the server test key through the
 existing CLI login if that local field is blank; it never prints keys. Run it only
-with founder authorization. It prints no tokens or signed URLs. Examine
-provider BLOCKED lines: a passing core-media check does not prove semantic indexing
-when OpenAI credits are exhausted. Confirm cleanup output after failures.
+with founder authorization. It prints no tokens or signed URLs. Embedding indexing and hybrid query inference must pass; no provider-blocked bypass
+is accepted. Confirm cleanup output after failures.
 
 ## Cleanup and operational limits
 
@@ -103,11 +102,16 @@ Server checks actual MP4/WebP metadata, codec configuration, sample-table offset
 size/duration/dimensions; it does not fully decode every frame or transcode video.
 A dedicated transcoding/decoding pipeline is future work if device support requires it.
 
-Search embeddings use text-embedding-3-small1536 and are private. Text edits and
-verified-credit changes invalidate old embeddings; call index-entity afterward.
-No automatic indexing queue yet; the client must retry on 409/503 without blocking
-saved content. OpenAI currently reports exhausted credits; add credit before checking
-semantic quality. Exact filters and full-text fallback work without OpenAI.
+Search embeddings use Supabase Edge Runtime built-in `gte-small` (384 dimensions),
+server-side only, with mean pooling and normalization. No external AI API key is needed.
+English only; model input beyond 512 tokens is truncated. Structured metadata comes
+before free text to retain roles/genres/location. Supabase runtime usage still applies.
+Text edits and verified-credit changes invalidate old embeddings; call index-entity
+afterward. No automatic indexing queue yet; retry 409/503 without blocking saved
+content. Exact filters and full-text fallback remain available during inference outages.
+Do not mix model vectors. Migration 20261016185726 refuses to run if old embedding
+or taste rows exist; the current deployment had none. A populated deployment needs
+an explicitly reviewed reset/reindex plan before applying that migration.
 
 Rate limits: uploads30 intents/hour/user, media calls120/hour/user, indexing30/hour,
 semantic searches60/hour, events60/minute and one taste update/film/kind/day. Database

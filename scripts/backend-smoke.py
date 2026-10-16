@@ -59,15 +59,10 @@ try:
  assert api('/rest/v1/messages?conversation_id=eq.'+cid,token=c['token'],public=True)==[]
  denied('/rest/v1/messages',{'conversation_id':cid,'sender_id':b['id'],'body':'Forged'},a['token'])
  print('PASS auth, profile bootstrap, draft privacy, chat authorization, impersonation denial')
- try:
-  assert fn('index-entity',{'kind':'profile','id':a['id']},a['token'])['indexed']
-  assert fn('index-entity',{'kind':'film','id':film['id']},a['token'])['indexed']
-  search=fn('search',{'query':'quiet films about leaving home'},a['token']);assert search['mode']=='hybrid',search
-  print('PASS OpenAI indexing and hybrid query embedding',flush=True)
- except ApiError as error:
-  print('BLOCKED embedding provider, HTTP',error.status,flush=True)
-  search=fn('search',{'query':'quiet films about leaving home'},a['token']);assert search['mode']=='full_text'
-  print('PASS full-text fallback when embeddings unavailable',flush=True)
+ assert fn('index-entity',{'kind':'profile','id':a['id']},a['token'])['indexed']
+ assert fn('index-entity',{'kind':'film','id':film['id']},a['token'])['indexed']
+ search=fn('search',{'query':'quiet films about leaving home'},a['token']);assert search['mode']=='hybrid',search
+ print('PASS Supabase gte-small indexing and hybrid query embedding',flush=True)
  with tempfile.TemporaryDirectory(prefix='arcenray-smoke-') as tmp:
   movie=pathlib.Path(tmp)/'film.mp4';poster=pathlib.Path(tmp)/'poster.webp'
   subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=320x240:d=1','-f','lavfi','-i','anullsrc=r=44100:cl=stereo','-t','1','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-movflags','+faststart',str(movie)],check=True)
@@ -88,10 +83,13 @@ try:
   url=os.environ['R2_PUBLIC_URL']+'/'+published['film_key']
   subprocess.run(['node','scripts/check-media-range.mjs'],env={**os.environ,'ARCENRAY_SMOKE_MEDIA_URL':url},check=True)
   print('PASS direct R2 upload, actual media inspection, profile picture, publication, CDN Range playback')
+  semantic=fn('search',{'query':'quiet films about leaving home','kind':'film'},b['token'])
+  assert semantic['mode']=='hybrid' and any(row['id']==film['id'] and row['score']>0 for row in semantic['results']),semantic
+  print('PASS published film retrieved with real gte-small query vector')
   api('/rest/v1/rpc/record_event','POST',{'p_film_id':film['id'],'p_kind':'film_complete','p_idempotency_key':str(uuid.uuid4()),'p_watch_seconds':1},b['token'],True)
   assert not any(f['id']==film['id'] for f in api('/rest/v1/rpc/get_personalized_feed','POST',{},b['token'],True))
   print('PASS event ingestion and consumed-film filtering')
- print('Core live checks passed; inspect provider status above')
+ print('All live checks passed, including Supabase embedding inference')
 finally:
  # Only IDs created by this process are deleted. Never delete unrelated project data.
  for aid in assets:

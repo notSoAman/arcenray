@@ -36,11 +36,11 @@ serve(async (req) => {
     );
     content = [
       f.title,
-      f.synopsis,
       f.genres.join(", "),
       f.mood_tags.join(", "),
       f.location_city,
       f.language,
+      f.synopsis,
       ...credits.map((c) => `${c.display_name}: ${c.role}`),
     ]
       .filter(Boolean)
@@ -60,10 +60,10 @@ serve(async (req) => {
     );
     content = [
       p.full_name,
-      p.bio,
       p.roles.join(", "),
       p.skills_gear.join(", "),
       p.location_city,
+      p.bio,
       ...credits.map((c) => c.role),
     ]
       .filter(Boolean)

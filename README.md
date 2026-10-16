@@ -15,7 +15,7 @@ pnpm --filter web dev
 Open http://localhost:3000. The current pages are the original Next.js scaffold;
 UI implementation is the next task. Setup writes public project configuration to
 the ignored `apps/web/.env.local` and preserves any existing file. Your friend
-needs repository access, not R2, service-role, or OpenAI credentials.
+needs repository access, not R2 or service-role credentials.
 
 ## Backend
 
