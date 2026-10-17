@@ -1,0 +1,146 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title {
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.count {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  border-radius: var(--radius-card);
+  background: var(--graphite);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: opacity 300ms ease;
+}
+.card[data-choice="pass"] {
+  opacity: 0.45;
+}
+
+.art {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  background: var(--void);
+}
+
+.badge {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(14, 15, 14, 0.78);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.filmTitle {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.by {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.pass,
+.like {
+  min-height: 44px;
+  border-radius: 22px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pass {
+  border: 1px solid rgba(243, 239, 233, 0.16);
+  background: transparent;
+  color: var(--bone);
+  font-weight: 600;
+}
+.like {
+  border: none;
+  background: var(--ember-crimson);
+  color: #fff;
+}
+
+.liked,
+.passed {
+  margin-top: auto;
+  padding-top: 12px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.liked {
+  border: none;
+  background: transparent;
+  color: var(--lime-mist);
+  cursor: pointer;
+  text-align: left;
+}
+.passed {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}

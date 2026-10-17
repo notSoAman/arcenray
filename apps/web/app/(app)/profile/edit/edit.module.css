@@ -1,0 +1,10 @@
+/* The flow brings its own top bar; hide it under the app nav and leave room for the tab bar. */
+.wrap > div > header {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .wrap {
+    padding-bottom: calc(100px + env(safe-area-inset-bottom));
+  }
+}

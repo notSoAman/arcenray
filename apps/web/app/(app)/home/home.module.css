@@ -1,0 +1,165 @@
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.introTitle {
+  font-size: clamp(30px, 3.4vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.seeAll {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.seeAll:hover {
+  color: var(--bone);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 28px 16px;
+}
+
+.more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.endNote {
+  font-size: 14px;
+  color: var(--text-faint);
+}
+
+.emptyArt {
+  width: 100%;
+  height: 72px;
+  border-radius: 18px;
+  margin-bottom: 10px;
+}
+
+.people {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.person {
+  border-radius: 20px;
+  background: var(--graphite);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.person:hover {
+  background: #202021;
+}
+
+.personText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.personName {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.personRole {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Skeletons */
+.skeleton {
+  display: block;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    var(--graphite) 0%,
+    #242425 50%,
+    var(--graphite) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.skeletonKicker {
+  width: 120px;
+  height: 12px;
+}
+.skeletonTitle {
+  width: min(360px, 80%);
+  height: 36px;
+}
+.skeletonFeatured {
+  height: 420px;
+  border-radius: var(--radius-panel);
+}
+.skeletonCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.skeletonPoster {
+  aspect-ratio: 2 / 3;
+  border-radius: 18px;
+}
+.skeletonLine {
+  height: 16px;
+  width: 80%;
+}
+.skeletonLineShort {
+  height: 12px;
+  width: 55%;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 12px;
+  }
+  .skeletonFeatured {
+    height: 300px;
+  }
+}

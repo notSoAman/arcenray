@@ -1,0 +1,51 @@
+.cover {
+  object-fit: cover;
+}
+
+.fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 16px;
+}
+.fallback::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(14, 15, 14, 0.15),
+    rgba(14, 15, 14, 0.85)
+  );
+}
+.fallback span {
+  position: relative;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.avatar {
+  position: relative;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    url(/brand/spectrum-strip.webp) center / cover no-repeat,
+    var(--deep-plum);
+  border: 1.5px solid rgba(243, 239, 233, 0.25);
+  font-weight: 800;
+  color: var(--bone);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+}

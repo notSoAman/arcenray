@@ -1,16 +1,34 @@
 # Arcenray design reference
 
-Source supplied by the founder: [Claude artifact](https://claude.ai/artifact/5wapxcaa1Em9CVdM23kAW6).
-Handoff recorded2026-10-17; this date is not an artifact version or visual approval.
+Source supplied by the founder: [Claude artifact](https://claude.ai/artifact/5wapxcaa1Em9CVdM23kAW6)
+(design canvas "Arcenray", pages: Mobile MVP, Website MVP, Brand, Later).
+Handoff recorded 2026-10-17; this date is not an artifact version or visual approval.
 Design owner: collaborator using Claude Code. Technical owner: founder using Codex.
 
-The repository does not currently include exported artifact source, screen captures,
-logo files or approved design tokens. The link was not accessible through the text
-fetch tool during handoff. The friend should open it with their own authorized access;
-if unavailable, the founder/design owner must share the exports/screenshots and assets.
-Do not claim a reproduced design or redraw the brand based only on the product brief.
+## Imported into the web app (2026-10-17, canvas version `1792179649-c01a`)
+
+Read directly from the canvas by the design lead's Claude Code session:
+
+- **Logo exports** (canvas assets, unmodified) in `apps/web/public/brand/`:
+  `arcenray-a.webp` (600×697, full mark), `arcenray-mark.webp` (160×185, small mark),
+  `spectrum-hero.webp` and `spectrum-strip.webp` (signature spectrum artwork).
+- **Tokens** from the "Brand system" artboard (v1.0, October 2026), defined in
+  `apps/web/app/globals.css`: Void `#0E0F0E`, Graphite `#1A1A1B`, Bone `#F3EFE9`,
+  Ember Crimson `#C2234B`, Signal Pink `#E8527A`, Solar Orange `#FF8A2B`,
+  Lime Mist `#C6D79B`, Orchid Violet `#7B4FA3`, Deep Plum `#3A1F33`.
+- **Type**: grotesk (Helvetica Neue → Inter Tight) for headlines/body; Courier Prime,
+  tracked and uppercase, for kickers and labels only.
+- **Rules**: calls to action are Bone or Ember Crimson only; orange marks badges,
+  lime marks success; the logo sits on a Void panel, never over busy artwork.
+
+Screens implemented from the canvas (web app, responsive): welcome (W1 + 01), sign-in,
+onboarding (01), home (W1/02), discover (W2/03 swipe deck at phone width), search (W3/04),
+film page (W4/05), full-screen player (W5/06), creator profile (W6/07) and chats (W7/08/09).
+The mobile artboards are implemented as the web app's phone-width layout (glass bottom tab
+bar); a native Expo app has not been initialized. Not implemented: taste "vibe check",
+message requests, projects/places search, subtitles/quality and the "Later" page.
 
 Use the reference for the cinematic filmmaking/collaboration UI, with the exclusions
 in AGENTS.md: no stories, generic social-post clone or unapproved hiring marketplace.
 Detailed appearance and screen states belong to the accepted design, not a new system
-invented by a backend agent. Add dated/versioned approved exports here when supplied.
+invented by a backend agent.

@@ -1,0 +1,199 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+}
+
+/* Art side: signature spectrum with the mark on a calm Void tile. */
+.art {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: clamp(32px, 5vw, 64px);
+}
+
+.artShade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(14, 15, 14, 0.1) 0%,
+    rgba(14, 15, 14, 0.45) 55%,
+    rgba(14, 15, 14, 0.92) 100%
+  );
+}
+
+.artInner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.artTile {
+  width: 180px;
+  border-radius: 30px;
+}
+
+.artLine {
+  font-size: clamp(32px, 3.6vw, 52px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.artLine span {
+  color: var(--signal-pink);
+}
+
+/* Form side */
+.panel {
+  display: flex;
+  flex-direction: column;
+  padding: 24px clamp(20px, 5vw, 72px) 40px;
+  gap: 32px;
+}
+
+.panelTop {
+  display: flex;
+  align-items: center;
+}
+
+.formWrap {
+  width: 100%;
+  max-width: 440px;
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kicker {
+  color: var(--ember-crimson);
+}
+
+.title {
+  font-size: clamp(36px, 4vw, 48px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.lede {
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.formStack > div:empty {
+  display: none;
+}
+.formStack > div:focus {
+  outline: none;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.oauth {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+}
+
+/* Sent state */
+.sent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  border-radius: var(--radius-card);
+  background: var(--graphite);
+  border: 1px solid var(--line);
+}
+.sent:focus {
+  outline: none;
+}
+
+.sentIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(198, 215, 155, 0.12);
+  color: var(--lime-mist);
+  margin-bottom: 4px;
+}
+
+.sentTitle {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.sentText {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+.sentText strong {
+  color: var(--bone);
+  word-break: break-all;
+}
+
+.sentActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 8px;
+}
+
+.linkButton {
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--bone);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+@media (max-width: 860px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+  .art {
+    display: none;
+  }
+}

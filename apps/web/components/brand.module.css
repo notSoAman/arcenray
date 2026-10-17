@@ -1,0 +1,28 @@
+.lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.wordmark {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.tile {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 36px;
+  background: var(--void);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tileImage {
+  width: 62%;
+  height: auto;
+}

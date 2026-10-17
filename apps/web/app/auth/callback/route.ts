@@ -3,25 +3,26 @@ import { safeNextPath } from "@repo/shared/contracts";
 import { createClient } from "../../../lib/supabase/server";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code");
+  const params = request.nextUrl.searchParams;
+  const code = params.get("code");
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       const response = NextResponse.redirect(
-        new URL(
-          safeNextPath(request.nextUrl.searchParams.get("next")),
-          request.nextUrl.origin,
-        ),
+        new URL(safeNextPath(params.get("next")), request.nextUrl.origin),
       );
       response.headers.set("Cache-Control", "private, no-store");
       return response;
     }
   }
-  return NextResponse.json(
-    {
-      error: "Authentication failed. Request a new sign-in link and try again.",
-    },
-    { status: 400, headers: { "Cache-Control": "private, no-store" } },
+  // Send people back to the sign-in screen with a readable reason instead of raw JSON.
+  // Only a fixed reason code is forwarded; provider error text is never reflected.
+  const reason =
+    params.get("error_code") === "otp_expired" ? "expired" : "link";
+  const response = NextResponse.redirect(
+    new URL(`/sign-in?error=${reason}`, request.nextUrl.origin),
   );
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
 }

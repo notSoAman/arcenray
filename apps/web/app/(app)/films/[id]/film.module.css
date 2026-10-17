@@ -1,0 +1,200 @@
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.playerCol {
+  flex: 999 1 640px;
+  min-width: 0;
+}
+
+.info {
+  flex: 1 1 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kicker {
+  color: var(--solar-orange);
+  font-style: italic;
+}
+
+.title {
+  font-size: clamp(34px, 3.6vw, 52px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  overflow-wrap: anywhere;
+}
+
+.facts,
+.moods {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  color: #cfc9c0;
+}
+.facts li,
+.moods li {
+  padding: 5px 11px;
+  border-radius: 14px;
+  border: 1px solid rgba(243, 239, 233, 0.14);
+}
+.facts li:has(.place) {
+  padding: 0;
+  border: none;
+}
+
+.place {
+  display: inline-block;
+  padding: 5px 11px;
+  border-radius: 14px;
+  border: 1px solid rgba(232, 82, 122, 0.4);
+  color: var(--signal-pink);
+}
+
+.moods li {
+  border-color: rgba(198, 215, 155, 0.3);
+  color: var(--lime-mist);
+}
+
+.creator {
+  border-radius: 22px;
+  background: var(--graphite);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.creatorLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.creatorText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.creatorName {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.creatorMeta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.creatorActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.message {
+  min-height: 46px;
+  border-radius: 23px;
+  border: none;
+  background: var(--ember-crimson);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.message:disabled {
+  opacity: 0.6;
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.synopsis {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-soft);
+  white-space: pre-line;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.muted {
+  color: var(--text-faint);
+}
+
+.credits {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.credit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  background: var(--graphite);
+}
+a.credit:hover {
+  background: #202021;
+}
+
+.creditText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.creditName {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.creditRole {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.creditState[data-state="accepted"] {
+  color: var(--lime-mist);
+}
+
+.related {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .top {
+    gap: 22px;
+  }
+  .playerCol {
+    margin: 0 calc(-1 * var(--gutter) / 2);
+  }
+}
