@@ -158,7 +158,7 @@ export default async function FilmPage({
               {film.location_city ? (
                 <li>
                   <Link
-                    href={`/discover?city=${encodeURIComponent(film.location_city)}`}
+                    href={`/search?q=${encodeURIComponent(film.location_city)}&city=${encodeURIComponent(film.location_city)}`}
                     className={styles.place}
                   >
                     Shot in {film.location_city}
@@ -214,6 +214,14 @@ export default async function FilmPage({
           ) : null}
 
           <div className={styles.toggles}>
+            {isOwner && film.status === "draft" ? (
+              <Link
+                href={`/publish?draft=${film.id}`}
+                className="btn btn-primary"
+              >
+                Continue editing draft
+              </Link>
+            ) : null}
             {film.status === "published" ? (
               <FilmToggles
                 filmId={film.id}

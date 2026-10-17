@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Lockup } from "./brand";
-import { IconChat, IconCompass, IconHome, IconSearch } from "./icons";
+import { IconChat, IconLoop, IconHome, IconSearch } from "./icons";
 import { AccountMenu } from "./account-menu";
 import { Avatar } from "./media";
 import styles from "./app-nav.module.css";
@@ -12,7 +12,7 @@ type Viewer = { name: string; handle: string; picKey: string | null };
 
 const sections = [
   { href: "/home", label: "Home", Icon: IconHome },
-  { href: "/discover", label: "Discover", Icon: IconCompass },
+  { href: "/loop", label: "Loop", Icon: IconLoop },
   { href: "/search", label: "Search", Icon: IconSearch },
   { href: "/chats", label: "Chats", Icon: IconChat },
 ] as const;
@@ -52,6 +52,7 @@ export function AppNav({ viewer }: { viewer: Viewer | null }) {
                   className={styles.navLink}
                   aria-current={isActive(pathname, s.href) ? "page" : undefined}
                 >
+                  {s.href === "/loop" ? <IconLoop size={18} /> : null}
                   {s.label}
                 </Link>
               ))}
@@ -63,6 +64,12 @@ export function AppNav({ viewer }: { viewer: Viewer | null }) {
           >
             <IconSearch size={18} />
             <span>Search films and people</span>
+          </Link>
+          <Link
+            href={viewer ? "/publish" : "/sign-in?next=%2Fpublish"}
+            className={styles.publish}
+          >
+            Publish
           </Link>
           <Link
             href={profileHref}

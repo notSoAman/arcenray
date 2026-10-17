@@ -590,7 +590,47 @@ export type Database = {
       };
       current_profile_id: { Args: never; Returns: string };
       ensure_current_profile: { Args: never; Returns: string };
+      get_loop_feed: {
+        Args: { p_exclude_ids?: string[]; p_limit?: number };
+        Returns: {
+          created_at: string;
+          duration_seconds: number | null;
+          film_asset_id: string | null;
+          film_key: string | null;
+          genres: string[];
+          hook_asset_id: string | null;
+          hook_key: string | null;
+          id: string;
+          language: string | null;
+          location_city: string | null;
+          mood_tags: string[];
+          owner_id: string;
+          poster_asset_id: string | null;
+          poster_key: string | null;
+          provider_id: string | null;
+          published_at: string | null;
+          search_document: unknown;
+          source: string;
+          status: string;
+          synopsis: string;
+          title: string;
+          updated_at: string;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "films";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       get_my_asset: { Args: { p_asset_id: string }; Returns: Json };
+      get_my_film_feedback: {
+        Args: never;
+        Returns: {
+          film_id: string;
+          preference: string;
+        }[];
+      };
       get_my_storage: { Args: never; Returns: Json };
       get_personalized_feed: {
         Args: { p_genre?: string; p_limit?: number; p_offset?: number };
@@ -692,6 +732,10 @@ export type Database = {
       };
       respond_to_credit: {
         Args: { p_accept: boolean; p_credit_id: string };
+        Returns: undefined;
+      };
+      set_film_feedback: {
+        Args: { p_film_id: string; p_preference: string };
         Returns: undefined;
       };
     };

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { newId, recordEvent } from "../lib/client-api";
 import { mediaUrl } from "../lib/feed";
-import { IconPlay, IconVolume } from "./icons";
+import { IconPlay, IconPause, IconVolume } from "./icons";
 import { Poster } from "./media";
 import styles from "./hook-preview.module.css";
 
@@ -28,6 +28,7 @@ export function HookPreview({
   title,
   sizes,
   active = false,
+  controlled = false,
 }: {
   filmId: string;
   hookKey: string | null;
@@ -35,6 +36,7 @@ export function HookPreview({
   title: string;
   sizes: string;
   active?: boolean;
+  controlled?: boolean;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const sent = useRef(false);
@@ -46,21 +48,31 @@ export function HookPreview({
     () => window.matchMedia(REDUCED).matches,
     () => true,
   );
+  const visible = useSyncExternalStore(
+    (cb) => {
+      document.addEventListener("visibilitychange", cb);
+      return () => document.removeEventListener("visibilitychange", cb);
+    },
+    () => !document.hidden,
+    () => false,
+  );
   const src = mediaUrl(hookKey);
 
   useEffect(() => {
     const v = video.current;
     if (!v) return;
-    if (active && !reduced) void v.play().catch(() => undefined);
-    else if (!active) v.pause();
-  }, [active, reduced]);
+    if (active && !reduced && visible) void v.play().catch(() => undefined);
+    else v.pause();
+    return () => v.pause();
+  }, [active, reduced, visible]);
 
   if (!src) {
     return <Poster posterKey={posterKey} title={title} sizes={sizes} />;
   }
 
   const start = () => {
-    if (!reduced) void video.current?.play().catch(() => undefined);
+    if (!reduced && visible && (!controlled || active))
+      void video.current?.play().catch(() => undefined);
   };
   const stop = () => {
     if (!active) video.current?.pause();
@@ -106,6 +118,20 @@ export function HookPreview({
       {playing ? (
         <button
           type="button"
+          className={`${styles.pause} glass`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            video.current?.pause();
+          }}
+          aria-label={`Pause preview of ${title}`}
+        >
+          <IconPause size={16} />
+        </button>
+      ) : null}
+      {playing ? (
+        <button
+          type="button"
           className={`${styles.sound} glass`}
           onClick={(e) => {
             e.preventDefault();
@@ -123,7 +149,8 @@ export function HookPreview({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            void video.current?.play().catch(() => undefined);
+            if (visible && (!controlled || active))
+              void video.current?.play().catch(() => undefined);
           }}
           aria-label={`Play preview of ${title}`}
         >

@@ -9,8 +9,8 @@ export function SiteHeader() {
       <div className={styles.inner}>
         <Lockup />
         <nav aria-label="Account" className={styles.end}>
-          <Link href="/discover" className={styles.textLink}>
-            Discover
+          <Link href="/loop" className={styles.textLink}>
+            Loop
           </Link>
           <Link href="/sign-in" className={styles.textLink}>
             Sign in

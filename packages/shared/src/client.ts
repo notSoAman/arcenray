@@ -80,9 +80,7 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
           p_genre: genre,
         }),
     },
-    async search(
-      input: SearchInput,
-    ): Promise<{
+    async search(input: SearchInput): Promise<{
       data: {
         results: {
           id: string;
@@ -110,6 +108,24 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
         data: data ? { results: data, mode: "full_text" } : null,
         error,
       };
+    },
+    loop: {
+      page: (excludeIds: string[] = [], limit = 10) => {
+        const ids = uuidSchema.array().max(10000).parse(excludeIds);
+        return supabase.rpc("get_loop_feed", {
+          p_limit: Math.min(50, Math.max(1, limit)),
+          p_exclude_ids: ids,
+        });
+      },
+      feedback: (filmId: string, preference: "more" | "less") => {
+        if (preference !== "more" && preference !== "less")
+          throw new Error("Invalid preference");
+        return supabase.rpc("set_film_feedback", {
+          p_film_id: uuidSchema.parse(filmId),
+          p_preference: preference,
+        });
+      },
+      preferences: () => supabase.rpc("get_my_film_feedback"),
     },
     chat: {
       open: (otherUser: string) =>

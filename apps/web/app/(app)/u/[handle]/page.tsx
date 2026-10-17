@@ -164,6 +164,9 @@ export default async function ProfilePage({
           <div className={styles.actions}>
             {isSelf ? (
               <>
+                <Link href="/publish" className="btn btn-accent">
+                  Publish a film
+                </Link>
                 <Link href="/profile/edit" className="btn btn-primary">
                   Edit profile
                 </Link>
