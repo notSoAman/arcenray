@@ -20,6 +20,13 @@ export function MessageButton({
   async function open() {
     setState("opening");
     try {
+      if (!(await browserApi().viewer.id())) {
+        router.push(
+          `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+        );
+        setState("idle");
+        return;
+      }
       const { data, error } = await browserApi().chat.open(userId);
       if (error || !data) {
         setState("error");

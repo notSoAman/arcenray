@@ -27,7 +27,7 @@ type Tab = keyof typeof TABS;
 
 async function loadProfile(handle: string) {
   const { supabase, user } = await getViewer();
-  if (!user || !/^[a-z0-9_]{3,32}$/.test(handle)) return null;
+  if (!/^[a-z0-9_]{3,32}$/.test(handle)) return null;
   const { data } = await supabase
     .from("profiles")
     .select(
@@ -61,7 +61,7 @@ export default async function ProfilePage({
   const loaded = await loadProfile(handle);
   if (!loaded) notFound();
   const { profile, supabase, user } = loaded;
-  const isSelf = profile.id === user.id;
+  const isSelf = profile.id === user?.id;
 
   const [filmsRes, creditsRes, followRes, blockRes] = await Promise.all([
     supabase
@@ -74,7 +74,7 @@ export default async function ProfilePage({
       .select("id,film_id,role,verification_state,created_at")
       .eq("profile_id", profile.id)
       .order("created_at", { ascending: false }),
-    isSelf
+    isSelf || !user
       ? Promise.resolve({ data: null })
       : supabase
           .from("profile_follows")
@@ -82,7 +82,7 @@ export default async function ProfilePage({
           .eq("follower_id", user.id)
           .eq("following_id", profile.id)
           .maybeSingle(),
-    isSelf
+    isSelf || !user
       ? Promise.resolve({ data: null })
       : supabase
           .from("user_blocks")

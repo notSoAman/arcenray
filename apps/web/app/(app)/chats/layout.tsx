@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getViewer } from "../../../lib/session";
 import { ChatList } from "./chat-list";
 import { ChatsShell } from "./chats-shell";
@@ -12,7 +13,7 @@ export default async function ChatsLayout({
   children: React.ReactNode;
 }) {
   const { supabase, user } = await getViewer();
-  if (!user) return null;
+  if (!user) redirect("/sign-in?next=%2Fchats");
   const chats = await loadChats(supabase, user.id);
   return <ChatsShell list={<ChatList chats={chats} />}>{children}</ChatsShell>;
 }

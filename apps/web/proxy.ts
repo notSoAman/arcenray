@@ -1,36 +1,22 @@
-import { createServerClient } from "@supabase/ssr";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest } from "next/server";
-import type { Database } from "@repo/shared/database";
-import { supabaseConfig } from "./lib/supabase/config";
-export async function proxy(request: NextRequest) {
-  // Scaffold pages work before local Supabase credentials are configured.
+
+const clerk = clerkMiddleware();
+// Browsing is public. Protected pages check the viewer and RLS protects writes.
+export default function proxy(
+  request: NextRequest,
+  event: Parameters<typeof clerk>[1],
+) {
   if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+    !process.env.CLERK_SECRET_KEY
   )
-    return NextResponse.next({ request });
-  const { url, key } = supabaseConfig();
-  let response = NextResponse.next({ request });
-  const supabase = createServerClient<Database>(url, key, {
-    cookies: {
-      getAll: () => request.cookies.getAll(),
-      setAll(values) {
-        values.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
-        values.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
-        );
-      },
-    },
-  });
-  await supabase.auth.getClaims();
-  response.headers.set("Cache-Control", "private, no-store");
-  response.headers.set("Pragma", "no-cache");
-  response.headers.set("Expires", "0");
-  return response;
+    return NextResponse.next();
+  return clerk(request, event);
 }
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api|trpc)(.*)",
   ],
 };

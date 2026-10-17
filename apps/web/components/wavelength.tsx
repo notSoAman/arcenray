@@ -13,11 +13,16 @@ type Choice = "like" | "pass";
 /** Like a published film: likes table row (idempotent) + a strong taste signal. */
 export async function likeFilm(filmId: string) {
   const api = browserApi();
-  const { data } = await api.supabase.auth.getUser();
-  if (!data.user) return false;
+  const userId = await api.viewer.id();
+  if (!userId) {
+    window.location.assign(
+      `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+    );
+    return false;
+  }
   const { error } = await api.supabase
     .from("film_likes")
-    .insert({ user_id: data.user.id, film_id: filmId });
+    .insert({ user_id: userId, film_id: filmId });
   if (error && error.code !== "23505") return false;
   recordEvent(filmId, "like");
   return true;
@@ -32,7 +37,7 @@ export function WavelengthPicks({
   viewerId,
 }: {
   films: FeedFilm[];
-  viewerId: string;
+  viewerId: string | null;
 }) {
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [failed, setFailed] = useState<string | null>(null);
@@ -40,6 +45,12 @@ export function WavelengthPicks({
   const liked = Object.values(choices).filter((c) => c === "like").length;
 
   async function choose(film: FeedFilm, choice: Choice) {
+    if (!viewerId) {
+      window.location.assign(
+        `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+      );
+      return;
+    }
     setFailed(null);
     setChoices((c) => ({ ...c, [film.id]: choice }));
     if (choice === "pass") {

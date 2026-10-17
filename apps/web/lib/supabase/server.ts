@@ -1,23 +1,17 @@
 import "server-only";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@repo/shared/database";
 import { supabaseConfig } from "./config";
+
 export async function createClient() {
-  const store = await cookies();
   const { url, key } = supabaseConfig();
-  return createServerClient<Database>(url, key, {
-    cookies: {
-      getAll: () => store.getAll(),
-      setAll(values) {
-        try {
-          values.forEach(({ name, value, options }) =>
-            store.set(name, value, options),
-          );
-        } catch {
-          /* Server Components cannot write cookies; proxy refreshes them. */
-        }
-      },
-    },
+  const session =
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+    process.env.CLERK_SECRET_KEY
+      ? await auth()
+      : null;
+  return createSupabaseClient<Database>(url, key, {
+    accessToken: async () => (session ? await session.getToken() : null),
   });
 }

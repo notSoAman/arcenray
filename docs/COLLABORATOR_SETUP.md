@@ -1,3 +1,8 @@
+> Historical handoff: the Claude design implementation is merged in PR #4.
+> Founder + Codex now owns all development through launch. Authentication instructions
+> below predate Clerk; use [the current auth contract](architecture/clerk-auth.md).
+> Do not use old Supabase Auth sign-in examples or request the founder's `.env.test`.
+
 # Arcenray: friend + Claude Code setup
 
 This guide is for the design lead working on the web frontend. The repository is
@@ -91,15 +96,15 @@ edits local files and runs terminal commands. You need authenticated Git for the
 repo; the GitHub CLI (`gh auth login`) is optional for convenient PR creation. A GitHub
 MCP connector is optional and not a substitute for Git authentication.
 
-| Tool | Recommendation | Access |
-| --- | --- | --- |
-| Git/GitHub | Required for cloning/pushing; use your own invited account | Repository access only |
-| Claude Code | Required for this agent workflow; own account | Local repository |
-| Playwright MCP | Optional, useful for browser inspection and screenshots | Own browser test session; no cloud admin login |
-| Supabase MCP | Skip initially; SDK/contracts suffice | Optional later, approved dev/staging scope, read-only |
-| Cloudflare MCP/Wrangler login | Not needed for UI work | Founder-owned operations |
-| OpenAI connector/key | Not needed | Embeddings run in Supabase |
-| Other plugins/agent skills | Not required | Ask before new project dependencies/config |
+| Tool                          | Recommendation                                             | Access                                                |
+| ----------------------------- | ---------------------------------------------------------- | ----------------------------------------------------- |
+| Git/GitHub                    | Required for cloning/pushing; use your own invited account | Repository access only                                |
+| Claude Code                   | Required for this agent workflow; own account              | Local repository                                      |
+| Playwright MCP                | Optional, useful for browser inspection and screenshots    | Own browser test session; no cloud admin login        |
+| Supabase MCP                  | Skip initially; SDK/contracts suffice                      | Optional later, approved dev/staging scope, read-only |
+| Cloudflare MCP/Wrangler login | Not needed for UI work                                     | Founder-owned operations                              |
+| OpenAI connector/key          | Not needed                                                 | Embeddings run in Supabase                            |
+| Other plugins/agent skills    | Not required                                               | Ask before new project dependencies/config            |
 
 Optional browser MCP, run in the repo (local scope keeps the configuration personal):
 

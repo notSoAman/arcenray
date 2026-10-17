@@ -551,6 +551,10 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      backend_link_identity: {
+        Args: { p_issuer: string; p_profile: string; p_subject: string };
+        Returns: undefined;
+      };
       backend_promote_asset: {
         Args: { p_id: string; p_owner: string };
         Returns: Json;
@@ -584,6 +588,8 @@ export type Database = {
         };
         Returns: Json;
       };
+      current_profile_id: { Args: never; Returns: string };
+      ensure_current_profile: { Args: never; Returns: string };
       get_my_asset: { Args: { p_asset_id: string }; Returns: Json };
       get_my_storage: { Args: never; Returns: Json };
       get_personalized_feed: {

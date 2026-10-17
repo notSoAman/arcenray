@@ -358,11 +358,9 @@ enabled = false
 
 # Use Clerk as a third-party provider alongside Supabase Auth.
 [auth.third_party.clerk]
-enabled = false
-# Obtain from https://clerk.com/setup/supabase
-# domain = "example.clerk.accounts.dev"
+enabled = true
+domain = "growing-burro-9418.clerk.accounts.dev"
 
-# OAuth server configuration
 [auth.oauth_server]
 # Enable OAuth server functionality
 enabled = false
@@ -414,15 +412,15 @@ enabled = true
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 
 [functions.media-upload]
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/deno.json"
 
 [functions.index-entity]
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/deno.json"
 
 [functions.search]
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/deno.json"
 
 [functions.media-cleanup]

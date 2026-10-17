@@ -11,9 +11,15 @@ import {
 } from "./icons";
 import styles from "./social-actions.module.css";
 
+/** Require a verified app identity only when a visitor takes a private action. */
 async function currentUserId() {
-  const { data } = await browserApi().supabase.auth.getUser();
-  return data.user?.id ?? null;
+  const id = await browserApi().viewer.id();
+  if (!id) {
+    window.location.assign(
+      `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+    );
+  }
+  return id;
 }
 
 /** Follow / Following toggle (profile_follows; own rows only). */
@@ -34,6 +40,10 @@ export function FollowButton({
     setBusy(true);
     setError(false);
     const me = await currentUserId();
+    if (!me) {
+      setBusy(false);
+      return;
+    }
     const db = browserApi().supabase;
     const res = !me
       ? { error: { code: "auth" } }
@@ -201,7 +211,8 @@ export function ReportButton({
       <button
         type="button"
         className={styles.quiet}
-        onClick={() => {
+        onClick={async () => {
+          if (!(await currentUserId())) return;
           setState("idle");
           dialog.current?.showModal();
         }}

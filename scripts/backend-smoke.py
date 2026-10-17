@@ -2,7 +2,7 @@
 Creates temporary users; always removes them. No tokens or signed URLs are printed.
 Run via the setup guide; this script is never part of frontend code.
 """
-import os, json, uuid, pathlib, urllib.request, urllib.error, subprocess, tempfile, socket, xml.etree.ElementTree as ET
+import os, json, uuid, time, base64, pathlib, urllib.request, urllib.error, subprocess, tempfile, socket, xml.etree.ElementTree as ET
 # Cache DNS per process to avoid repeated resolver latency during disposable tests.
 _real_getaddrinfo=socket.getaddrinfo
 _dns={}
@@ -15,7 +15,27 @@ BASE=os.environ['SUPABASE_URL'].rstrip('/')
 PUBLIC=os.environ['SUPABASE_PUBLISHABLE_KEY']; ADMIN=os.environ['SUPABASE_SERVICE_ROLE_KEY']
 class ApiError(Exception):
  def __init__(self,status,body): self.status=status;self.body=body;super().__init__(f'API HTTP {status}: {body[:300]}')
+CLERK=os.environ.get('ARCENRAY_TEST_AUTH_PROVIDER')=='clerk'
+def clerk(path,body=None,method=None):
+ # Use the supported Node transport. This environment's Python client is rejected
+ # by Clerk's browser-integrity filter; no protections or TLS checks are disabled.
+ program="""let text='';for await(const part of process.stdin)text+=part;
+ const input=JSON.parse(text);const response=await fetch('https://api.clerk.com/v1'+input.path,{method:input.method,headers:{Authorization:'Bearer '+process.env.CLERK_SECRET_KEY,'Content-Type':'application/json'},body:input.body===null?undefined:JSON.stringify(input.body)});
+ const raw=await response.text();process.stdout.write(JSON.stringify({status:response.status,raw}));"""
+ result=subprocess.run(['node','--input-type=module','-e',program],input=json.dumps({'path':path,'body':body,'method':method or ('POST' if body is not None else 'GET')}),text=True,capture_output=True,check=True)
+ response=json.loads(result.stdout)
+ if response['status']>=400:raise ApiError(response['status'],response['raw'])
+ return json.loads(response['raw']) if response['raw'] else None
+def token_for(token):
+ if CLERK and token:
+  u=next((u for u in users if u.get('token')==token),None)
+  if u:
+   claims=json.loads(base64.urlsafe_b64decode(token.split('.')[1]+'==='))
+   if claims['exp']<time.time()+20:
+    u['token']=clerk('/sessions/'+u['session']+'/tokens',{})['jwt'];return u['token']
+ return token
 def api(path,method='GET',body=None,token=None,public=False,headers=None):
+ token=token_for(token)
  h={'apikey':PUBLIC if public else ADMIN,'Authorization':'Bearer '+(token or ADMIN),'Content-Type':'application/json'}
  h.update(headers or {})
  r=urllib.request.Request(BASE+path,method=method,headers=h,data=json.dumps(body).encode() if body is not None else None)
@@ -44,14 +64,34 @@ users=[];assets=[];film=None
 try:
  for i in range(3):
   email='backend-smoke-'+uuid.uuid4().hex+'@example.invalid';password=uuid.uuid4().hex+'!A9'
-  u=api('/auth/v1/admin/users','POST',{'email':email,'password':password,'email_confirm':True});users.append({'id':u['id']})
-  session=api('/auth/v1/token?grant_type=password','POST',{'email':email,'password':password},public=True)
-  users[-1]['token']=session['access_token']
-  print('Created disposable user',i+1,flush=True)
-  api('/rest/v1/profiles?id=eq.'+u['id'],'PATCH',{'handle':'test_'+uuid.uuid4().hex[:16],'full_name':'Backend smoke fixture','bio':'Disposable verification user','roles':['director'],'onboarding_completed':True},session['access_token'],True)
+  if CLERK:
+   u=clerk('/users',{'email_address':['backend-smoke-'+uuid.uuid4().hex+'+clerk_test@example.com'],'username':'smoke_'+uuid.uuid4().hex[:20],'phone_number':['+1555555019'+str(i+6)],'password':password})
+   fixture={'id':None,'clerk_id':u['id']};users.append(fixture)
+   session=clerk('/sessions',{'user_id':u['id']});fixture['session']=session['id']
+   fixture['token']=clerk('/sessions/'+session['id']+'/tokens',{})['jwt']
+   claims=json.loads(base64.urlsafe_b64decode(fixture['token'].split('.')[1]+'==='));assert claims.get('role')=='authenticated'
+   fixture['id']=api('/rest/v1/rpc/ensure_current_profile','POST',{},fixture['token'],True)
+   assert fixture['id']==api('/rest/v1/rpc/ensure_current_profile','POST',{},fixture['token'],True)
+  else:
+   u=api('/auth/v1/admin/users','POST',{'email':email,'password':password,'email_confirm':True});users.append({'id':u['id']})
+   session=api('/auth/v1/token?grant_type=password','POST',{'email':email,'password':password},public=True)
+   users[-1]['token']=session['access_token']
+  print('Created disposable '+('Clerk ' if CLERK else '')+'user',i+1,flush=True)
+  api('/rest/v1/profiles?id=eq.'+users[-1]['id'],'PATCH',{'handle':'test_'+uuid.uuid4().hex[:16],'full_name':'Backend smoke fixture','bio':'Disposable verification user','roles':['director'],'onboarding_completed':True},users[-1]['token'],True)
  a,b,c=users
+ guest=PUBLIC
+ # Publishable keys are not JWTs. Explicitly omit Authorization for a real anon request.
+ def guest_api(path,method='GET',body=None):
+  req=urllib.request.Request(BASE+path,method=method,headers={'apikey':PUBLIC,'Content-Type':'application/json'},data=json.dumps(body).encode() if body is not None else None)
+  try:
+   with urllib.request.urlopen(req,timeout=30) as res:
+    raw=res.read();return json.loads(raw) if raw else None
+  except urllib.error.HTTPError as e:raise ApiError(e.code,e.read().decode()) from None
+ try:guest_api('/rest/v1/messages');raise AssertionError('Guest messages leaked')
+ except ApiError as error:assert error.status in (401,403)
  film=api('/rest/v1/films','POST',{'owner_id':a['id'],'title':'Disposable backend smoke film','synopsis':'A quiet film about leaving home.','genres':['drama']},a['token'],True,{'Prefer':'return=representation'})[0]
  assert api('/rest/v1/films?id=eq.'+film['id'],token=b['token'],public=True)==[]
+ assert guest_api('/rest/v1/films?id=eq.'+film['id'])==[]
  denied('/rest/v1/rpc/publish_film',{'p_film_id':film['id']},b['token'])
  cid=api('/rest/v1/rpc/open_conversation','POST',{'p_other_user':b['id']},a['token'],True)
  api('/rest/v1/messages','POST',{'conversation_id':cid,'sender_id':a['id'],'body':'Disposable hello'},a['token'],True)
@@ -86,6 +126,9 @@ try:
   semantic=fn('search',{'query':'quiet films about leaving home','kind':'film'},b['token'])
   assert semantic['mode']=='hybrid' and any(row['id']==film['id'] and row['score']>0 for row in semantic['results']),semantic
   print('PASS published film retrieved with real gte-small query vector')
+  assert guest_api('/rest/v1/films?id=eq.'+film['id'])[0]['id']==film['id']
+  assert guest_api('/rest/v1/profiles?id=eq.'+a['id'])[0]['id']==a['id']
+  print('PASS guest public films/profiles and draft/message privacy')
   api('/rest/v1/rpc/record_event','POST',{'p_film_id':film['id'],'p_kind':'film_complete','p_idempotency_key':str(uuid.uuid4()),'p_watch_seconds':1},b['token'],True)
   assert not any(f['id']==film['id'] for f in api('/rest/v1/rpc/get_personalized_feed','POST',{},b['token'],True))
   print('PASS event ingestion and consumed-film filtering')
@@ -104,10 +147,14 @@ finally:
       subprocess.run(['pnpm','exec','wrangler','r2','object','delete',bucket+'/'+key,'--remote'],check=True,stdout=subprocess.DEVNULL)
   except Exception as e:print('Fixture object cleanup needs retry:',aid,type(e).__name__)
  for u in reversed(users):
-  try:api('/auth/v1/admin/users/'+u['id'],'DELETE')
+  try:
+   if CLERK:
+    if u['id']:api('/rest/v1/profiles?id=eq.'+u['id'],'DELETE')
+    clerk('/users/'+u['clerk_id'],method='DELETE')
+   else:api('/auth/v1/admin/users/'+u['id'],'DELETE')
   except Exception as e:print('Fixture user cleanup needs retry:',u['id'],type(e).__name__)
  # Polymorphic private embedding rows have no entity FK; remove this run's orphans.
- ids=[str(uuid.UUID(u['id'])) for u in users]
+ ids=[str(uuid.UUID(u['id'])) for u in users if u['id']]
  if film:ids.append(str(uuid.UUID(film['id'])))
  if ids:
   literals=','.join("'"+value+"'" for value in ids)

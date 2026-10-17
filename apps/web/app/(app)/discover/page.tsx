@@ -70,7 +70,6 @@ export default async function DiscoverPage({
         : undefined,
   };
   const { supabase, user } = await getViewer();
-  if (!user) return null;
 
   let films: FeedFilm[] = [];
   let failed = false;
@@ -288,7 +287,7 @@ export default async function DiscoverPage({
             ) : (
               <>
                 <div className={styles.deck}>
-                  <SwipeDeck films={films} viewerId={user.id} />
+                  <SwipeDeck films={films} viewerId={user?.id ?? null} />
                 </div>
                 <div className={styles.grid}>
                   {grid.map((film) => (

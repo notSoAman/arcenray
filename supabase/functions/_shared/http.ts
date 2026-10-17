@@ -22,13 +22,13 @@ export async function auth(req: Request) {
   if (!header?.startsWith("Bearer "))
     throw new HttpError(401, "Authentication required");
   const client = createClient(env("SUPABASE_URL"), env("SUPABASE_ANON_KEY"), {
-    global: { headers: { Authorization: header } },
-    auth: { persistSession: false, autoRefreshToken: false },
+    accessToken: async () => header.slice(7),
   });
-  const { data, error } = await client.auth.getUser(header.slice(7));
-  if (error || !data.user || data.user.is_anonymous)
-    throw new HttpError(401, "A verified account is required");
-  return { client, user: data.user };
+  // PostgREST verifies the external issuer/signature before running this RPC.
+  // Fail closed before any privileged client or R2 work; never just decode a JWT.
+  const { data: id, error } = await client.rpc("current_profile_id");
+  if (error || !id) throw new HttpError(401, "A verified account is required");
+  return { client, user: { id: String(id) } };
 }
 export function checked<T>({
   data,

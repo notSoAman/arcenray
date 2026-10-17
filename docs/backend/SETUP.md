@@ -5,12 +5,11 @@ See [current validation and pending setup](STATUS.md) before assuming a provider
 ## Services
 
 - Supabase project `ropbxsnjtejfomnpdllf`, Mumbai, PostgreSQL17.
-- Supabase Auth, REST/RPC Data API and messages/participants Realtime publication.
+- Clerk web authentication, Supabase REST/RPC Data API and messages/participants Realtime publication.
 - Cloudflare R2 `arcenray-uploads`: private incoming objects, no public domain.
 - R2 `arcenray-media`: deliberately published assets at `https://cdn.arcenray.com`.
 - Strict CORS allows localhost:3000, arcenray.com and www.arcenray.com only.
-- Edge Functions: media-upload, index-entity, search, media-cleanup. JWT verification
-  enabled; handlers additionally verify users with Auth. Cleanup additionally requires a dedicated operations secret; scheduled calls use a service-role JWT.
+- Edge Functions: media-upload, index-entity, search, media-cleanup. Clerk JWT issuer/signature verification through the Data API inside user handlers. Cleanup additionally requires a dedicated operations secret; scheduled calls use a service-role JWT.
 
 Migrations are ordered, versioned and matched to remote history. Do not blindly
 reset or db push this shared project. Local Supabase requires Docker running.
@@ -36,13 +35,12 @@ corresponding Vault secret along with each server credential. Collaborators do n
 
 ## Auth launch configuration
 
-Approved and registered callback allowlist: http://localhost:3000/auth/callback,
-https://arcenray.com/auth/callback, https://www.arcenray.com/auth/callback.
-Current Site URL remains localhost for development. Change it to the approved deployed
-web host for launch. Email confirmation remains enabled. Google OAuth requires the
-founder's Google client credentials and provider configuration. Production email
-requires SMTP setup/deliverability testing; built-in Auth email delivery is not a
-production email service. No frontend is deployed by this backend change.
+The current provider is Clerk. Follow [the authentication contract](../architecture/clerk-auth.md)
+for keys, selected application, issuer trust, signup requirements and account migration.
+The old Supabase callback URLs are retained for compatibility; the web callback no
+longer exchanges PKCE codes. Never configure a legacy Clerk JWT template or share
+Supabase signing secrets. Production Clerk/provider setup and end-to-end owner sign-in
+remain launch checks. No frontend is deployed by this backend change.
 
 ## Deploy/update
 
@@ -59,7 +57,8 @@ pnpm exec supabase functions deploy --use-api --project-ref ropbxsnjtejfomnpdllf
 
 Do not use config push against the entire generated local config without reviewing
 config diff: local defaults are not the desired hosted project settings.
-Do not deploy with --no-verify-jwt. Keep shared types generated, not hand-authored.
+Use the reviewed per-function verify_jwt configuration: user handlers verify Clerk
+through the Data API; cleanup retains gateway verification. Never remove handler auth. Keep shared types generated, not hand-authored.
 
 ## Validation
 
@@ -119,3 +118,6 @@ semantic searches60/hour, events60/minute and one taste update/film/kind/day. Da
 writes have RLS/field constraints; a full abuse/moderation admin UI, notifications,
 private draft sharing, account/media deletion workflows and production monitoring
 are not implemented. Do not open public onboarding before the founder reviews these.
+
+Clerk live smoke: `pnpm backend:smoke --clerk` (founder test credentials only).
+It creates and cleans disposable accounts/media; never run against production blindly.

@@ -4,16 +4,16 @@
 
 - Supabase project `ropbxsnjtejfomnpdllf`: schema, RLS, column grants and API/RPCs.
 - Realtime publication: messages and conversation_participants.
-- Seven ordered migrations applied, including cleanup authentication and the approved
+- Eight ordered migrations applied, including cleanup authentication and the approved
   switch to Supabase built-in gte-small (384 dimensions).
-- Four JWT-protected Edge Functions: media-upload, index-entity, search, media-cleanup.
+- Three Clerk-aware user Edge Functions plus the separately protected media-cleanup.
 - Credentials from the Git-ignored root `.env.test` synced to server-side secrets.
 - R2 `arcenray-media` and private `arcenray-uploads`; supplied S3 key verified on both.
 - `cdn.arcenray.com` attached with active ownership/SSL and TLS1.2 minimum.
 - Approved origin-specific CORS and auth callback URLs installed.
 - Approved15-minute cleanup schedule resumed. Operations secret is encrypted in Vault
   and stored in Edge secrets; incorrect secret is rejected.
-- Next.js SSR clients, PKCE callback, session proxy, shared SDK and frontend handoff in Git.
+- Clerk Next.js provider/proxy, token-aware Supabase clients and stable UUID identity SDK.
 
 ## Verified
 
@@ -29,7 +29,8 @@
 - First observed natural cleanup run after the fix returned HTTP200 with no timeout.
 - Synthetic-vector SQL tests passed for hybrid ranking, taste updates and deduplication.
 - Repository lint/types/build and Edge Deno typechecks.
-- Supabase security advisor previously reported zero findings; checked again after setup.
+- Supabase advisor currently reports legacy Auth leaked-password protection disabled;
+  Clerk breach checks remain enabled. Other auth/RLS test results are recorded below.
 
 The media smoke test now uses JavaScript fetch, matching the frontend runtime.
 The Python HTTP transport received403 for media while JavaScript returned206 for
@@ -40,10 +41,20 @@ All disposable live-test users and objects were removed.
 
 - Embedding limitation accepted by founder: English only, maximum512 input tokens
   (longer input is truncated). Recommendation quality still needs real-user evaluation.
-- Google OAuth credentials, production SMTP/deliverability, deployed frontend,
+- Clerk production instance/provider credentials, real OAuth/SMS/email validation, deployed frontend,
   pilot moderation/account/media deletion UX and private presence are later work.
 - Backend PR #1 merged into the default branch `codex/project-backup`.
 - Phase2 browser image preparation, video preflight and direct-upload tasks merged
-  in PR #2. Claude can integrate them from the default branch. No product UI screens
-  or frontend deployment are included.
+  in PR #2. Claude can integrate them from the default branch. Claude UI screens were subsequently merged in PR #4. No frontend deployment is included.
 - Collaborator instructions and prompts: `docs/COLLABORATOR_SETUP.md`.
+
+## Clerk + guest browsing update
+
+See [the current authentication contract](../architecture/clerk-auth.md) for actual
+configuration, verification, account migration and remaining launch checks. The live
+Clerk smoke test and all four SQL suites passed on 2026-10-17. Guest home was checked
+in the browser; public films/profiles and private-data denials passed live API tests.
+
+Both existing accounts were imported to the selected Clerk development instance,
+with original profile UUIDs, bcrypt passwords and verification states preserved.
+Legacy accounts remain for controlled compatibility; owner sign-in and cutoff pending.

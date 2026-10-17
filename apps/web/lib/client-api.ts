@@ -27,12 +27,17 @@ export function recordEvent(
   watchSeconds = 0,
   idempotencyKey = newId(),
 ) {
-  void Promise.resolve(
-    browserApi().events.record({
-      film_id: filmId,
-      kind,
-      idempotency_key: idempotencyKey,
-      watch_seconds: Math.max(0, Math.round(watchSeconds)),
-    }),
-  ).catch(() => undefined);
+  void browserApi()
+    .viewer.id()
+    .then((id) =>
+      id
+        ? browserApi().events.record({
+            film_id: filmId,
+            kind,
+            idempotency_key: idempotencyKey,
+            watch_seconds: Math.max(0, Math.round(watchSeconds)),
+          })
+        : undefined,
+    )
+    .catch(() => undefined);
 }

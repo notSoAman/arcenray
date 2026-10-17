@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Lockup } from "./brand";
 import { IconChat, IconCompass, IconHome, IconSearch } from "./icons";
+import { AccountMenu } from "./account-menu";
 import { Avatar } from "./media";
 import styles from "./app-nav.module.css";
 
@@ -24,9 +25,11 @@ function isActive(pathname: string, href: string) {
  * Desktop: sticky frosted header (web artboards). Phone width: compact top bar
  * plus the glass bottom tab bar from the mobile artboards.
  */
-export function AppNav({ viewer }: { viewer: Viewer }) {
+export function AppNav({ viewer }: { viewer: Viewer | null }) {
   const pathname = usePathname();
-  const profileHref = `/u/${viewer.handle}`;
+  const profileHref = viewer
+    ? `/u/${viewer.handle}`
+    : `/sign-in?next=${encodeURIComponent(pathname)}`;
   const onProfile =
     isActive(pathname, profileHref) || pathname === "/profile/edit";
 
@@ -41,7 +44,11 @@ export function AppNav({ viewer }: { viewer: Viewer }) {
               .map((s) => (
                 <Link
                   key={s.href}
-                  href={s.href}
+                  href={
+                    !viewer && s.href === "/chats"
+                      ? "/sign-in?next=%2Fchats"
+                      : s.href
+                  }
                   className={styles.navLink}
                   aria-current={isActive(pathname, s.href) ? "page" : undefined}
                 >
@@ -60,15 +67,22 @@ export function AppNav({ viewer }: { viewer: Viewer }) {
           <Link
             href={profileHref}
             className={styles.me}
-            aria-label="Your profile"
+            aria-label={viewer ? "Your profile" : "Sign in"}
             aria-current={onProfile ? "page" : undefined}
           >
-            <Avatar
-              picKey={viewer.picKey}
-              name={viewer.name || viewer.handle}
-              size={40}
-            />
+            {viewer ? (
+              <Avatar
+                picKey={viewer.picKey}
+                name={viewer.name || viewer.handle}
+                size={40}
+              />
+            ) : (
+              <span>Sign in</span>
+            )}
           </Link>
+          {viewer && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+            <AccountMenu />
+          ) : null}
         </div>
       </header>
 
@@ -78,7 +92,9 @@ export function AppNav({ viewer }: { viewer: Viewer }) {
           return (
             <Link
               key={href}
-              href={href}
+              href={
+                !viewer && href === "/chats" ? "/sign-in?next=%2Fchats" : href
+              }
               className={styles.tab}
               aria-current={on ? "page" : undefined}
             >
@@ -90,14 +106,18 @@ export function AppNav({ viewer }: { viewer: Viewer }) {
         <Link
           href={profileHref}
           className={styles.tab}
-          aria-label="Profile"
+          aria-label={viewer ? "Profile" : "Sign in"}
           aria-current={onProfile ? "page" : undefined}
         >
-          <Avatar
-            picKey={viewer.picKey}
-            name={viewer.name || viewer.handle}
-            size={30}
-          />
+          {viewer ? (
+            <Avatar
+              picKey={viewer.picKey}
+              name={viewer.name || viewer.handle}
+              size={30}
+            />
+          ) : (
+            <span>Sign in</span>
+          )}
         </Link>
       </nav>
     </>

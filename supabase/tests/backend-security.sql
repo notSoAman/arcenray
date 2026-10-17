@@ -1,5 +1,7 @@
 -- Run inside a transaction; fixtures are always rolled back. Requires postgres on local/staging.
 begin;
+-- Legacy-account compatibility during the Clerk migration.
+select set_config('request.jwt.claims','{"iss":"https://ropbxsnjtejfomnpdllf.supabase.co/auth/v1","role":"authenticated"}',true);
 create function pg_temp.assert_true(ok boolean, message text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'FAIL: %',message; end if; end; $$;
 create function pg_temp.expect_denied(statement text) returns void language plpgsql as $$ begin
  begin execute statement; exception when insufficient_privilege or check_violation or invalid_parameter_value or not_null_violation or raise_exception then return; end;

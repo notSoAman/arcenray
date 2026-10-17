@@ -16,14 +16,16 @@ pnpm setup:web
 pnpm --filter web dev
 ```
 
-Open http://localhost:3000. The current pages are the original Next.js scaffold;
-UI implementation is the next task. Setup writes public project configuration to
+Open http://localhost:3000. The accepted Claude UI is merged (PR #4). Guest browsing works with public config.
+For sign-in, add the selected Clerk development keys as described in
+[the authentication contract](docs/architecture/clerk-auth.md). Setup writes public project configuration to
 the ignored `apps/web/.env.local` and preserves any existing file. Your friend
 needs repository access, not R2 or service-role credentials.
 
 ## Backend
 
-Supabase provides authentication, the RLS-backed REST/RPC API, and Realtime chat.
+Clerk provides web authentication; Supabase provides the RLS-backed REST/RPC API
+and Realtime chat. Codex now owns frontend and backend development through launch.
 Edge Functions handle signed R2 upload intents, media inspection, publication,
 embedding indexing and semantic search. R2 uploads go straight to a **private**
 bucket; explicit publication copies verified objects server-side to the CDN bucket.

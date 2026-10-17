@@ -29,7 +29,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function loadFilm(id: string) {
   const { supabase, user } = await getViewer();
-  if (!uuid.test(id) || !user) return null;
+  if (!uuid.test(id)) return null;
   const { data } = await supabase
     .from("films")
     .select(FILM_DETAIL_COLUMNS)
@@ -56,7 +56,7 @@ export default async function FilmPage({
   const loaded = await loadFilm(id);
   if (!loaded) notFound();
   const { film, supabase, user } = loaded;
-  const isOwner = film.owner_id === user.id;
+  const isOwner = film.owner_id === user?.id;
 
   const [creators, credits, liked, saved, following, creatorFilms, related] =
     await Promise.all([
@@ -66,24 +66,30 @@ export default async function FilmPage({
         .select("id,display_name,role,profile_id,verification_state")
         .eq("film_id", film.id)
         .order("created_at", { ascending: true }),
-      supabase
-        .from("film_likes")
-        .select("film_id")
-        .eq("film_id", film.id)
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("film_bookmarks")
-        .select("film_id")
-        .eq("film_id", film.id)
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("profile_follows")
-        .select("following_id")
-        .eq("follower_id", user.id)
-        .eq("following_id", film.owner_id)
-        .maybeSingle(),
+      user
+        ? supabase
+            .from("film_likes")
+            .select("film_id")
+            .eq("film_id", film.id)
+            .eq("user_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      user
+        ? supabase
+            .from("film_bookmarks")
+            .select("film_id")
+            .eq("film_id", film.id)
+            .eq("user_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      user
+        ? supabase
+            .from("profile_follows")
+            .select("following_id")
+            .eq("follower_id", user.id)
+            .eq("following_id", film.owner_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
       supabase
         .from("films")
         .select("id", { count: "exact", head: true })
