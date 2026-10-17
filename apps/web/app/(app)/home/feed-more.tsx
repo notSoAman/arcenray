@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "../../lib/supabase/client";
-import { FEED_PAGE, loadFeedPage, type FeedFilm } from "../../lib/feed";
-import { FilmCard } from "./film-card";
+import { PosterCard } from "../../../components/film-cards";
+import { FEED_PAGE, loadFeedPage, type FeedFilm } from "../../../lib/feed";
+import { createClient } from "../../../lib/supabase/client";
 import styles from "./home.module.css";
 
 /** Appends further feed pages on request; keeps loaded films if a page fails. */
@@ -40,9 +40,9 @@ export function FeedMore({
   return (
     <>
       {films.length > 0 ? (
-        <div className={styles.grid} aria-label={`${films.length} more films`}>
+        <div className={styles.grid}>
           {films.map((film) => (
-            <FilmCard key={film.id} film={film} />
+            <PosterCard key={film.id} film={film} />
           ))}
         </div>
       ) : null}

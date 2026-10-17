@@ -1,0 +1,92 @@
+.follow {
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 23px;
+  border: 1px solid rgba(243, 239, 233, 0.3);
+  background: transparent;
+  color: var(--bone);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.follow[aria-pressed="true"] {
+  background: var(--bone);
+  border-color: var(--bone);
+  color: var(--void);
+}
+.follow:disabled {
+  opacity: 0.6;
+}
+
+.chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(243, 239, 233, 0.16);
+  background: transparent;
+  color: var(--bone);
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.chip:hover {
+  border-color: rgba(243, 239, 233, 0.4);
+}
+.chip[aria-pressed="true"] {
+  border-color: rgba(232, 82, 122, 0.55);
+  color: var(--signal-pink);
+}
+
+.quiet {
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.quiet:hover {
+  color: var(--bone);
+}
+
+.dialog {
+  margin: auto;
+  width: min(480px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--graphite);
+  color: var(--bone);
+  padding: 0;
+}
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.dialogBody {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dialogBody h2 {
+  font-size: 22px;
+  font-weight: 800;
+}
+.dialogBody p {
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}

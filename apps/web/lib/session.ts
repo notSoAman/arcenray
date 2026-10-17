@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "./supabase/server";
 
 /** True when `pnpm setup:web` (or an equivalent .env.local) supplied public config. */
@@ -25,7 +26,7 @@ export type ViewerProfile = {
  * Current signed-in user and their own profile row (RLS lets owners read their
  * pending profile). Pages still decide what to render; RLS stays the boundary.
  */
-export async function getViewer() {
+export const getViewer = cache(async function getViewer() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -44,4 +45,4 @@ export async function getViewer() {
     profile: (profile as ViewerProfile | null) ?? null,
     profileError: error,
   };
-}
+});

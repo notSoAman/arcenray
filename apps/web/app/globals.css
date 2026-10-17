@@ -247,3 +247,97 @@ textarea.input {
     scroll-behavior: auto !important;
   }
 }
+
+/* Frosted glass surface (player chrome, mobile tab bar). */
+.glass {
+  background: rgba(26, 26, 27, 0.66);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(243, 239, 233, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Shared page frame for signed-in screens. */
+.app-main {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 32px var(--gutter) 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.page-kicker {
+  color: var(--signal-pink);
+}
+
+.page-title {
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+.section-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Pill toggles: filters, tabs, sort. */
+.pill {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(243, 239, 233, 0.16);
+  background: transparent;
+  color: var(--bone);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pill:hover {
+  border-color: rgba(243, 239, 233, 0.4);
+}
+.pill[aria-pressed="true"],
+.pill[aria-current="page"],
+.pill[aria-selected="true"] {
+  background: var(--bone);
+  border-color: var(--bone);
+  color: var(--void);
+}
+
+/* Empty / error panel */
+.state-panel {
+  border-radius: var(--radius-card);
+  background: var(--deep-plum);
+  padding: clamp(24px, 4vw, 40px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.state-panel h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.state-panel p {
+  max-width: 520px;
+  color: var(--text-soft);
+  line-height: 1.55;
+}
+.state-panel .btn {
+  margin-top: 6px;
+}
+
+@media (max-width: 720px) {
+  .app-main {
+    padding: 20px var(--gutter) calc(120px + env(safe-area-inset-bottom));
+    gap: 28px;
+  }
+}

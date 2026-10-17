@@ -17,7 +17,7 @@ export default async function WelcomePage() {
 
   return (
     <div className={styles.page}>
-      <SiteHeader variant="public" />
+      <SiteHeader />
       <main className={styles.main}>
         {!configured ? <SetupNotice /> : null}
         <section className={`${styles.hero} spectrum-hero`}>

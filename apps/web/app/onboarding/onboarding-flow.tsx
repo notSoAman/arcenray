@@ -48,10 +48,12 @@ export function OnboardingFlow({
   userId,
   email,
   initial,
+  mode = "onboarding",
 }: {
   userId: string;
   email: string | null;
   initial: Initial;
+  mode?: "onboarding" | "edit";
 }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
@@ -189,7 +191,7 @@ export function OnboardingFlow({
       }
       // Search indexing runs in the background; a failure must not block entering the app.
       void api.index("profile", userId).catch(() => undefined);
-      router.replace("/home");
+      router.replace(mode === "edit" ? `/u/${input.handle}` : "/home");
       router.refresh();
     } catch {
       setSaving(false);
@@ -203,7 +205,7 @@ export function OnboardingFlow({
     <div className={styles.page}>
       <span className={styles.glow} aria-hidden="true" />
       <header className={styles.top}>
-        <Lockup href="/onboarding" />
+        <Lockup href={mode === "edit" ? "/home" : "/onboarding"} />
         <div className={styles.topEnd}>
           {email ? <span className={styles.email}>{email}</span> : null}
           <SignOutButton className={styles.quiet} />
@@ -487,7 +489,11 @@ export function OnboardingFlow({
                   className="btn btn-accent btn-block"
                   disabled={saving}
                 >
-                  {saving ? "Saving your profile…" : "Enter arcenray."}
+                  {saving
+                    ? "Saving your profile…"
+                    : mode === "edit"
+                      ? "Save profile"
+                      : "Enter arcenray."}
                 </button>
               </div>
             </form>

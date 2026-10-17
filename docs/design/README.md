@@ -21,9 +21,12 @@ Read directly from the canvas by the design lead's Claude Code session:
 - **Rules**: calls to action are Bone or Ember Crimson only; orange marks badges,
   lime marks success; the logo sits on a Void panel, never over busy artwork.
 
-Screens implemented from the canvas: welcome (W1 hero + 01 splash), multi-role
-onboarding (01), home feed (W1). Discover, search, film page, player, profile and
-chats artboards are not implemented yet.
+Screens implemented from the canvas (web app, responsive): welcome (W1 + 01), sign-in,
+onboarding (01), home (W1/02), discover (W2/03 swipe deck at phone width), search (W3/04),
+film page (W4/05), full-screen player (W5/06), creator profile (W6/07) and chats (W7/08/09).
+The mobile artboards are implemented as the web app's phone-width layout (glass bottom tab
+bar); a native Expo app has not been initialized. Not implemented: taste "vibe check",
+message requests, projects/places search, subtitles/quality and the "Later" page.
 
 Use the reference for the cinematic filmmaking/collaboration UI, with the exclusions
 in AGENTS.md: no stories, generic social-post clone or unapproved hiring marketplace.

@@ -1,0 +1,292 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+}
+
+.banner {
+  position: relative;
+  height: clamp(140px, 18vw, 220px);
+  border-radius: 28px 28px 0 0;
+  overflow: hidden;
+}
+
+.bannerShade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(14, 15, 14, 0) 40%,
+    rgba(14, 15, 14, 0.6) 100%
+  );
+}
+
+.card {
+  background: var(--graphite);
+  border-radius: 0 0 28px 28px;
+  padding: 0 clamp(20px, 3vw, 36px) 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px 24px;
+}
+
+.avatar {
+  margin-top: -84px;
+  border: 5px solid var(--graphite) !important;
+}
+
+.identity {
+  flex: 999 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 16px;
+  min-width: 0;
+}
+
+.name {
+  font-size: clamp(34px, 4vw, 56px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  overflow-wrap: anywhere;
+}
+
+.handle {
+  font-size: 14px;
+  color: var(--text-faint);
+}
+
+.roles {
+  font-size: 16px;
+  color: #cfc9c0;
+}
+
+.place {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.actions {
+  flex: 1 1 240px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.message {
+  min-height: 46px;
+}
+
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.main {
+  flex: 999 1 600px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 26px;
+  background: var(--graphite);
+  align-self: flex-start;
+}
+
+.tab {
+  min-height: 42px;
+  padding: 0 22px;
+  border-radius: 21px;
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #cfc9c0;
+}
+.tab[aria-current="page"] {
+  background: var(--bone);
+  color: var(--void);
+}
+
+.films {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px 16px;
+}
+
+.creditList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.creditRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(243, 239, 233, 0.08);
+  font-size: 16px;
+}
+
+.creditWork {
+  font-weight: 700;
+}
+
+.creditMeta {
+  color: var(--text-muted);
+}
+
+.creditState[data-state="pending"] {
+  color: var(--solar-orange);
+}
+
+.creditActions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 720px;
+}
+
+.bio {
+  font-size: 20px;
+  line-height: 1.5;
+  font-weight: 500;
+  white-space: pre-line;
+}
+
+.muted {
+  color: var(--text-faint);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skills {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.skills li {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(243, 239, 233, 0.14);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.side {
+  flex: 1 1 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sideTitle {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.sideBio {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-soft);
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.person {
+  width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #e8e3db;
+  text-align: center;
+}
+
+.safety {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.quiet {
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 13px;
+  cursor: pointer;
+}
+.quiet:hover {
+  color: var(--bone);
+}
+
+.blockConfirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+@media (max-width: 720px) {
+  .banner {
+    border-radius: 22px 22px 0 0;
+  }
+  .card {
+    border-radius: 0 0 22px 22px;
+  }
+  .avatar {
+    width: 112px !important;
+    height: 112px !important;
+    margin-top: -56px;
+  }
+  .actions {
+    justify-content: flex-start;
+  }
+}
