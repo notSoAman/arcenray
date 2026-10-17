@@ -3,10 +3,12 @@
 import { createArcenrayClient } from "@repo/shared";
 import { createClient } from "./supabase/client";
 
-let cached: ReturnType<typeof createArcenrayClient> | null = null;
+export type ArcenrayApi = ReturnType<typeof createArcenrayClient>;
+
+let cached: ArcenrayApi | null = null;
 
 /** Browser SDK bound to the signed-in session. RLS stays the authority. */
-export function browserApi() {
+export function browserApi(): ArcenrayApi {
   cached ??= createArcenrayClient(createClient());
   return cached;
 }
