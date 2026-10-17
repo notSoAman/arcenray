@@ -32,6 +32,7 @@ bucket; explicit publication copies verified objects server-side to the CDN buck
 
 - [Live validation status and pending provider setup](docs/backend/STATUS.md)
 - [Frontend integration and API examples](docs/backend/FRONTEND_HANDOFF.md)
+- [Loop and creator publishing verification](docs/architecture/loop-creator-journey.md)
 - [Browser media preparation and upload tasks](docs/architecture/browser-media.md)
 - [Setup, deployment, operations and known limits](docs/backend/SETUP.md)
 - [Database/API contract](docs/architecture/backend-contract.md)

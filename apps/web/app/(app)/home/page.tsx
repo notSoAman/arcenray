@@ -75,8 +75,8 @@ export default async function HomePage() {
             When filmmakers publish on arcenray, their work appears here —
             ranked by what you watch. Check back soon.
           </p>
-          <Link href="/discover" className="btn btn-primary">
-            Browse Discover
+          <Link href="/loop" className="btn btn-primary">
+            Browse Loop
           </Link>
         </section>
       ) : (
@@ -91,7 +91,7 @@ export default async function HomePage() {
                 <h2 id="more-films" className="section-title">
                   More to watch
                 </h2>
-                <Link href="/discover" className={styles.seeAll}>
+                <Link href="/loop" className={styles.seeAll}>
                   See all
                 </Link>
               </div>

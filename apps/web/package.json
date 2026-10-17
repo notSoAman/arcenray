@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit",
-    "test": "node --experimental-strip-types lib/media/upload.test.ts"
+    "test": "node --experimental-strip-types --test lib/media/upload.test.ts \"app/(app)/publish/film-link.test.ts\""
   },
   "dependencies": {
     "@clerk/nextjs": "7.9.17",

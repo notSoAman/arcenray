@@ -58,3 +58,13 @@ in the browser; public films/profiles and private-data denials passed live API t
 Both existing accounts were imported to the selected Clerk development instance,
 with original profile UUIDs, bcrypt passwords and verification states preserved.
 Legacy accounts remain for controlled compatibility; owner sign-in and cutoff pending.
+
+## Loop and creator web slice
+
+PR #5 merged after review; founder confirmed real sign-in. `/loop` replaces Discover
+with hook-card playback, private more/less feedback and repeat-free infinite loading.
+`/publish` provides authenticated native/external draft upload and publication.
+The ninth migration adds private feedback and scoped feed/preferences RPCs.
+See [the journey verification record](../architecture/loop-creator-journey.md) for
+23 tests, five SQL suites, browser upload/reload/publish/search/watch/chat checks,
+screenshots and known limits. Production deployment and mobile implementation remain pending.

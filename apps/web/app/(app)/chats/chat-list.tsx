@@ -61,7 +61,7 @@ export function ChatList({ chats }: { chats: ChatRow[] | null }) {
               Message a filmmaker from their film or profile and it&apos;ll show
               up here.
             </p>
-            <Link href="/discover" className="btn btn-primary">
+            <Link href="/loop" className="btn btn-primary">
               Find people
             </Link>
           </div>

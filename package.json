@@ -12,7 +12,8 @@
     "backend:types": "node scripts/generate-db-types.mjs",
     "backend:smoke": "node scripts/run-backend-smoke.mjs",
     "test:browser-media": "node scripts/check-browser-media.mjs",
-    "backend:auth-check": "node scripts/check-auth-boundaries.mjs"
+    "backend:auth-check": "node scripts/check-auth-boundaries.mjs",
+    "backend:test-sql": "node scripts/check-db.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.6",

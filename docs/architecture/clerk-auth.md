@@ -124,7 +124,7 @@ Founder approved importing both accounts' email addresses, bcrypt hashes and pro
 IDs, then separately approved optional phone at signup. Both imports and private
 identity links completed; original profile UUIDs and legacy accounts are retained.
 One email stays verified and one stays unverified/reserved. Plaintext passwords
-were neither requested nor stored. Actual owner password sign-in remains untested.
+were neither requested nor stored. Founder subsequently confirmed real sign-in works (2026-10-17). Individual production provider flows remain launch checks.
 
 `pnpm backend:auth-check` is a read-only deployed-function check that rejects both
 missing and forged tokens for media-upload, index-entity and search (HTTP 401).

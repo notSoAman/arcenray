@@ -144,3 +144,10 @@ export const IconUser = (p: P) => (
     <path d="M4 21a8 8 0 0 1 16 0" />
   </Svg>
 );
+
+export const IconLoop = (p: P) => (
+  <Svg {...p}>
+    <path d="M20 7v5h-5M4 17v-5h5" />
+    <path d="M5.2 8a7.5 7.5 0 0 1 12.4-3L20 8M4 16l2.4 3A7.5 7.5 0 0 0 18.8 16" />
+  </Svg>
+);
