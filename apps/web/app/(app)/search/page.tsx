@@ -1,3 +1,4 @@
+import { createArcenrayClient } from "@repo/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RowCard } from "../../../components/film-cards";
@@ -47,13 +48,6 @@ type Params = {
   role?: string;
   genre?: string;
 };
-type Hit = {
-  id: string;
-  kind: string;
-  title: string;
-  summary: string;
-  score: number;
-};
 
 function href(current: Params, patch: Partial<Params>) {
   const next = { ...current, ...patch };
@@ -90,18 +84,13 @@ export default async function SearchPage({
   let failed = false;
 
   if (params.q) {
-    const { data, error } = await supabase.functions.invoke<{
-      results: Hit[];
-      mode: string;
-    }>("search", {
-      body: {
-        query: params.q,
-        kind,
-        ...(params.city ? { city: params.city } : {}),
-        ...(params.role ? { role: params.role } : {}),
-        ...(params.genre ? { genre: params.genre } : {}),
-        limit: 30,
-      },
+    const { data, error } = await createArcenrayClient(supabase).search({
+      query: params.q,
+      kind: kind as "all" | "film" | "profile",
+      ...(params.city ? { city: params.city } : {}),
+      ...(params.role ? { role: params.role } : {}),
+      ...(params.genre ? { genre: params.genre } : {}),
+      limit: 30,
     });
     if (error || !data) {
       failed = true;

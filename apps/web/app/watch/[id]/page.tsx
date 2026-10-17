@@ -26,9 +26,7 @@ export default async function WatchPage({
 }) {
   if (!isSupabaseConfigured()) redirect("/");
   const { id } = await params;
-  const { supabase, user, profile } = await getViewer();
-  if (!user) redirect("/sign-in");
-  if (!profile?.onboarding_completed) redirect("/onboarding");
+  const { supabase } = await getViewer();
   if (!uuid.test(id)) notFound();
 
   const { data: film } = await supabase

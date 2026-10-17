@@ -11,7 +11,8 @@
     "test": "pnpm --filter @repo/shared test && node --experimental-strip-types --test supabase/functions/_shared/media-inspection.test.ts && pnpm --filter web test",
     "backend:types": "node scripts/generate-db-types.mjs",
     "backend:smoke": "node scripts/run-backend-smoke.mjs",
-    "test:browser-media": "node scripts/check-browser-media.mjs"
+    "test:browser-media": "node scripts/check-browser-media.mjs",
+    "backend:auth-check": "node scripts/check-auth-boundaries.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.6",

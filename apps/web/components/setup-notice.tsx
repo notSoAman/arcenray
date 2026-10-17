@@ -1,12 +1,11 @@
-/** Shown instead of auth screens when the public Supabase settings are missing. */
+/** Missing auth configuration never blocks reading published content. */
 export function SetupNotice() {
   return (
     <div className="notice notice-error" role="alert">
       <div>
-        <strong>Sign-in isn&apos;t configured on this machine.</strong> Run{" "}
-        <code>pnpm setup:web</code> from the repository root to create{" "}
-        <code>apps/web/.env.local</code> with the public project settings, then
-        restart the dev server.
+        <strong>Sign-in is not configured on this machine.</strong> Configure
+        the selected Clerk application and restart the app. You can still browse
+        public films and profiles.
       </div>
     </div>
   );

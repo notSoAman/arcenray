@@ -34,8 +34,8 @@ export default async function WelcomePage() {
               behind them, and start a conversation.
             </p>
             <div className={styles.heroActions}>
-              <Link href="/sign-in?new=1" className="btn btn-primary">
-                Get started
+              <Link href="/home" className="btn btn-primary">
+                Explore films
               </Link>
               <Link href="/sign-in" className="btn btn-ghost">
                 Sign in

@@ -22,30 +22,20 @@ when possible; the configured hosted project is shared.
 
 ## Clients and sign-in
 
-Browser: `apps/web/lib/supabase/client.ts`. Server Components / Route Handlers:
-`apps/web/lib/supabase/server.ts`. The proxy refreshes cookie sessions; `/auth/callback`
-exchanges PKCE codes and rejects external redirect targets. Protected pages still
-need an authenticated user check; RLS is always the authorization boundary.
-
-```ts
-import { createClient } from "./lib/supabase/client"; // adjust relative path to this file
-import { createArcenrayClient } from "@repo/shared";
-const supabase = createClient();
-const api = createArcenrayClient(supabase);
-await supabase.auth.signInWithOtp({
-  email,
-  options: { emailRedirectTo: `${location.origin}/auth/callback` },
-});
-// Google uses signInWithOAuth only after founder configures provider credentials.
-```
+Browser: `apps/web/lib/supabase/client.ts`; server: `apps/web/lib/supabase/server.ts`.
+Clerk supplies session tokens via accessToken callbacks. The proxy does not globally
+protect browsing. Private pages check the viewer; RLS always controls authorization.
+Use Clerk SignIn/SignUp/UserButton and `api.viewer.id()` for the stable application
+UUID, not Supabase Auth getUser/signInWithOtp/signInWithOAuth. See
+[the current auth contract](../architecture/clerk-auth.md).
 
 Always handle `{data,error}` from Supabase; a fulfilled Promise does not imply
 success. Function errors return an error response; preserve drafts and offer retry.
-No real UI routes or screens were replaced by the backend work.
+The accepted UI from PR #4 is now integrated with Clerk and public browsing.
 
 ## Profiles and films
 
-Auth automatically creates a pending profile with a unique UUID-derived handle.
+Verified Clerk identity bootstrap transactionally creates a pending profile with a unique UUID-derived handle.
 Complete `api.profiles.update` with handle, full_name, bio, roles[], location_city,
 skills_gear[], onboarding_completed:true. Public profiles exclude quota and taste
 vectors. `roles` supports multiple creative roles.
@@ -101,10 +91,9 @@ and deduplicated. Use explicit consent-aware meaningful events, not per-frame te
 Likes/bookmarks/follows are simple RLS-protected tables; for example:
 
 ```ts
-const {
-  data: { user },
-} = await supabase.auth.getUser();
-await supabase.from("film_bookmarks").insert({ user_id: user!.id, film_id });
+const userId = await api.viewer.id();
+if (!userId) throw new Error("Sign in to bookmark");
+await supabase.from("film_bookmarks").insert({ user_id: userId, film_id });
 await supabase.from("film_bookmarks").delete().eq("film_id", film_id);
 ```
 

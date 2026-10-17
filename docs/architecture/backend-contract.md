@@ -4,13 +4,15 @@ Scope: profiles/onboarding, films and verified credits, discovery/search, likes/
 private one-to-one chat, reports/blocks, quota-reserved R2 uploads. No stories,
 general social posts, hiring marketplace, payments, or mobile UI.
 
-Supabase Auth + RLS-backed Data API are the API; do not add a competing API server.
+Clerk web identity + Supabase RLS-backed Data API are the API; do not add a competing API server.
 Public schema tables: profiles, films, film_credits, film_likes, film_bookmarks,
 profile_follows, user_blocks, conversations, conversation_participants, messages,
 content_reports. Private schema: user_state (quota/taste), media_assets, entity_embeddings,
 user_events. Private data is not exposed through PostgREST.
 
-All IDs are UUIDs. All timestamps UTC. Profile id = auth.users.id.
+Application IDs are UUIDs; Clerk subjects are strings privately mapped by trusted
+issuer/subject. All timestamps UTC. Existing profile UUIDs are retained. See
+[the current authentication contract](clerk-auth.md).
 Profiles: handle (lowercase), full_name, bio, roles[], location_city, skills_gear[],
 profile_pic_key, onboarding_completed. Films: owner_id, title, synopsis, genres[],
 mood_tags[], location_city, language, source (r2_native/vimeo_embed/youtube_embed),

@@ -1,5 +1,7 @@
 -- Synthetic vectors test ranking and taste math independently of the embedding runtime.
 begin;
+-- Legacy-account compatibility during the Clerk migration.
+select set_config('request.jwt.claims','{"iss":"https://ropbxsnjtejfomnpdllf.supabase.co/auth/v1","role":"authenticated"}',true);
 create function pg_temp.assert_true(ok boolean,message text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'FAIL: %',message; end if; end; $$;
 insert into auth.users(id,email) values('12000000-0000-0000-0000-000000000001','taste-'||gen_random_uuid()||'@example.invalid');
 update public.profiles set full_name='Taste fixture',roles=array['director'],onboarding_completed=true where id='12000000-0000-0000-0000-000000000001';

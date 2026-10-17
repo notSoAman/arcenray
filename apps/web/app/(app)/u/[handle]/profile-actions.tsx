@@ -62,17 +62,23 @@ export function BlockButton({
   async function apply() {
     setState("busy");
     const api = browserApi();
-    const { data } = await api.supabase.auth.getUser();
-    if (!data.user) return setState("error");
+    const userId = await api.viewer.id();
+    if (!userId) {
+      router.push(
+        `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+      );
+      setState("idle");
+      return;
+    }
     const { error } = blocked
       ? await api.supabase
           .from("user_blocks")
           .delete()
-          .eq("blocker_id", data.user.id)
+          .eq("blocker_id", userId)
           .eq("blocked_id", profileId)
       : await api.supabase
           .from("user_blocks")
-          .insert({ blocker_id: data.user.id, blocked_id: profileId });
+          .insert({ blocker_id: userId, blocked_id: profileId });
     if (error && error.code !== "23505") return setState("error");
     setConfirming(false);
     setState("idle");
@@ -118,7 +124,15 @@ export function BlockButton({
     <button
       type="button"
       className={styles.quiet}
-      onClick={() => setConfirming(true)}
+      onClick={async () => {
+        if (!(await browserApi().viewer.id())) {
+          router.push(
+            `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+          );
+          return;
+        }
+        setConfirming(true);
+      }}
     >
       Block
     </button>

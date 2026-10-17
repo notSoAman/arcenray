@@ -18,13 +18,19 @@ import type {
 
 /** Inject the platform's authenticated client; RLS remains the authority. */
 export function createArcenrayClient(supabase: SupabaseClient<Database>) {
+  async function viewerId(): Promise<string | null> {
+    const { data, error } = await supabase.rpc("current_profile_id");
+    if (error) throw error;
+    return data;
+  }
   async function userId() {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw new Error("Sign in to continue");
-    return data.user.id;
+    const id = await viewerId();
+    if (!id) throw new Error("Sign in to continue");
+    return id;
   }
   return {
     supabase,
+    viewer: { id: viewerId },
     profiles: {
       get: (id: string) =>
         supabase
@@ -74,8 +80,37 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
           p_genre: genre,
         }),
     },
-    search: (input: SearchInput) =>
-      supabase.functions.invoke("search", { body: searchSchema.parse(input) }),
+    async search(
+      input: SearchInput,
+    ): Promise<{
+      data: {
+        results: {
+          id: string;
+          kind: string;
+          title: string;
+          summary: string;
+          score: number;
+        }[];
+        mode: "hybrid" | "full_text";
+      } | null;
+      error: unknown;
+    }> {
+      const parsed = searchSchema.parse(input);
+      if (await viewerId())
+        return supabase.functions.invoke("search", { body: parsed });
+      const { data, error } = await supabase.rpc("hybrid_search", {
+        p_query: parsed.query,
+        p_kind: parsed.kind,
+        p_city: parsed.city,
+        p_role: parsed.role,
+        p_genre: parsed.genre,
+        p_limit: parsed.limit,
+      });
+      return {
+        data: data ? { results: data, mode: "full_text" } : null,
+        error,
+      };
+    },
     chat: {
       open: (otherUser: string) =>
         supabase.rpc("open_conversation", {

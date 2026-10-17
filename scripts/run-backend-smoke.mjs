@@ -3,7 +3,14 @@ import { execFileSync, spawnSync } from "node:child_process";
 // Explicit live test: creates and removes disposable users and media.
 // Secrets stay in the child environment and never appear in argv or logs.
 process.loadEnvFile(".env.test");
+if (process.argv.includes("--clerk"))
+  process.loadEnvFile("apps/web/.env.local");
 const env = { ...process.env };
+if (process.argv.includes("--clerk")) {
+  env.ARCENRAY_TEST_AUTH_PROVIDER = "clerk";
+  if (!env.CLERK_SECRET_KEY?.startsWith("sk_test_"))
+    throw new Error("Clerk smoke requires development key");
+}
 env.R2_BUCKET_NAME ||= "arcenray-media";
 env.R2_UPLOAD_BUCKET_NAME ||= "arcenray-uploads";
 env.R2_PUBLIC_URL ||= "https://cdn.arcenray.com";

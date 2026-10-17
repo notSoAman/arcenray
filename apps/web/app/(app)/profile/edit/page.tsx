@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { isCreativeRole } from "../../../../lib/roles";
 import { getViewer } from "../../../../lib/session";
@@ -10,7 +11,8 @@ export const dynamic = "force-dynamic";
 /** Same two steps as onboarding, pre-filled, returning to the profile on save. */
 export default async function EditProfilePage() {
   const { user, profile } = await getViewer();
-  if (!user || !profile) return null; // layout redirects
+  if (!user) redirect("/sign-in?next=%2Fprofile%2Fedit");
+  if (!profile) redirect("/onboarding");
 
   return (
     <div className={styles.wrap}>

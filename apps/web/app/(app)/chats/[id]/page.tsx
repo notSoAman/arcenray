@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FILM_COLUMNS, loadProfiles } from "../../../../lib/feed";
 import { getViewer } from "../../../../lib/session";
 import { Thread, type ThreadFilm, type ThreadMessage } from "./thread";
@@ -16,7 +16,8 @@ export default async function ChatPage({
 }) {
   const { id } = await params;
   const { supabase, user } = await getViewer();
-  if (!user || !uuid.test(id)) notFound();
+  if (!user) redirect(`/sign-in?next=${encodeURIComponent(`/chats/${id}`)}`);
+  if (!uuid.test(id)) notFound();
 
   // Membership is enforced by RLS: a non-member sees no participants.
   const { data: participants } = await supabase

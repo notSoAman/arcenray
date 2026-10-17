@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { safeNextPath } from "@repo/shared";
 import { redirect } from "next/navigation";
 import { Lockup, LogoTile } from "../../components/brand";
 import { SetupNotice } from "../../components/setup-notice";
@@ -9,27 +10,27 @@ import styles from "./sign-in.module.css";
 export const metadata: Metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
 
-const linkErrors = {
-  expired:
-    "That sign-in link has expired. Links work once and only for a short time — request a new one below.",
-  link: "That sign-in link didn't work. It may have expired or already been used. Request a new one below.",
-} as const;
-
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; new?: string }>;
+  searchParams: Promise<{ error?: string; new?: string; next?: string }>;
 }) {
-  const configured = isSupabaseConfigured();
+  const configured =
+    isSupabaseConfigured() &&
+    Boolean(
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+      process.env.CLERK_SECRET_KEY,
+    );
   if (configured) {
     const { user } = await getViewer();
-    if (user) redirect("/");
+    if (user)
+      redirect(
+        safeNextPath((await searchParams).next) === "/"
+          ? "/home"
+          : safeNextPath((await searchParams).next),
+      );
   }
   const params = await searchParams;
-  const linkError =
-    params.error === "expired" || params.error === "link"
-      ? linkErrors[params.error]
-      : null;
   const isNew = params.new === "1";
 
   return (
@@ -58,10 +59,20 @@ export default async function SignInPage({
             {isNew ? "Create your account" : "Sign in"}
           </h1>
           <p className={styles.lede}>
-            We&apos;ll email you a one-time link — no password needed. New here?
-            The same link creates your account.
+            Sign in with your connected account, email, phone number or account
+            username.
           </p>
-          {configured ? <SignInForm linkError={linkError} /> : <SetupNotice />}
+          {configured ? (
+            <SignInForm
+              next={
+                safeNextPath(params.next) === "/"
+                  ? "/home"
+                  : safeNextPath(params.next)
+              }
+            />
+          ) : (
+            <SetupNotice />
+          )}
         </div>
       </main>
     </div>

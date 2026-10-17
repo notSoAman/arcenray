@@ -1,9 +1,10 @@
 # Arcenray — Master Agent Instructions
 
 > **Repository-wide instructions for Codex, Claude Code, Antigravity, and any future coding agent.**
-> **Status:** MVP engineering contract. Applies from the repository root to every workspace unless a narrower instruction explicitly approved by the project owner adds constraints.  
-> **Project owner / final technical approver:** Arcenray founder using **Codex**.  
-> **Primary design owner:** Collaborator using **Claude Code**.  
+> **Status:** MVP engineering contract. **Founder update 2026-10-17:** Codex owns frontend and backend through launch; Clerk replaces Supabase Auth for new web sessions. See `docs/architecture/clerk-auth.md`. Applies from the repository root to every workspace unless a narrower instruction explicitly approved by the project owner adds constraints.
+> **Project owner / final technical approver:** Arcenray founder using **Codex**.
+> **Accepted design source:** Collaborator using **Claude Code**; implementation ownership is now Codex through launch.
+> **Current ownership:** Codex owns all implementation, including UI integration, through launch. Historical team sections below describe earlier roles; founder updates take precedence.
 > **Auxiliary agent:** **Antigravity (Flash 3.8)** for small, bounded tasks.
 
 ## 0. First-read protocol
@@ -20,7 +21,7 @@ Before editing anything:
 
 **Instruction priority:** direct, current instructions from the founder > this file > approved architecture decisions and shared interface contracts > accepted design artifacts > feature-specific tickets > suggestions in old conversations. If two authoritative sources conflict, stop and ask rather than guessing.
 
-**Important history:** Previous Arcenray planning considered Cloudflare D1/Vectorize/Queues/Durable Objects, Clerk, central Vimeo hosting, and Bunny Stream. **Those are superseded proposals**, not the current default stack. Do not resurrect them without an approved architecture decision.
+**Important history:** Previous Arcenray planning considered Cloudflare D1/Vectorize/Queues/Durable Objects, central Vimeo hosting, and Bunny Stream. **Those are superseded proposals**, not the current default stack. Do not resurrect them without an approved architecture decision.
 
 ---
 
@@ -46,11 +47,11 @@ The original stack discussion does **not** finalize a complete jobs/gigs/applica
 
 ## 2. Team governance and decision rights
 
-| Role | Scope and default ownership | Authority / limitations |
-| --- | --- | --- |
-| **Founder + Codex — primary driver / technical lead** | Repository root, architectural decisions, package/contract coordination, Supabase schema/review, authentication/security, Supabase Edge Functions, Cloudflare R2, media integration, performance, CI/CD, environments, deployments, releases, final code review | **Only this role** authorizes production actions, cloud resource changes, paid services, new credentials, breaking contracts, migrations against shared/production DBs, and merges to `main`. Codex may work across any package when required, but coordinates edits to Claude-owned UI. |
-| **Friend + Claude Code — design lead / UI implementation** | Design artifacts, design tokens, layouts, interaction/animation direction, accessibility and visual QA; primarily `apps/web` presentation components/routes and, when assigned, mobile UI design references | **Design direction and product visual consistency are led here.** Claude proposes and implements UI, consumes shared interfaces, and flags missing APIs. Claude **does not** independently change DB tables, auth policy, cloud config, API contracts, secrets, or production resources. |
-| **Founder + Antigravity Flash 3.8 — auxiliary execution** | Founder-assigned small tasks: isolated components/styling based on approved tokens, responsive fixes, test cases, fixtures, documentation, simple CRUD wiring against stable interfaces, accessibility checks, browser smoke tests | **No independent architecture.** No auth, RLS, schema, billing, cloud, production, secret handling, or large multi-package rewrites. Prefer one task/PR at a time with tight file boundaries. |
+| Role                                                       | Scope and default ownership                                                                                                                                                                                                                                     | Authority / limitations                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Founder + Codex — primary driver / technical lead**      | Repository root, architectural decisions, package/contract coordination, Supabase schema/review, authentication/security, Supabase Edge Functions, Cloudflare R2, media integration, performance, CI/CD, environments, deployments, releases, final code review | **Only this role** authorizes production actions, cloud resource changes, paid services, new credentials, breaking contracts, migrations against shared/production DBs, and merges to `main`. Codex may work across any package when required, but coordinates edits to Claude-owned UI. |
+| **Friend + Claude Code — design lead / UI implementation** | Design artifacts, design tokens, layouts, interaction/animation direction, accessibility and visual QA; primarily `apps/web` presentation components/routes and, when assigned, mobile UI design references                                                     | **Design direction and product visual consistency are led here.** Claude proposes and implements UI, consumes shared interfaces, and flags missing APIs. Claude **does not** independently change DB tables, auth policy, cloud config, API contracts, secrets, or production resources. |
+| **Founder + Antigravity Flash 3.8 — auxiliary execution**  | Founder-assigned small tasks: isolated components/styling based on approved tokens, responsive fixes, test cases, fixtures, documentation, simple CRUD wiring against stable interfaces, accessibility checks, browser smoke tests                              | **No independent architecture.** No auth, RLS, schema, billing, cloud, production, secret handling, or large multi-package rewrites. Prefer one task/PR at a time with tight file boundaries.                                                                                            |
 
 ### Golden rules for collaboration
 
@@ -72,18 +73,18 @@ Claude Code normally loads root `CLAUDE.md`, not necessarily `AGENTS.md` automat
 
 **Use the existing repository first; these are target choices, not permission to overwrite an initialized codebase.**
 
-| Layer | MVP choice | Notes |
-| --- | --- | --- |
-| Monorepo | **pnpm + Turborepo + TypeScript** | Shared linting, type checks, types, schemas and APIs. |
-| Web | **Next.js App Router**, Tailwind CSS, a restrained motion library, Supabase SSR, TanStack Query where useful | Server/client separation; good load states and media performance. |
-| Mobile | **Expo Router / React Native**, `expo-video`, `expo-secure-store`, Supabase JS | Reuse contracts and business behavior, **not** web DOM components. |
-| Relational data + search | **Supabase PostgreSQL** + **pgvector** + PostgreSQL full-text search (`tsvector`) + SQL | Migrations under `supabase/migrations`. No D1 or MongoDB as the primary store. |
-| Identity | **Supabase Auth** (Google OAuth and magic links as MVP choices) | Web via supported SSR client; mobile token/session storage via secure mechanisms. **No Clerk**. |
-| Live communication | **Supabase Realtime** + Postgres persistence/RLS | Chat delivery, ephemeral typing and presence. No custom Durable Objects by default. |
-| Media | **Cloudflare R2** | Main film MP4, hook clip, poster and compact profile picture. Direct authenticated, authorized uploads; no full movie bytes through serverless API functions. |
-| Semantic embeddings | **Supabase Edge Runtime `gte-small`, 384 dimensions (English, max 512 tokens)**, server-side only | Index films and profiles. Provider changes require founder approval and coordinated dimension/index migration. |
-| Cloud operations | **Supabase Edge Functions** for narrow trusted actions; Cloudflare CDN/Workers only if justified | Avoid building a separate service/API layer by default. Host the web app on a platform compatible with the selected Next.js features; founder approves hosting. |
-| Product telemetry | Minimal consent-aware event capture; optional analytics only if approved | No user surveillance SDK added just for investor demos. |
+| Layer                    | MVP choice                                                                                                                      | Notes                                                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Monorepo                 | **pnpm + Turborepo + TypeScript**                                                                                               | Shared linting, type checks, types, schemas and APIs.                                                                                                                 |
+| Web                      | **Next.js App Router**, Tailwind CSS, a restrained motion library, Clerk + Supabase token adapters, TanStack Query where useful | Server/client separation; good load states and media performance.                                                                                                     |
+| Mobile                   | **Expo Router / React Native**, `expo-video`, `expo-secure-store`, Supabase JS                                                  | Reuse contracts and business behavior, **not** web DOM components.                                                                                                    |
+| Relational data + search | **Supabase PostgreSQL** + **pgvector** + PostgreSQL full-text search (`tsvector`) + SQL                                         | Migrations under `supabase/migrations`. No D1 or MongoDB as the primary store.                                                                                        |
+| Identity                 | **Clerk** (Google, Apple, email, phone and username)                                                                            | Web via Clerk Next.js SDK and native Supabase third-party JWT trust. Preserve UUID ownership with private issuer/subject mapping; mobile integration remains pending. |
+| Live communication       | **Supabase Realtime** + Postgres persistence/RLS                                                                                | Chat delivery, ephemeral typing and presence. No custom Durable Objects by default.                                                                                   |
+| Media                    | **Cloudflare R2**                                                                                                               | Main film MP4, hook clip, poster and compact profile picture. Direct authenticated, authorized uploads; no full movie bytes through serverless API functions.         |
+| Semantic embeddings      | **Supabase Edge Runtime `gte-small`, 384 dimensions (English, max 512 tokens)**, server-side only                               | Index films and profiles. Provider changes require founder approval and coordinated dimension/index migration.                                                        |
+| Cloud operations         | **Supabase Edge Functions** for narrow trusted actions; Cloudflare CDN/Workers only if justified                                | Avoid building a separate service/API layer by default. Host the web app on a platform compatible with the selected Next.js features; founder approves hosting.       |
+| Product telemetry        | Minimal consent-aware event capture; optional analytics only if approved                                                        | No user surveillance SDK added just for investor demos.                                                                                                               |
 
 ### Target repository layout
 
@@ -110,7 +111,7 @@ Create missing folders **only when needed**. Do not add `apps/api`, `packages/db
 
 ### Canonical integration boundaries
 
-1. **Clients** authenticate via Supabase Auth and query permitted data through RLS-backed operations / approved RPCs.
+1. **Clients** authenticate via Clerk and query permitted data through RLS-backed operations / approved RPCs.
 2. **Supabase PostgreSQL** stores the relational source of truth, full-text indexes, pgvector embeddings, moderation and publication states, and chat persistence.
 3. **Supabase Edge Functions** perform authorization-sensitive tasks: R2 upload intents/signatures, trusted metadata validation, embedding API calls and reindex jobs. Secrets never enter the client.
 4. **R2** stores media bytes and serves permitted assets via controlled public delivery/appropriate URLs. Database rows store durable **asset keys + metadata** where possible, not arbitrary unverified user-provided R2 URLs.
@@ -126,7 +127,7 @@ All database changes must be created as **versioned migrations**. The live dashb
 
 ### Required conceptual entities
 
-- **`profiles`**: `id` linked to `auth.users`, name, unique handle, bio, **`roles text[]`** (multiple creative roles), `location_city`, `skills_gear text[]`, `profile_pic` asset reference, `onboarding_completed`, **`embedding vector(384)`**, `taste_vector vector(384)`, full-text index, storage quota and reserved/used bytes as needed. Prefer a canonical roles taxonomy plus extensible labels.
+- **`profiles`**: `id` as stable UUID linked through private trusted issuer/subject mappings, name, unique handle, bio, **`roles text[]`** (multiple creative roles), `location_city`, `skills_gear text[]`, `profile_pic` asset reference, `onboarding_completed`, **`embedding vector(384)`**, `taste_vector vector(384)`, full-text index, storage quota and reserved/used bytes as needed. Prefer a canonical roles taxonomy plus extensible labels.
 - **`films`**: creator ownership, title, synopsis, genres, mood tags, city/location when meaningful, source (`r2_native`, `vimeo_embed`, `youtube_embed`), provider ID / external URL or internal asset key, `poster`, **mandatory discovery hook**, hook duration **`<= 30 seconds`**, film duration, visibility/publication/processing state, `embedding vector(384)`, full-text index and timestamps. Do not require a native R2 video asset for external-linked films.
 - **`film_credits`**: film, credited creative (if registered), role/department, claim/invitation status, **verification state and verifier/audit record**. A user cannot grant themselves a verified credit by changing client-supplied flags.
 - **`user_events`**: actor, event kind, film or target, meaningful dwell/watch data, timestamp, stable idempotency/deduplication identifier. Restrict and minimize tracking; no raw video/audio logging.
@@ -141,7 +142,7 @@ All database changes must be created as **versioned migrations**. The live dashb
 - Public reads must be limited to deliberately public/published profile, credit and film fields. Drafts, private messages and sensitive metadata must not leak through broad `SELECT`.
 - Users may edit **their own** profile/media/film drafts; chat participants may read/write **their own** conversation messages. No one can arbitrarily join a conversation, impersonate a sender, or modify another user's storage usage/verification data.
 - Privileged writes (usage counters, verification, publishing pipeline, indexing) happen via trusted transactional functions or Edge Functions with explicit authorization.
-- For `SECURITY DEFINER` SQL RPCs: fix `search_path`, explicitly check `auth.uid()`, validate access and parameters, and restrict grants. **Never accept a client-controlled `p_user_id` as authority over another user's taste/profile.**
+- For `SECURITY DEFINER` SQL RPCs: fix `search_path`, explicitly check `private.current_profile_id()`, validate access and parameters, and restrict grants. **Never accept a client-controlled `p_user_id` as authority over another user's taste/profile.**
 - Include negative security tests: unauthenticated access, cross-user edits, guessed conversation IDs, unauthorized credit verification and quota bypass.
 
 ### Stable service contracts (names are targets, not permission to break existing ones)
@@ -160,7 +161,7 @@ All database changes must be created as **versioned migrations**. The live dashb
 
 ### A. Authentication and onboarding
 
-1. Supabase Auth sign-in (Google and passwordless email where configured).
+1. Clerk sign-in (Google, Apple, email, phone and username as configured).
 2. Multi-role selection (e.g. director + editor + colorist), city, bio and skills/gear; upload compact profile picture.
 3. **12-card visual vibe check:** choose **3** mood/film references. Use precomputed embeddings or a safe preference fallback to seed taste; do not block signup forever if embedding service is unavailable.
 4. Show a useful personalized or fallback feed immediately; no unexplained blank feed.
@@ -192,13 +193,13 @@ Do not force filmmakers to leave Arcenray, sign up for a Vimeo account, or uploa
 
 ## 6. Media constraints and reliable uploads
 
-| Asset | MVP default | Acceptance requirements |
-| --- | --- | --- |
-| Profile picture | Center-cropped **<=256 x 256**, WebP around quality **0.80**; **<=25 KB is a target**, not an excuse for visible artifacts | One profile-picture field; no redundant avatar variants by default; validate dimensions and MIME on the trusted side. |
-| Film poster | **<=800 x 1200**, WebP around quality **0.82**; roughly **100 KB target** | Maintain intended aspect ratio without stretching; avoid aggressive compression of typography/art. |
-| Discovery hook | **Required**, **0 < duration <=30.0 s**, target **720p** and efficiently encoded MP4/H.264 (+audio when authorized) | Creator chooses the moment; enforce upper bound server-side on metadata AND verify actual asset; mute default in feed. |
-| Native main film | One well-optimized **1080p-or-lower H.264/AAC MP4** as simple MVP baseline, seekable (`+faststart` where applicable) | Prefer original if supported and already good; don't re-encode a visibly poor-quality source expecting improvement. Test browsers/devices and HTTP Range delivery. |
-| Storage quota | **2 GiB initial allowance per account** is the later planning default; actual quotas are founder-configurable | Enforce safely server-side using verified actual storage usage + reserved pending uploads. Do not trust claimed file size/metadata. |
+| Asset            | MVP default                                                                                                                | Acceptance requirements                                                                                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Profile picture  | Center-cropped **<=256 x 256**, WebP around quality **0.80**; **<=25 KB is a target**, not an excuse for visible artifacts | One profile-picture field; no redundant avatar variants by default; validate dimensions and MIME on the trusted side.                                              |
+| Film poster      | **<=800 x 1200**, WebP around quality **0.82**; roughly **100 KB target**                                                  | Maintain intended aspect ratio without stretching; avoid aggressive compression of typography/art.                                                                 |
+| Discovery hook   | **Required**, **0 < duration <=30.0 s**, target **720p** and efficiently encoded MP4/H.264 (+audio when authorized)        | Creator chooses the moment; enforce upper bound server-side on metadata AND verify actual asset; mute default in feed.                                             |
+| Native main film | One well-optimized **1080p-or-lower H.264/AAC MP4** as simple MVP baseline, seekable (`+faststart` where applicable)       | Prefer original if supported and already good; don't re-encode a visibly poor-quality source expecting improvement. Test browsers/devices and HTTP Range delivery. |
+| Storage quota    | **2 GiB initial allowance per account** is the later planning default; actual quotas are founder-configurable              | Enforce safely server-side using verified actual storage usage + reserved pending uploads. Do not trust claimed file size/metadata.                                |
 
 **Smart compression (heuristic, not hardcoded dogma):** for an already-compatible <=1080p MP4 around **<=4.5 Mbps**, prefer pass-through after validation. For oversize/unsupported high-bitrate input, offer client-side conversion toward good-looking 1080p H.264 (starting quality target CRF ~22) **only when the browser/device supports a practical, stable implementation**. Preserve film grain/creative intent; prefer an explicit creator warning or recommended export preset over a frozen tab or a silent quality downgrade. Mobile compression is a distinct implementation.
 

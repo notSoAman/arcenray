@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
 import { Courier_Prime, Inter_Tight } from "next/font/google";
 import "./globals.css";
@@ -42,7 +43,21 @@ export default function RootLayout({
       lang="en"
       className={`${interTight.variable} ${courierPrime.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+        process.env.CLERK_SECRET_KEY ? (
+          <ClerkProvider
+            signInUrl="/sign-in"
+            signUpUrl="/sign-up"
+            signInFallbackRedirectUrl="/home"
+            signUpFallbackRedirectUrl="/onboarding"
+          >
+            {children}
+          </ClerkProvider>
+        ) : (
+          children
+        )}
+      </body>
     </html>
   );
 }

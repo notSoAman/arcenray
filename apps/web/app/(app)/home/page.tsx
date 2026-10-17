@@ -17,25 +17,27 @@ const PICKS = 5;
 
 export default async function HomePage() {
   const { supabase, user, profile } = await getViewer();
-  if (!user || !profile) return null; // layout redirects
 
   const page = await loadFeedPage(supabase, 0);
-  const firstName = profile.full_name.split(/\s+/)[0] || `@${profile.handle}`;
+  const firstName = profile
+    ? profile.full_name.split(/\s+/)[0] || `@${profile.handle}`
+    : null;
 
   // Filmmakers in the same city (exact match, completed public profiles only).
-  const nearby = profile.location_city
-    ? ((
-        await supabase
-          .from("profiles")
-          .select(PROFILE_CARD_COLUMNS)
-          .ilike(
-            "location_city",
-            profile.location_city.replace(/[%_\\]/g, "\\$&"),
-          )
-          .neq("id", user.id)
-          .limit(8)
-      ).data ?? [])
-    : [];
+  const nearby =
+    user && profile?.location_city
+      ? ((
+          await supabase
+            .from("profiles")
+            .select(PROFILE_CARD_COLUMNS)
+            .ilike(
+              "location_city",
+              profile.location_city.replace(/[%_\\]/g, "\\$&"),
+            )
+            .neq("id", user.id)
+            .limit(8)
+        ).data ?? [])
+      : [];
 
   const films = page.ok ? page.films : [];
   const featured = films[0];
@@ -45,7 +47,9 @@ export default async function HomePage() {
   return (
     <main className="app-main">
       <div className={styles.intro}>
-        <span className="kicker page-kicker">For {firstName}</span>
+        <span className="kicker page-kicker">
+          {firstName ? `For ${firstName}` : "Independent cinema"}
+        </span>
         <h1 className={styles.introTitle}>Short films for you</h1>
       </div>
 
@@ -79,7 +83,7 @@ export default async function HomePage() {
         <>
           <FeaturedFilm film={featured} kicker="Tonight's pick" />
           {picks.length > 0 ? (
-            <WavelengthPicks films={picks} viewerId={user.id} />
+            <WavelengthPicks films={picks} viewerId={user?.id ?? null} />
           ) : null}
           {rest.length > 0 || page.hasMore ? (
             <section className={styles.section} aria-labelledby="more-films">
@@ -106,7 +110,7 @@ export default async function HomePage() {
         <section className={styles.section} aria-labelledby="nearby">
           <div className={styles.sectionHead}>
             <div className={styles.headCopy}>
-              <span className="kicker">Near {profile.location_city}</span>
+              <span className="kicker">Near {profile?.location_city}</span>
               <h2 id="nearby" className="section-title">
                 Filmmakers close to you
               </h2>

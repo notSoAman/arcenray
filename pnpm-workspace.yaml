@@ -4,3 +4,6 @@ packages:
 allowBuilds:
   esbuild: true
   workerd: true
+minimumReleaseAgeExclude:
+  - '@clerk/backend@3.25.0'
+  - '@clerk/nextjs@7.9.17'

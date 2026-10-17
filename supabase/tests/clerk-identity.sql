@@ -1,0 +1,42 @@
+-- JWT claims here simulate requests AFTER Supabase signature verification; no real
+-- external JWT is manufactured by SQL. HTTP signature denials are tested separately.
+begin;
+create function pg_temp.assert_true(ok boolean,message text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'FAIL: %',message; end if; end; $$;
+create function pg_temp.denied(sql text) returns void language plpgsql as $$ begin
+ begin execute sql; exception when insufficient_privilege or check_violation or raise_exception then return; end;
+ raise exception 'FAIL: expected denial'; end; $$;
+insert into private.identity_providers(issuer,provider) values('https://clerk-fixture.accounts.dev','clerk');
+select set_config('request.jwt.claim.sub','',true);
+select set_config('request.jwt.claims','{"iss":"https://clerk-fixture.accounts.dev","sub":"user_clerkAlice","role":"authenticated"}',true);
+set local role authenticated;
+select set_config('test.alice',public.ensure_current_profile()::text,true);
+select pg_temp.assert_true(public.ensure_current_profile()=current_setting('test.alice')::uuid,'bootstrap idempotent');
+select pg_temp.assert_true(public.current_profile_id()=current_setting('test.alice')::uuid,'Clerk string subject maps UUID');
+update public.profiles set full_name='Clerk fixture Alice',roles=array['director'],onboarding_completed=true where id=public.current_profile_id();
+reset role;
+insert into public.films(id,owner_id,title) values('23000000-0000-0000-0000-000000000001',current_setting('test.alice')::uuid,'Clerk public fixture'),('23000000-0000-0000-0000-000000000002',current_setting('test.alice')::uuid,'Clerk private fixture');
+reset role;
+update public.films set status='published',published_at=now() where id='23000000-0000-0000-0000-000000000001';
+select set_config('request.jwt.claims','{"iss":"https://clerk-fixture.accounts.dev","sub":"user_clerkBob","role":"authenticated"}',true);
+set local role authenticated;
+select set_config('test.bob',public.ensure_current_profile()::text,true);
+select pg_temp.assert_true(public.current_profile_id()<>current_setting('test.alice')::uuid,'distinct subjects never share profile');
+select pg_temp.assert_true((select count(*)=0 from public.films where id='23000000-0000-0000-0000-000000000002'),'other user cannot see draft');
+select pg_temp.denied(format('insert into public.films(owner_id,title) values(%L,''Forged'')',current_setting('test.alice')));
+select pg_temp.denied(format('select public.backend_link_identity(''https://clerk-fixture.accounts.dev'',''user_steal'',%L)',current_setting('test.alice')));
+select set_config('request.jwt.claims','{"iss":"https://attacker.invalid","sub":"user_clerkAlice","role":"authenticated"}',true);
+select pg_temp.assert_true(public.current_profile_id() is null,'untrusted issuer cannot resolve subject');
+select pg_temp.denied('select public.ensure_current_profile()');
+reset role;
+select set_config('request.jwt.claims','{}',true);
+set local role anon;
+select pg_temp.assert_true(public.current_profile_id() is null,'guest has no app identity');
+select pg_temp.assert_true((select count(*)=1 from public.films where id in ('23000000-0000-0000-0000-000000000001','23000000-0000-0000-0000-000000000002')),'guest only published film visible');
+select pg_temp.assert_true((select count(*)=1 from public.profiles where id in (current_setting('test.alice')::uuid,current_setting('test.bob')::uuid)),'guest only completed public profile visible');
+select pg_temp.denied('select public.ensure_current_profile()');
+select pg_temp.denied('select * from public.messages');
+select pg_temp.denied('select * from private.auth_identities');
+select pg_temp.denied(format('insert into public.profile_follows(follower_id,following_id) values(%L,%L)',current_setting('test.bob'),current_setting('test.alice')));
+reset role;
+rollback;
+select 'Clerk mapping, guest boundaries and cross-user assertions passed; fixtures rolled back' as result;

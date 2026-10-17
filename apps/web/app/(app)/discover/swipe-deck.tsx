@@ -16,7 +16,13 @@ const THRESHOLD = 110;
  * Phone swipe deck (03 Discover). Drag right = Same wavelength (like),
  * left = Not my niche (skip). Buttons do the same for keyboard and screen readers.
  */
-export function SwipeDeck({ films }: { films: FeedFilm[]; viewerId: string }) {
+export function SwipeDeck({
+  films,
+  viewerId,
+}: {
+  films: FeedFilm[];
+  viewerId: string | null;
+}) {
   const [index, setIndex] = useState(0);
   const [dx, setDx] = useState(0);
   const [leaving, setLeaving] = useState<"left" | "right" | null>(null);
@@ -29,6 +35,12 @@ export function SwipeDeck({ films }: { films: FeedFilm[]; viewerId: string }) {
 
   function decide(dir: "left" | "right") {
     if (!cur || leaving) return;
+    if (!viewerId) {
+      window.location.assign(
+        `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+      );
+      return;
+    }
     setLeaving(dir);
     const film = cur;
     if (dir === "left") {
