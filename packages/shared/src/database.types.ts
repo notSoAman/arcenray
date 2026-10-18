@@ -520,6 +520,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      backend_abort_multipart: {
+        Args: { p_asset: string; p_owner: string }
+        Returns: Json
+      }
       backend_asset: { Args: { p_id: string; p_owner: string }; Returns: Json }
       backend_begin_account_deletion: {
         Args: {
@@ -544,6 +548,17 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      backend_claim_index_jobs: {
+        Args: { p_limit?: number }
+        Returns: {
+          content: string
+          entity_id: string
+          kind: string
+          owner_id: string
+          source_updated_at: string
+          version: number
+        }[]
+      }
       backend_claim_media_jobs: {
         Args: { p_limit?: number }
         Returns: unknown[]
@@ -553,6 +568,24 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      backend_claim_multipart_operation: {
+        Args: { p_asset: string; p_operation: string; p_owner: string }
+        Returns: Json
+      }
+      backend_complete_multipart: {
+        Args: { p_asset: string; p_owner: string; p_token: string }
+        Returns: Json
+      }
+      backend_create_multipart: {
+        Args: {
+          p_bytes: number
+          p_draft: string
+          p_fingerprint: string
+          p_owner: string
+          p_request: string
+        }
+        Returns: Json
       }
       backend_defer_account_deletion: {
         Args: { p_job: string }
@@ -591,21 +624,59 @@ export type Database = {
         Args: { p_job: string }
         Returns: boolean
       }
+      backend_finish_index_job: {
+        Args: {
+          p_id: string
+          p_kind: string
+          p_success: boolean
+          p_version: number
+        }
+        Returns: boolean
+      }
       backend_finish_media_job: {
         Args: { p_asset: string; p_version: number }
         Returns: boolean
       }
-      backend_finish_promotion: {
-        Args: { p_id: string; p_owner: string; p_token: string }
+      backend_finish_promotion:
+        | {
+            Args: { p_id: string; p_owner: string; p_token: string }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bytes: number
+              p_content_type: string
+              p_id: string
+              p_owner: string
+              p_public_etag: string
+              p_token: string
+            }
+            Returns: Json
+          }
+      backend_initialize_multipart: {
+        Args: {
+          p_asset: string
+          p_owner: string
+          p_token: string
+          p_upload_id: string
+        }
         Returns: Json
       }
       backend_link_identity: {
         Args: { p_issuer: string; p_profile: string; p_subject: string }
         Returns: undefined
       }
+      backend_list_multipart: {
+        Args: { p_draft: string; p_owner: string }
+        Returns: Json
+      }
       backend_mark_clerk_deleted: {
         Args: { p_job: string }
         Returns: undefined
+      }
+      backend_multipart: {
+        Args: { p_asset: string; p_owner: string }
+        Returns: Json
       }
       backend_pending_account_deletions: {
         Args: never
@@ -625,7 +696,22 @@ export type Database = {
         Args: { p_limit: number; p_operation: string; p_user: string }
         Returns: boolean
       }
+      backend_record_media_copy: {
+        Args: {
+          p_area: string
+          p_asset: string
+          p_bytes: number
+          p_content_type: string
+          p_etag: string
+          p_version: number
+        }
+        Returns: boolean
+      }
       backend_release_asset: { Args: { p_id: string }; Returns: undefined }
+      backend_release_multipart_operation: {
+        Args: { p_asset: string; p_owner: string; p_token: string }
+        Returns: undefined
+      }
       backend_set_embedding: {
         Args: {
           p_embedding: string
@@ -636,6 +722,10 @@ export type Database = {
           p_updated_at: string
         }
         Returns: boolean
+      }
+      backend_sign_multipart: {
+        Args: { p_asset: string; p_owner: string }
+        Returns: Json
       }
       backend_source_deleted: { Args: { p_id: string }; Returns: undefined }
       backend_verify_asset: {

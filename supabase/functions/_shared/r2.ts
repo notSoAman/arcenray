@@ -1,6 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import { env, HttpError } from "./http.ts";
-function signer() {
+export function signer() {
   return new AwsClient({
     accessKeyId: env("R2_ACCESS_KEY_ID"),
     secretAccessKey: env("R2_SECRET_ACCESS_KEY"),
@@ -8,7 +8,7 @@ function signer() {
     region: "auto",
   });
 }
-function objectUrl(bucket: string, key: string) {
+export function objectUrl(bucket: string, key: string) {
   return new URL(
     `https://${env("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com/${bucket}/${key.split("/").map(encodeURIComponent).join("/")}`,
   );
@@ -42,13 +42,55 @@ export async function signUpload(key: string, bytes: number, type: string) {
     expires_at: new Date(Date.now() + 600000).toISOString(),
   };
 }
+/** CopyObject may return a destination ETag different from the multipart source. */
+export function copyResultEtag(xml: string) {
+  if (/<(?:[A-Za-z0-9_]+:)?Error(?:\s|>)/.test(xml))
+    throw new HttpError(502, "Media copy failed");
+  const matches = [
+    ...xml.matchAll(
+      /<(?:[A-Za-z0-9_]+:)?ETag>\s*([^<]+?)\s*<\/(?:[A-Za-z0-9_]+:)?ETag>/g,
+    ),
+  ];
+  const value = matches[0]?.[1]?.replace(/&quot;/g, '"').trim();
+  if (
+    matches.length !== 1 ||
+    !value ||
+    !/^(?:"[a-fA-F0-9-]+"|[a-fA-F0-9-]+)$/.test(value)
+  )
+    throw new HttpError(502, "Invalid media copy snapshot");
+  return value;
+}
+export function copiedHeadSnapshot(
+  head: Response,
+  etag: string,
+  bytes: number,
+  type: string,
+) {
+  const actual = {
+    bytes: Number(head.headers.get("content-length")),
+    etag: head.headers.get("etag") ?? "",
+    contentType: head.headers.get("content-type")?.split(";")[0]?.trim() ?? "",
+  };
+  if (
+    !head.ok ||
+    !Number.isSafeInteger(bytes) ||
+    bytes < 1 ||
+    actual.bytes !== bytes ||
+    actual.contentType !== type ||
+    actual.etag.replace(/^"|"$/g, "") !== etag.replace(/^"|"$/g, "")
+  ) {
+    throw new HttpError(502, "Copied media snapshot mismatch");
+  }
+  return actual;
+}
 export async function copyPublic(
   key: string,
   id: string,
   etag: string,
   type: string,
+  bytes: number,
 ) {
-  const source = `/${env("R2_UPLOAD_BUCKET_NAME")}/${key}`;
+  const source = `/${env("R2_UPLOAD_BUCKET_NAME")}/${key.split("/").map(encodeURIComponent).join("/")}`;
   const response = await r2("PUT", env("R2_BUCKET_NAME"), `assets/${id}`, {
     "x-amz-copy-source": source,
     "x-amz-copy-source-if-match": etag,
@@ -56,9 +98,11 @@ export async function copyPublic(
     "Content-Type": type,
     "Cache-Control": "public,max-age=31536000,immutable",
   });
-  // S3 may encode CopyObject errors in a successful HTTP response.
-  if ((await response.text()).includes("<Error>"))
-    throw new HttpError(502, "Media promotion failed");
+  const destinationEtag = copyResultEtag(await response.text());
+  const head = await r2("HEAD", env("R2_BUCKET_NAME"), `assets/${id}`, {
+    "If-Match": destinationEtag,
+  });
+  return copiedHeadSnapshot(head, destinationEtag, bytes, type);
 }
 export async function readRange(
   key: string,
@@ -168,6 +212,5 @@ export async function copyLifecycleObject(
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new HttpError(502, "Media copy failed");
-  if ((await response.text()).includes("<Error>"))
-    throw new HttpError(502, "Media copy failed");
+  return copyResultEtag(await response.text());
 }

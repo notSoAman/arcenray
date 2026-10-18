@@ -7,6 +7,13 @@ import { DeleteFilm } from "../../../components/delete-film";
 import { FilmCreditsEditor } from "../../../components/film-credits-editor";
 import { browserApi } from "../../../lib/client-api";
 import { inspectVideo, prepareImage } from "../../../lib/media/prepare";
+import { multipartCheckpoint } from "../../../lib/media/multipart-checkpoint";
+import {
+  createMultipartUploadTask,
+  parseMultipartDescriptor,
+  type MultipartDescriptor,
+  type MultipartState,
+} from "../../../lib/media/multipart-upload";
 import { createUploadTask, type UploadState } from "../../../lib/media/upload";
 import styles from "./publish.module.css";
 import { parseFilmLink } from "./film-link";
@@ -16,8 +23,8 @@ type Kind = "film" | "hook" | "poster";
 type Task = ReturnType<typeof createUploadTask>;
 type Slot = {
   name: string;
-  task: Task;
-  state: UploadState;
+  task?: Task;
+  state: UploadState | MultipartState;
   description: string;
 };
 const empty: FilmDraft = {
@@ -91,7 +98,22 @@ export function PublishForm({
   );
   const [slots, setSlots] = useState<Partial<Record<Kind, Slot>>>({});
   const tasks = useRef<Partial<Record<Kind, Task>>>({});
-  const active = useRef<Task | null>(null);
+  const active = useRef<{ cancel(): void } | null>(null);
+  const mainFile = useRef<File | null>(null);
+  const mainTask = useRef<ReturnType<typeof createMultipartUploadTask> | null>(
+    null,
+  );
+  const operation = useRef(false);
+  const [pendingUploads, setPendingUploads] = useState<MultipartDescriptor[]>(
+    [],
+  );
+  const [resumeId, setResumeId] = useState<string | null>(null);
+  const [resumeLoading, setResumeLoading] = useState(
+    Boolean(initial?.id && initial.status === "draft"),
+  );
+  const [resumeError, setResumeError] = useState("");
+  const [discardConfirmation, setDiscardConfirmation] = useState("");
+  const [fileVersion, setFileVersion] = useState(0);
   const cancelled = useRef(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -138,6 +160,7 @@ export function PublishForm({
     void refreshStorage().catch(() => setStorageError(true));
     return () => {
       for (const task of Object.values(tasks.current)) task?.cancel();
+      mainTask.current?.pause();
     };
   }, []);
   useEffect(() => {
@@ -149,8 +172,98 @@ export function PublishForm({
     return () => window.removeEventListener("beforeunload", warn);
   }, [busy]);
 
+  async function loadPending(id: string) {
+    const reply = await browserApi().media.multipart.list(id);
+    if (
+      reply.error ||
+      !reply.data ||
+      typeof reply.data !== "object" ||
+      !("uploads" in reply.data) ||
+      !Array.isArray(reply.data.uploads)
+    )
+      throw new Error(
+        "Could not check resumable film uploads. Your saved draft is safe. Retry before starting or replacing a film upload.",
+      );
+    const descriptors = reply.data.uploads.map(parseMultipartDescriptor);
+    if (
+      new Set(descriptors.map((item) => item.asset_id)).size !==
+        descriptors.length ||
+      descriptors.some((item) => item.draft_id !== id)
+    )
+      throw new Error("Invalid draft upload response");
+    const checkpointPort = multipartCheckpoint(viewerId, id);
+    const saved = await checkpointPort.read();
+    if (saved?.asset_id) {
+      let known = descriptors.find((item) => item.asset_id === saved.asset_id);
+      if (!known) {
+        const state = await browserApi().media.multipart.status(saved.asset_id);
+        if (state.error)
+          throw new Error(
+            "Could not reconcile the saved upload checkpoint. Retry before creating a replacement.",
+          );
+        known = parseMultipartDescriptor(state.data);
+        if (known.asset_id !== saved.asset_id || known.draft_id !== id)
+          throw new Error("Invalid saved upload response");
+        descriptors.push(known);
+      }
+      if (known.status === "aborted") {
+        await checkpointPort.clear();
+        if (
+          mainTask.current?.state.assetId === known.asset_id &&
+          mainTask.current.state.stage !== "complete"
+        ) {
+          mainTask.current = null;
+          mainFile.current = null;
+          setSlots((previous) => {
+            const next = { ...previous };
+            delete next.film;
+            return next;
+          });
+          setFileVersion((version) => version + 1);
+          setDiscardConfirmation("");
+        }
+      }
+    }
+    const candidates = descriptors.filter(
+      (item) =>
+        item.status !== "aborted" &&
+        !(
+          item.asset_id === form.film_asset_id &&
+          ["uploaded", "ready"].includes(item.status)
+        ),
+    );
+    setPendingUploads(candidates);
+    setResumeId((previous) =>
+      candidates.some((item) => item.asset_id === previous)
+        ? previous
+        : candidates.length === 1
+          ? candidates[0]!.asset_id
+          : null,
+    );
+    setResumeError("");
+    return candidates;
+  }
+  useEffect(() => {
+    if (!initial?.id || initial.status !== "draft") return;
+    let alive = true;
+    // Checkpoint ownership is scoped to the current authenticated application UUID.
+    void loadPending(initial.id)
+      .catch((err) => {
+        if (alive) setResumeError(message(err));
+      })
+      .finally(() => {
+        if (alive) setResumeLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+    // The keyed server entry remounts when a different draft is opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial?.id]);
+
   async function choose(kind: Kind, file?: File) {
-    if (!file) return;
+    if (!file || operation.current || busy || preparing) return;
+    operation.current = true;
     setPreparing(kind);
     setError("");
     try {
@@ -166,6 +279,28 @@ export function PublishForm({
         if (kind === "film" && (file.size * 8) / metadata.duration > 4_500_000)
           description +=
             " · High bitrate: consider an H.264/AAC, CRF 22 export for a smaller upload.";
+      }
+      if (kind === "film") {
+        mainTask.current?.pause();
+        mainTask.current = null;
+        mainFile.current = file;
+        setSlots((previous) => ({
+          ...previous,
+          film: {
+            name: file.name,
+            description,
+            state: {
+              stage: "idle",
+              bytesSent: 0,
+              totalBytes: file.size,
+              hashedBytes: 0,
+            },
+          },
+        }));
+        setNotice(
+          "Film checked. Save draft & upload will check the complete file fingerprint before resuming any saved parts.",
+        );
+        return;
       }
       tasks.current[kind]?.cancel();
       const task = createUploadTask(kind, blob, browserApi().media, (state) =>
@@ -187,6 +322,7 @@ export function PublishForm({
     } catch (err) {
       setError(message(err));
     } finally {
+      operation.current = false;
       setPreparing(null);
     }
   }
@@ -218,7 +354,8 @@ export function PublishForm({
     return reply.data.id;
   }
   async function save() {
-    if (busy || preparing) return;
+    if (busy || preparing || operation.current || resumeLoading) return;
+    operation.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -226,7 +363,27 @@ export function PublishForm({
     setUploading(true);
     try {
       let value = input();
-      await persist(value); // Save metadata first, before any upload reservation.
+      const id = await persist(value); // Save metadata first, before any upload reservation.
+      let resumable: MultipartDescriptor | undefined;
+      let mainFreshBytes = 0;
+      if (
+        value.source === "r2_native" &&
+        mainFile.current &&
+        !mainTask.current
+      ) {
+        const candidates = await loadPending(id);
+        resumable =
+          candidates.find((item) => item.asset_id === resumeId) ??
+          (candidates.length === 1 ? candidates[0] : undefined);
+        if (candidates.length && !resumable)
+          throw new Error(
+            "Choose the saved upload to resume or explicitly discard it before starting another film.",
+          );
+        const checkpoint = await multipartCheckpoint(viewerId, id).read();
+        // A checkpoint without an asset ID may follow a committed but lost create response.
+        // Never count that existing reservation twice; server quota remains final authority.
+        if (!resumable && !checkpoint) mainFreshBytes = mainFile.current.size;
+      }
       const quota = await browserApi().media.storage();
       if (
         quota.error ||
@@ -241,22 +398,52 @@ export function PublishForm({
         Number(quota.data.quota_bytes) -
         Number(quota.data.used_bytes) -
         Number(quota.data.reserved_bytes);
-      const freshBytes = Object.entries(tasks.current).reduce(
-        (total, [kind, task]) =>
-          (kind !== "film" || value.source === "r2_native") &&
-          task?.state.stage === "idle"
-            ? total + task.state.totalBytes
-            : total,
-        0,
-      );
+      const freshBytes =
+        mainFreshBytes +
+        Object.entries(tasks.current).reduce(
+          (total, [kind, task]) =>
+            (kind !== "film" || value.source === "r2_native") &&
+            task?.state.stage === "idle"
+              ? total + task.state.totalBytes
+              : total,
+          0,
+        );
       if (!Number.isFinite(remaining) || freshBytes > remaining)
         throw new Error(
           "These files exceed your available storage. Choose smaller exports or wait for abandoned reservations to clear.",
         );
-      const kinds: Kind[] =
-        value.source === "r2_native"
-          ? ["film", "hook", "poster"]
-          : ["hook", "poster"];
+      if (value.source === "r2_native" && mainFile.current) {
+        if (!mainTask.current)
+          mainTask.current = createMultipartUploadTask(
+            mainFile.current,
+            browserApi().media.multipart,
+            {
+              draftId: id,
+              existing: resumable,
+              checkpoint: multipartCheckpoint(viewerId, id),
+              onChange: (state) =>
+                setSlots((previous) =>
+                  previous.film
+                    ? { ...previous, film: { ...previous.film, state } }
+                    : previous,
+                ),
+            },
+          );
+        if (cancelled.current)
+          throw new Error(
+            "Upload paused. Resume it in this tab or reselect the same film after reopening this draft.",
+          );
+        active.current = mainTask.current;
+        const receipt = await mainTask.current.start();
+        value = { ...value, film_asset_id: receipt.asset_id };
+        patch({ film_asset_id: receipt.asset_id });
+        await persist(value);
+        setPendingUploads((previous) =>
+          previous.filter((item) => item.asset_id !== receipt.asset_id),
+        );
+        setResumeId(null);
+      }
+      const kinds: Kind[] = ["hook", "poster"];
       for (const kind of kinds) {
         if (cancelled.current)
           throw new Error(
@@ -271,13 +458,16 @@ export function PublishForm({
         await persist(value); // Persist each verified receipt so later failures do not lose it.
       }
       setNotice(
-        "Draft saved privately. All selected files are verified. Review your details, then publish.",
+        pendingUploads.length && !mainFile.current
+          ? "Draft saved privately. Reselect the original film below to resume its pending upload."
+          : "Draft saved privately. All selected files are verified. Review your details, then publish.",
       );
     } catch (err) {
       setError(message(err));
     } finally {
       active.current = null;
       setUploading(false);
+      operation.current = false;
       setBusy(false);
       void refreshStorage().catch(() => setStorageError(true));
     }
@@ -291,12 +481,25 @@ export function PublishForm({
     setIndexed(true);
   }
   async function publish() {
-    if (busy || preparing) return;
+    if (busy || preparing || operation.current) return;
+    operation.current = true;
     setBusy(true);
     setError("");
     setNotice("");
     try {
       const value = input();
+      if (value.source === "r2_native" && (resumeLoading || resumeError))
+        throw new Error(
+          "Refresh saved uploads successfully before publishing this film.",
+        );
+      if (
+        value.source === "r2_native" &&
+        ((mainFile.current && mainTask.current?.state.stage !== "complete") ||
+          pendingUploads.some((item) => item.asset_id !== value.film_asset_id))
+      )
+        throw new Error(
+          "Finish or explicitly discard the pending film upload before publishing.",
+        );
       if (!rights)
         throw new Error(
           "Confirm that you have permission to publish the film, hook and poster.",
@@ -325,10 +528,79 @@ export function PublishForm({
     } catch (err) {
       setError(message(err));
     } finally {
+      operation.current = false;
       setBusy(false);
     }
   }
-  const locked = busy || preparing !== null || published;
+  async function discardMain() {
+    if (
+      operation.current ||
+      busy ||
+      preparing ||
+      discardConfirmation !== "DISCARD UPLOAD"
+    )
+      return;
+    operation.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const id = savedId.current;
+      if (!id) throw new Error("Save the draft before managing its upload.");
+      const selected = pendingUploads.find(
+        (item) => item.asset_id === resumeId,
+      );
+      let status: "aborting" | "aborted";
+      if (mainTask.current) status = await mainTask.current.discard();
+      else if (selected) {
+        const reply = await browserApi().media.multipart.abort(
+          selected.asset_id,
+        );
+        if (
+          reply.error ||
+          !reply.data ||
+          typeof reply.data !== "object" ||
+          !("status" in reply.data) ||
+          !["aborting", "aborted"].includes(String(reply.data.status))
+        )
+          throw new Error(
+            "Discard could not be confirmed. Retry; your upload may still be reserved.",
+          );
+        status = reply.data.status === "aborted" ? "aborted" : "aborting";
+        if (status === "aborted") {
+          const port = multipartCheckpoint(viewerId, id),
+            stored = await port.read();
+          if (stored?.asset_id === selected.asset_id) await port.clear();
+        }
+      } else
+        throw new Error(
+          "Choose the pending upload to discard, or reselect its original film to recover the checkpoint.",
+        );
+      if (status === "aborted") {
+        mainTask.current = null;
+        mainFile.current = null;
+        setSlots((previous) => {
+          const next = { ...previous };
+          delete next.film;
+          return next;
+        });
+        setFileVersion((version) => version + 1);
+        setDiscardConfirmation("");
+        setResumeId(null);
+        await loadPending(id);
+        setNotice("Upload discarded. Select a film to start a new upload.");
+      } else
+        setNotice(
+          "Discard queued. Storage remains reserved until cleanup is confirmed. Refresh saved uploads to check progress before choosing a replacement.",
+        );
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      operation.current = false;
+      setBusy(false);
+      void refreshStorage().catch(() => setStorageError(true));
+    }
+  }
+  const locked = busy || preparing !== null || published || resumeLoading;
   return (
     <div className={styles.layout}>
       <section className={styles.editor} aria-label="Film editor">
@@ -355,6 +627,157 @@ export function PublishForm({
             Refresh storage
           </button>
         </div>
+        {!published && draftId && (
+          <section
+            className={styles.resumePanel}
+            aria-label="Saved film uploads"
+          >
+            <h2>Resumable film upload</h2>
+            {resumeLoading ? (
+              <p role="status">Checking saved uploads…</p>
+            ) : resumeError ? (
+              <div>
+                <p role="alert" className={styles.error}>
+                  {resumeError}
+                </p>
+                <p>
+                  If a local recovery hint is unreadable, forget it and reload
+                  the server’s saved uploads. This does not discard remote parts
+                  or release storage.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={busy || resumeLoading}
+                  onClick={() => {
+                    if (operation.current) return;
+                    operation.current = true;
+                    setBusy(true);
+                    void (async () => {
+                      await multipartCheckpoint(viewerId, draftId).clear();
+                      mainTask.current?.pause();
+                      mainTask.current = null;
+                      mainFile.current = null;
+                      setSlots((previous) => {
+                        const next = { ...previous };
+                        delete next.film;
+                        return next;
+                      });
+                      setFileVersion((version) => version + 1);
+                      await loadPending(draftId);
+                    })()
+                      .catch((err) => setResumeError(message(err)))
+                      .finally(() => {
+                        operation.current = false;
+                        setBusy(false);
+                      });
+                  }}
+                >
+                  Forget local recovery hint & reload
+                </button>
+              </div>
+            ) : pendingUploads.length ? (
+              <>
+                <label>
+                  Saved upload
+                  <select
+                    value={resumeId ?? ""}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setResumeId(event.target.value || null);
+                      mainTask.current?.pause();
+                      mainTask.current = null;
+                      mainFile.current = null;
+                      setSlots((previous) => {
+                        const next = { ...previous };
+                        delete next.film;
+                        return next;
+                      });
+                      setFileVersion((version) => version + 1);
+                    }}
+                  >
+                    <option value="">Choose an upload</option>
+                    {pendingUploads.map((item) => (
+                      <option value={item.asset_id} key={item.asset_id}>
+                        {size(item.bytes)} · {item.status} ·{" "}
+                        {item.asset_id.slice(0, 8)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {pendingUploads
+                  .filter((item) => item.asset_id === resumeId)
+                  .map((item) => (
+                    <div key={item.asset_id}>
+                      <p>
+                        {size(item.bytes)} · {item.status}. Resume before{" "}
+                        {new Date(item.resume_expires_at).toLocaleString()}.
+                      </p>
+                      <p className={styles.fingerprint}>
+                        File fingerprint: {item.fingerprint}
+                      </p>
+                      <p>
+                        Reselect the original Main film MP4 below, then Save
+                        draft & upload. Every byte is fingerprint-checked before
+                        saved parts are reused.
+                      </p>
+                    </div>
+                  ))}
+              </>
+            ) : (
+              <p>
+                {mainTask.current?.state.assetId &&
+                mainTask.current.state.stage !== "complete"
+                  ? "A film upload is reserved in this tab. Resume it below or explicitly discard it."
+                  : "No pending upload was found for this draft."}
+              </p>
+            )}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy || resumeLoading}
+              onClick={() => {
+                setResumeLoading(true);
+                void loadPending(draftId)
+                  .catch((err) => setResumeError(message(err)))
+                  .finally(() => setResumeLoading(false));
+              }}
+            >
+              Refresh saved uploads
+            </button>
+            {(pendingUploads.length > 0 ||
+              (mainTask.current?.state.assetId &&
+                mainTask.current.state.stage !== "complete")) && (
+              <div className={styles.discard}>
+                <p>
+                  Discard permanently abandons these uploaded film parts. Your
+                  draft metadata stays saved. Quota may remain reserved while
+                  server cleanup finishes.
+                </p>
+                <label>
+                  Type DISCARD UPLOAD to confirm
+                  <input
+                    value={discardConfirmation}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setDiscardConfirmation(event.target.value)
+                    }
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={busy || discardConfirmation !== "DISCARD UPLOAD"}
+                  onClick={() => void discardMain()}
+                >
+                  Discard saved upload
+                </button>
+              </div>
+            )}
+          </section>
+        )}
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -424,13 +847,25 @@ export function PublishForm({
               Film source
               <select
                 value={form.source === "r2_native" ? "native" : "external"}
-                onChange={(e) =>
+                onChange={(e) => {
+                  if (
+                    pendingUploads.length ||
+                    (mainTask.current?.state.assetId &&
+                      !["complete", "aborted"].includes(
+                        mainTask.current.state.stage,
+                      ))
+                  ) {
+                    setError(
+                      "Resume or discard the pending film upload before changing its source.",
+                    );
+                    return;
+                  }
                   patch(
                     e.target.value === "native"
                       ? { source: "r2_native", provider_id: null }
                       : { source: "vimeo_embed", film_asset_id: null },
-                  )
-                }
+                  );
+                }}
               >
                 <option value="native">Upload my film (recommended)</option>
                 <option value="external">Link Vimeo or YouTube</option>
@@ -463,12 +898,19 @@ export function PublishForm({
                 <div key={kind} className={styles.asset}>
                   <label>
                     {kind === "film"
-                      ? "Main film MP4"
+                      ? pendingUploads.length || mainTask.current?.state.assetId
+                        ? "Reselect original Main film MP4 to resume"
+                        : "Main film MP4"
                       : kind === "hook"
                         ? "Discovery hook MP4 (required)"
                         : "Poster (required)"}
                     <input
+                      key={kind === "film" ? fileVersion : kind}
                       type="file"
+                      disabled={
+                        kind === "film" &&
+                        (resumeLoading || Boolean(resumeError))
+                      }
                       accept={
                         kind === "poster"
                           ? "image/jpeg,image/png,image/webp"
@@ -486,6 +928,17 @@ export function PublishForm({
                           ? "Ready to upload"
                           : slots[kind]!.state.stage}
                       </p>
+                      {kind === "film" &&
+                        slots.film &&
+                        "hashedBytes" in slots.film.state &&
+                        slots.film.state.stage === "hashing" && (
+                          <p>
+                            Checking complete file fingerprint:{" "}
+                            {size(slots.film.state.hashedBytes)} of{" "}
+                            {size(slots.film.state.totalBytes)}. No film bytes
+                            have been uploaded in this step.
+                          </p>
+                        )}
                       <progress
                         value={slots[kind]!.state.bytesSent}
                         max={slots[kind]!.state.totalBytes}
@@ -526,15 +979,17 @@ export function PublishForm({
                   active.current?.cancel();
                 }}
               >
-                Cancel upload
+                Pause uploads
               </button>
             )}
           </div>
           <p className={styles.muted}>
-            Uploads travel directly to storage. Keep this tab open while
-            uploading. Retry here to reuse a valid reservation. Saved drafts
-            survive a reload; unfinished local files must be selected again.
-            Abandoned reservations are cleaned up automatically.
+            Uploads travel directly to storage. Main films use resumable parts.
+            Pause to preserve transferred film parts; reopen this draft and
+            reselect the identical film before its displayed resume deadline.
+            Hooks and posters use single uploads and may need to restart after a
+            reload. Discard is a separate action; storage remains reserved until
+            cleanup is confirmed.
           </p>
         </form>
         {draftId ? (
@@ -604,11 +1059,16 @@ export function PublishForm({
                   className="btn btn-ghost"
                   disabled={busy}
                   onClick={() => {
+                    if (operation.current || busy) return;
+                    operation.current = true;
                     setBusy(true);
                     setError("");
                     void index(draftId)
                       .catch((err) => setError(message(err)))
-                      .finally(() => setBusy(false));
+                      .finally(() => {
+                        operation.current = false;
+                        setBusy(false);
+                      });
                   }}
                 >
                   Retry indexing
@@ -622,7 +1082,10 @@ export function PublishForm({
             filmId={draftId}
             title={form.title}
             disabled={busy || preparing !== null}
-            onBusyChange={setBusy}
+            onBusyChange={(value) => {
+              operation.current = value;
+              setBusy(value);
+            }}
           />
         )}
       </section>

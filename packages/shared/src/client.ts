@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types.ts";
 import {
+  multipartCreateSchema,
+  multipartSignSchema,
   eventSchema,
   filmDraftSchema,
   messageSchema,
@@ -10,6 +12,8 @@ import {
   uuidSchema,
 } from "./contracts.ts";
 import type {
+  MultipartCreateInput,
+  MultipartSignInput,
   FilmDraft,
   ProfileInput,
   SearchInput,
@@ -166,6 +170,14 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
       },
     },
     media: {
+      multipart: {
+        create: (input: MultipartCreateInput) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_create", ...multipartCreateSchema.parse(input)}}),
+        list: (draftId: string) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_list", draft_id: uuidSchema.parse(draftId)}}),
+        status: (assetId: string) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_status", asset_id: uuidSchema.parse(assetId)}}),
+        sign: (input: MultipartSignInput) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_sign", ...multipartSignSchema.parse(input)}}),
+        finish: (assetId: string) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_finish", asset_id: uuidSchema.parse(assetId)}}),
+        abort: (assetId: string) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_abort", asset_id: uuidSchema.parse(assetId)}}),
+      },
       storage: () => supabase.rpc("get_my_storage"),
       create: (input: UploadInput) =>
         supabase.functions.invoke("media-upload", {

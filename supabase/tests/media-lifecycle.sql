@@ -6,7 +6,7 @@ create function pg_temp.assert_true(ok boolean,message text) returns void langua
 insert into auth.users(id,email) values('11000000-0000-0000-0000-000000000001','media-lifecycle-'||gen_random_uuid()||'@example.invalid');
 insert into private.media_assets(id,owner_id,kind,object_key,expected_bytes,actual_bytes,content_type,status,expires_at,created_at) values
  ('21000000-0000-0000-0000-000000000001','11000000-0000-0000-0000-000000000001','film','fixture/expired',100,null,'video/mp4','pending',now()-interval '2 hours',now()-interval '3 hours'),
- ('21000000-0000-0000-0000-000000000002','11000000-0000-0000-0000-000000000001','film','fixture/ready',50,50,'video/mp4','ready',now(),now()),
+ ('21000000-0000-0000-0000-000000000002','11000000-0000-0000-0000-000000000001','film','fixture/ready',50,50,'video/mp4','ready',now()-interval '20 minutes',now()-interval '1 hour'),
  ('21000000-0000-0000-0000-000000000003','11000000-0000-0000-0000-000000000001','film','fixture/unattached',20,20,'video/mp4','uploaded',now()-interval '1 day',now()-interval '2 days'),
  ('21000000-0000-0000-0000-000000000004','11000000-0000-0000-0000-000000000001','film','fixture/attached',30,30,'video/mp4','uploaded',now()-interval '1 day',now()-interval '2 days');
 insert into public.films(owner_id,title,film_asset_id) values('11000000-0000-0000-0000-000000000001','Attached fixture','21000000-0000-0000-0000-000000000004');

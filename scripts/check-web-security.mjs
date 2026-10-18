@@ -2,8 +2,16 @@
 const base = new URL(
   process.env.ARCENRAY_WEB_TEST_URL || "http://localhost:3001",
 );
-if (!["localhost", "127.0.0.1"].includes(base.hostname))
-  throw new Error("Local test URL required");
+const local = ["localhost", "127.0.0.1"].includes(base.hostname);
+const hosted = [
+  "https://arcenray-web.amansinghchoudhary10.workers.dev",
+  "https://staging.arcenray.com",
+  "https://arcenray.com",
+].includes(base.origin);
+if (!local && !hosted)
+  throw new Error(
+    "An approved local, staging or production test URL is required",
+  );
 const pages = await Promise.all(
   [0, 1].map(() => fetch(new URL("/home", base), { redirect: "manual" })),
 );

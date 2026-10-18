@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "arcenray-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-18",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "arcenray-web" },
+  ],
+  "routes": [
+    { "pattern": "staging.arcenray.com", "custom_domain": true },
+    { "pattern": "arcenray.com/*", "zone_name": "arcenray.com" }
+  ],
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+}

@@ -59,6 +59,10 @@ function memory() {
       assert.equal(sourceObject?.etag, etag, "copy pins exact source ETag");
       assert.equal(sourceObject?.contentType, type);
       objects.set(`${to}:${destination}`, { ...sourceObject! });
+      return sourceObject!.etag;
+    },
+    async checkpoint(area, value) {
+      calls.push(`checkpoint:${area}:${value.etag}`);
     },
     async purge(key) {
       calls.push(`purge:${key}`);
@@ -116,6 +120,33 @@ test("deletion removes public origin and purges before waiting for upload signat
     `delete:private:${original}`,
     `delete:private:${backup}`,
   ]);
+});
+
+test("multipart deletion confirms abort before deleting objects and releasing a long reservation", async () => {
+  const { ports, calls } = memory();
+  ports.abortMultipart = async (key) => {
+    calls.push(`abort:${key}`);
+  };
+  const result = await executeMediaJob(
+    { ...job(), multipart: true, private_delete_after: "2027-01-01T00:00:00Z" },
+    ports,
+    Date.parse("2026-01-01"),
+  );
+  assert.equal(result, null);
+  assert.equal(calls[0], `abort:${original}`);
+  assert.ok(calls.includes(`delete:private:${original}`));
+});
+
+test("unconfirmed multipart abort retains quota and performs no object deletion", async () => {
+  for (const configured of [false, true]) {
+    const { ports, calls } = memory();
+    if (configured)
+      ports.abortMultipart = async () => {
+        throw new Error("R2 unavailable");
+      };
+    await assert.rejects(executeMediaJob({ ...job(), multipart: true }, ports));
+    assert.deepEqual(calls, []);
+  }
 });
 test("purge failure does not remove private copies or claim success", async () => {
   const { ports, calls } = memory();
@@ -187,4 +218,117 @@ test("restore retry accepts only the exact public snapshot after backup removal,
       error instanceof MediaJobError && error.code === "source_missing",
   );
   assert.ok(!missing.calls.some((call) => /^(copy|delete|purge):/.test(call)));
+});
+
+test("multipart source/public/backup ETags may differ but every copy is exact and checkpointed", async () => {
+  const state = memory();
+  const sourceEtag = '"11111111111111111111111111111111-6"';
+  const publicEtag = '"22222222222222222222222222222222"';
+  const backupEtag = '"33333333333333333333333333333333"';
+  const restoredEtag = '"44444444444444444444444444444444"';
+  state.objects.set(`private:${original}`, { ...snapshot, etag: sourceEtag });
+  state.objects.set(`public:${key}`, { ...snapshot, etag: publicEtag });
+  let recordedBackup = "";
+  let recordedPublic = publicEtag;
+  state.ports.copy = async (from, source, to, destination, etag) => {
+    const current = state.objects.get(`${from}:${source}`)!;
+    assert.equal(current.etag, etag);
+    const next = to === "private" ? backupEtag : restoredEtag;
+    state.objects.set(`${to}:${destination}`, { ...current, etag: next });
+    state.calls.push(`copy:${to}`);
+    return next;
+  };
+  state.ports.checkpoint = async (area, value) => {
+    state.calls.push(`checkpoint:${area}`);
+    if (area === "private") recordedBackup = value.etag;
+    else recordedPublic = value.etag;
+  };
+  await executeMediaJob(
+    { ...job("quarantine"), etag: publicEtag, source_etag: sourceEtag },
+    state.ports,
+  );
+  assert.equal(recordedBackup, backupEtag);
+  assert.ok(
+    state.calls.indexOf("checkpoint:private") <
+      state.calls.indexOf(`delete:public:${key}`),
+  );
+  await executeMediaJob(
+    {
+      ...job("restore"),
+      etag: publicEtag,
+      source_etag: sourceEtag,
+      backup_etag: recordedBackup,
+    },
+    state.ports,
+  );
+  assert.equal(recordedPublic, restoredEtag);
+  assert.ok(
+    state.calls.indexOf("checkpoint:public") <
+      state.calls.indexOf(`delete:private:${backup}`),
+  );
+  await executeMediaJob(
+    {
+      ...job("restore"),
+      etag: recordedPublic,
+      source_etag: sourceEtag,
+      backup_etag: recordedBackup,
+    },
+    state.ports,
+  );
+});
+
+test("private fallback must match original source ETag, never a public copy ETag or size alone", async () => {
+  const state = memory();
+  const source = '"11111111111111111111111111111111-6"';
+  const published = '"22222222222222222222222222222222"';
+  state.objects.set(`private:${original}`, { ...snapshot, etag: published });
+  await assert.rejects(
+    executeMediaJob(
+      { ...job("quarantine"), etag: published, source_etag: source },
+      state.ports,
+    ),
+  );
+  assert.ok(
+    !state.calls.some(
+      (call) => call.startsWith("copy:") || call.startsWith("delete:"),
+    ),
+  );
+  state.objects.set(`private:${original}`, { ...snapshot, etag: source });
+  await executeMediaJob(
+    { ...job("quarantine"), etag: published, source_etag: source },
+    state.ports,
+  );
+});
+
+test("copy result/HEAD mismatch cannot checkpoint or withdraw public media", async () => {
+  const state = memory();
+  state.objects.set(`public:${key}`, snapshot);
+  state.ports.copy = async () => '"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"';
+  await assert.rejects(executeMediaJob(job("quarantine"), state.ports));
+  assert.ok(
+    !state.calls.some((call) => /^(checkpoint|delete|purge):/.test(call)),
+  );
+});
+
+test("failed checkpoint preserves source and safely recopies it before retrying", async () => {
+  const state = memory();
+  const copyEtag = '"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"';
+  state.objects.set(`public:${key}`, snapshot);
+  state.ports.copy = async (from, source, to, destination, etag) => {
+    const value = state.objects.get(`${from}:${source}`)!;
+    assert.equal(value.etag, etag);
+    state.objects.set(`${to}:${destination}`, { ...value, etag: copyEtag });
+    state.calls.push(`copy:${to}`);
+    return copyEtag;
+  };
+  state.ports.checkpoint = async () => {
+    throw new MediaJobError("database");
+  };
+  await assert.rejects(executeMediaJob(job("quarantine"), state.ports));
+  assert.ok(state.objects.has(`public:${key}`));
+  assert.ok(!state.calls.some((call) => call.startsWith("delete:")));
+  state.ports.checkpoint = async () => {};
+  await executeMediaJob(job("quarantine"), state.ports);
+  assert.equal(state.calls.filter((call) => call === "copy:private").length, 2);
+  assert.ok(!state.objects.has(`public:${key}`));
 });

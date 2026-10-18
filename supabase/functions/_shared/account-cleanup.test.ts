@@ -4,6 +4,7 @@ import {
   AccountCleanupError,
   deleteClerkIdentity,
   executeAccountDeletion,
+  selectClerkCleanupConfig,
   type AccountDeletionJob,
   type AccountCleanupPorts,
 } from "./account-cleanup.ts";
@@ -14,6 +15,34 @@ const job: AccountDeletionJob = {
   clerk_deleted: false,
 };
 const configuration = { issuer: job.issuer, secret: "fake-unit-test-key" };
+test("shared pilot cleanup selects only the exact configured issuer and rejects ambiguous or missing keys", () => {
+  const production = {
+    issuer: "https://clerk.arcenray.com",
+    secret: "fake-live-key",
+  };
+  assert.deepEqual(
+    selectClerkCleanupConfig(job.issuer, [configuration, production]),
+    configuration,
+  );
+  assert.deepEqual(
+    selectClerkCleanupConfig(production.issuer, [configuration, production]),
+    production,
+  );
+  assert.throws(() =>
+    selectClerkCleanupConfig("https://attacker.invalid", [
+      configuration,
+      production,
+    ]),
+  );
+  assert.throws(() =>
+    selectClerkCleanupConfig(job.issuer, [configuration, configuration]),
+  );
+  assert.throws(() =>
+    selectClerkCleanupConfig(production.issuer, [
+      { ...production, secret: "" },
+    ]),
+  );
+});
 function ports() {
   const calls: string[] = [];
   const io: AccountCleanupPorts = {

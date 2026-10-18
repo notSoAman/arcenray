@@ -197,3 +197,12 @@
     display: none;
   }
 }
+.legal {
+  margin-top: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.legal a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

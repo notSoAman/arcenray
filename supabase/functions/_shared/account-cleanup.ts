@@ -23,6 +23,16 @@ function validate(job: AccountDeletionJob) {
   )
     throw new AccountCleanupError("identity");
 }
+/** Shared pilot: choose exactly one operator-configured issuer/key pair. */
+export function selectClerkCleanupConfig(
+  issuer: string,
+  configurations: { issuer: string; secret: string }[],
+) {
+  const matches = configurations.filter((config) => config.issuer === issuer);
+  if (matches.length !== 1 || !matches[0]!.secret)
+    throw new AccountCleanupError("configuration");
+  return matches[0]!;
+}
 export async function deleteClerkIdentity(
   job: AccountDeletionJob,
   configuration: { issuer: string; secret: string },
@@ -102,20 +112,23 @@ export async function processAccountDeletions(deadline = Date.now() + 14000) {
   if (error || !Array.isArray(data)) throw new AccountCleanupError("database");
   const ports: AccountCleanupPorts = {
     async deleteIdentity(job) {
-      let issuer: string, secret: string;
+      let configuration: { issuer: string; secret: string };
       try {
-        issuer = env("CLERK_ISSUER");
-        secret = env("CLERK_SECRET_KEY");
+        const configurations = [
+          { issuer: env("CLERK_ISSUER"), secret: env("CLERK_SECRET_KEY") },
+        ];
+        const productionIssuer = Deno.env.get("CLERK_PRODUCTION_ISSUER");
+        if (productionIssuer)
+          configurations.push({
+            issuer: productionIssuer,
+            secret: env("CLERK_PRODUCTION_SECRET_KEY"),
+          });
+        configuration = selectClerkCleanupConfig(job.issuer, configurations);
       } catch {
         throw new AccountCleanupError("configuration");
       }
       // Reserve six seconds for mark+finish and a failed-job defer if needed.
-      await deleteClerkIdentity(
-        job,
-        { issuer, secret },
-        fetch,
-        deadline - 6000,
-      );
+      await deleteClerkIdentity(job, configuration, fetch, deadline - 6000);
     },
     async markDeleted(id) {
       const { error } = await db

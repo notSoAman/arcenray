@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { safeNextPath } from "@repo/shared";
 import { redirect } from "next/navigation";
 import { Lockup, LogoTile } from "../../components/brand";
@@ -59,8 +60,7 @@ export default async function SignInPage({
             {isNew ? "Create your account" : "Sign in"}
           </h1>
           <p className={styles.lede}>
-            Sign in with your connected account, email, phone number or account
-            username.
+            Sign in with Google, your email address or account username.
           </p>
           {configured ? (
             <SignInForm
@@ -73,6 +73,11 @@ export default async function SignInPage({
           ) : (
             <SetupNotice />
           )}
+          <p className={styles.legal}>
+            <Link href="/privacy">Privacy Policy</Link>
+            {" · "}
+            <Link href="/terms">Terms of Service</Link>
+          </p>
         </div>
       </main>
     </div>

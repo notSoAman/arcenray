@@ -1,4 +1,5 @@
 import { admin, env } from "./http.ts";
+import { createMultipartStorage } from "./multipart-storage.ts";
 import { copyLifecycleObject, r2Lifecycle } from "./r2.ts";
 
 export type MediaJob = {
@@ -9,14 +10,18 @@ export type MediaJob = {
   content_type: string;
   bytes: number;
   etag: string | null;
+  source_etag?: string | null;
+  backup_etag?: string | null;
   action: "delete" | "quarantine" | "restore";
   version: number;
   private_delete_after: string;
   state: string;
   attempts: number;
+  multipart?: boolean;
 };
 type ObjectSnapshot = { bytes: number; etag: string; contentType: string };
 export type MediaPorts = {
+  abortMultipart?: (key: string) => Promise<void>;
   head: (
     area: "public" | "private",
     key: string,
@@ -29,6 +34,10 @@ export type MediaPorts = {
     destination: string,
     etag: string,
     type: string,
+  ) => Promise<string>;
+  checkpoint: (
+    area: "public" | "private",
+    snapshot: ObjectSnapshot,
   ) => Promise<void>;
   purge: (key: string) => Promise<void>;
 };
@@ -42,6 +51,7 @@ export class MediaJobError extends Error {
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export function validateMediaJob(job: MediaJob) {
   if (
+    (job.multipart !== undefined && typeof job.multipart !== "boolean") ||
     !uuid.test(job.asset_id) ||
     !uuid.test(job.owner_id) ||
     !job.object_key.startsWith(job.owner_id + "/") ||
@@ -58,8 +68,10 @@ export function validateMediaJob(job: MediaJob) {
     job.bytes > 2147483648 ||
     !["video/mp4", "image/webp"].includes(job.content_type) ||
     !Number.isFinite(Date.parse(job.private_delete_after)) ||
-    (job.etag !== null &&
-      !/^(?:"[a-fA-F0-9-]+"|[a-fA-F0-9-]+)$/.test(job.etag)) ||
+    [job.etag, job.source_etag, job.backup_etag].some(
+      (etag) =>
+        etag != null && !/^(?:"[a-fA-F0-9-]+"|[a-fA-F0-9-]+)$/.test(etag),
+    ) ||
     (job.action !== "delete" && !job.etag)
   )
     throw new MediaJobError("storage");
@@ -80,11 +92,15 @@ export function exactPurgePayload(base: string, key: string) {
     throw new MediaJobError("purge");
   return { files: [new URL(key, url).href] };
 }
-function matches(object: ObjectSnapshot | null, job: MediaJob) {
+function matches(
+  object: ObjectSnapshot | null,
+  job: MediaJob,
+  etag = job.etag,
+) {
   return (
     object !== null &&
     object.bytes === job.bytes &&
-    object.etag.replace(/^"|"$/g, "") === job.etag?.replace(/^"|"$/g, "") &&
+    object.etag.replace(/^"|"$/g, "") === etag?.replace(/^"|"$/g, "") &&
     object.contentType === job.content_type
   );
 }
@@ -95,15 +111,22 @@ export async function executeMediaJob(
   ports: MediaPorts,
   now = Date.now(),
 ): Promise<string | null> {
-  const job = validateMediaJob(input);
+  const job = { ...validateMediaJob(input) };
   const publicKey = `assets/${job.asset_id}`,
     backup = `quarantine/${job.asset_id}`;
   if (job.action === "delete") {
+    if (job.multipart) {
+      if (!ports.abortMultipart) throw new MediaJobError("storage");
+      // Close every exact-key session first. A part signature cannot recreate a
+      // completed object after its upload ID is aborted; writer grace is enforced
+      // by the database claim deadline before this function can run.
+      await ports.abortMultipart(job.object_key);
+    }
     await ports.remove("public", publicKey);
     await ports.purge(publicKey);
     // Existing signatures may still recreate the original staging object. Keep
     // accounting/identity records until they have expired and this job retries.
-    if (Date.parse(job.private_delete_after) > now)
+    if (!job.multipart && Date.parse(job.private_delete_after) > now)
       return job.private_delete_after;
     await ports.remove("private", job.object_key);
     await ports.remove("private", backup);
@@ -111,8 +134,7 @@ export async function executeMediaJob(
   }
   if (job.action === "quarantine") {
     const existing = await ports.head("private", backup);
-    if (existing && !matches(existing, job)) throw new MediaJobError("storage");
-    if (!existing) {
+    if (!matches(existing, job, job.backup_etag ?? job.etag)) {
       const published = await ports.head("public", publicKey);
       let source: "public" | "private" = "public";
       let sourceKey = publicKey;
@@ -121,8 +143,13 @@ export async function executeMediaJob(
         sourceKey = job.object_key;
       }
       const snapshot = published ?? (await ports.head("private", sourceKey));
-      if (!matches(snapshot, job)) throw new MediaJobError("source_missing");
-      await ports.copy(
+      const expected =
+        source === "public" ? job.etag : (job.source_etag ?? job.etag);
+      if (!matches(snapshot, job, expected))
+        throw new MediaJobError("source_missing");
+      // An uncheckpointed destination is never trusted by size alone. Recopy an
+      // exact known source, pin the CopyObject result, then checkpoint before withdrawal.
+      const copiedEtag = await ports.copy(
         source,
         sourceKey,
         "private",
@@ -130,8 +157,10 @@ export async function executeMediaJob(
         snapshot!.etag,
         job.content_type,
       );
-      if (!matches(await ports.head("private", backup), job))
-        throw new MediaJobError("storage");
+      const copied = await ports.head("private", backup);
+      if (!matches(copied, job, copiedEtag)) throw new MediaJobError("storage");
+      await ports.checkpoint("private", copied!);
+      job.backup_etag = copied!.etag;
     }
     await ports.remove("public", publicKey);
     await ports.purge(publicKey);
@@ -140,8 +169,9 @@ export async function executeMediaJob(
   const backupSnapshot = await ports.head("private", backup);
   const published = await ports.head("public", publicKey);
   if (backupSnapshot) {
-    if (!matches(backupSnapshot, job)) throw new MediaJobError("storage");
-    await ports.copy(
+    if (!matches(backupSnapshot, job, job.backup_etag ?? job.etag))
+      throw new MediaJobError("storage");
+    const copiedEtag = await ports.copy(
       "private",
       backup,
       "public",
@@ -149,11 +179,11 @@ export async function executeMediaJob(
       backupSnapshot.etag,
       job.content_type,
     );
-    if (!matches(await ports.head("public", publicKey), job))
-      throw new MediaJobError("storage");
+    const copied = await ports.head("public", publicKey);
+    if (!matches(copied, job, copiedEtag)) throw new MediaJobError("storage");
+    await ports.checkpoint("public", copied!);
+    job.etag = copied!.etag;
   } else if (!matches(published, job)) {
-    // A completed copy followed by a database failure can leave only the valid
-    // public object. Anything else fails closed rather than claiming restoration.
     throw new MediaJobError("source_missing");
   }
   await ports.purge(publicKey);
@@ -170,7 +200,7 @@ export function lifecycleTimeout(
   if (remaining <= 0) throw new MediaJobError("storage");
   return Math.min(maximum, remaining);
 }
-function productionPorts(deadline: number): MediaPorts {
+function productionPorts(deadline: number, job: MediaJob): MediaPorts {
   // Validate purge configuration before deleting origin media. Missing credentials
   // leave the durable job failed/retryable, never falsely marked removed.
   let zone: string, token: string, base: string;
@@ -188,6 +218,9 @@ function productionPorts(deadline: number): MediaPorts {
     private: env("R2_UPLOAD_BUCKET_NAME"),
   };
   return {
+    abortMultipart: async (key) => {
+      await createMultipartStorage().abortAll(key, deadline);
+    },
     async head(area, key) {
       const response = await r2Lifecycle(
         "HEAD",
@@ -213,7 +246,7 @@ function productionPorts(deadline: number): MediaPorts {
       );
     },
     async copy(from, source, to, destination, etag, type) {
-      await copyLifecycleObject(
+      return await copyLifecycleObject(
         buckets[from],
         source,
         buckets[to],
@@ -223,6 +256,20 @@ function productionPorts(deadline: number): MediaPorts {
         to === "public",
         lifecycleTimeout(deadline, 10000),
       );
+    },
+    async checkpoint(area, snapshot) {
+      const result = await admin()
+        .rpc("backend_record_media_copy", {
+          p_asset: job.asset_id,
+          p_version: job.version,
+          p_area: area,
+          p_etag: snapshot.etag,
+          p_bytes: snapshot.bytes,
+          p_content_type: snapshot.contentType,
+        })
+        .abortSignal(AbortSignal.timeout(lifecycleTimeout(deadline, 2000)));
+      if (result.error || result.data !== true)
+        throw new MediaJobError("database");
     },
     async purge(key) {
       try {
@@ -266,7 +313,10 @@ export async function processMediaJobs(deadline = Date.now() + 45000) {
       const job = input as MediaJob;
       try {
         validateMediaJob(job);
-        const until = await executeMediaJob(job, productionPorts(workDeadline));
+        const until = await executeMediaJob(
+          job,
+          productionPorts(workDeadline, job),
+        );
         if (until) {
           const { error } = await db
             .rpc("backend_defer_media_job", {

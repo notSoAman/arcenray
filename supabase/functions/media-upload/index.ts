@@ -1,5 +1,10 @@
 import { z } from "zod";
 import {
+  multipartSchema,
+  isMultipartAction,
+  handleMultipart,
+} from "../_shared/multipart.ts";
+import {
   serve,
   auth,
   admin,
@@ -21,7 +26,7 @@ import {
   inspectMp4Moov,
   validateMp4Samples,
 } from "../_shared/media-inspection.ts";
-const bodySchema = z.discriminatedUnion("action", [
+const basicBodySchema = z.discriminatedUnion("action", [
   z
     .object({
       action: z.literal("create"),
@@ -33,6 +38,7 @@ const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("complete"), asset_id: z.uuid() }).strict(),
   z.object({ action: z.literal("publish"), film_id: z.uuid() }).strict(),
 ]);
+const bodySchema = z.union([basicBodySchema, multipartSchema]);
 type Asset = {
   id: string;
   owner_id: string;
@@ -61,15 +67,25 @@ async function promote(a: Asset) {
       p_owner: a.owner_id,
     }),
   );
-  await copyPublic(a.object_key, a.id, a.etag, a.content_type);
+  const destination = await copyPublic(
+    a.object_key,
+    a.id,
+    a.etag,
+    a.content_type,
+    a.actual_bytes ?? a.expected_bytes,
+  );
   const result = checked(
     await admin().rpc("backend_finish_promotion", {
       p_id: a.id,
       p_owner: a.owner_id,
       p_token: token,
+      p_public_etag: destination.etag,
+      p_bytes: destination.bytes,
+      p_content_type: destination.contentType,
     }),
   ) as Asset;
-  // The verified immutable copy is now authoritative; remove the private duplicate.
+  // Delete the current duplicate opportunistically. Ordinary PUT URLs may still
+  // recreate it; SQL keeps source_deleted=false until their full safety hold passes.
   try {
     await r2("DELETE", env("R2_UPLOAD_BUCKET_NAME"), a.object_key);
     await admin().rpc("backend_source_deleted", { p_id: a.id });
@@ -77,6 +93,57 @@ async function promote(a: Asset) {
     /* Scheduled cleanup retries source deletion. */
   }
   return result;
+}
+async function verifyCompletedAsset(id: string, owner: string) {
+  let a = await asset(id, owner);
+  if (a.status === "ready" || a.status === "uploaded") {
+    if (a.kind === "profile_picture") a = await promote(a);
+    return { asset_id: a.id, status: a.status, public_key: a.public_key };
+  }
+  if (a.status !== "pending" || Date.parse(a.expires_at) < Date.now())
+    throw new HttpError(409, "Upload expired");
+  const head = await r2("HEAD", env("R2_UPLOAD_BUCKET_NAME"), a.object_key);
+  const bytes = Number(head.headers.get("content-length"));
+  const etag = head.headers.get("etag");
+  if (
+    bytes !== Number(a.expected_bytes) ||
+    !etag ||
+    head.headers.get("content-type")?.split(";")[0] !== a.content_type
+  )
+    throw new HttpError(
+      422,
+      "Uploaded size or MIME type differs from reservation",
+    );
+  let metadata: { width: number; height: number; duration_seconds?: number };
+  try {
+    if (a.content_type === "image/webp")
+      metadata = inspectWebP(await readRange(a.object_key, 0, bytes - 1, etag));
+    else {
+      const file = await readMoov(a.object_key, bytes, etag);
+      validateMp4Samples(file.moov, file.fileSize, file.mdatRanges);
+      metadata = inspectMp4Moov(file.moov);
+    }
+  } catch (e) {
+    if (e instanceof HttpError) throw e;
+    throw new HttpError(
+      422,
+      "Unsupported or malformed media. Export WebP or H.264/AAC MP4.",
+    );
+  }
+  a = checked(
+    await admin().rpc("backend_verify_asset", {
+      p_id: a.id,
+      p_owner: owner,
+      p_bytes: bytes,
+      p_etag: etag,
+      p_width: metadata.width,
+      p_height: metadata.height,
+      p_duration: metadata.duration_seconds ?? null,
+    }),
+  ) as Asset;
+  // Profile images are deliberately public; film media remains private until explicit publication.
+  if (a.kind === "profile_picture") a = await promote(a);
+  return { asset_id: a.id, status: a.status, public_key: a.public_key };
 }
 serve(async (req) => {
   const { client, user } = await auth(req);
@@ -91,6 +158,8 @@ serve(async (req) => {
     "R2_BUCKET_NAME",
   ])
     env(key);
+  if (isMultipartAction(b))
+    return handleMultipart(b, user.id, verifyCompletedAsset);
   if (b.action === "create") {
     const a = checked(
       await client.rpc("reserve_upload", {
@@ -104,59 +173,7 @@ serve(async (req) => {
       ...(await signUpload(a.object_key, b.bytes, b.content_type)),
     };
   }
-  if (b.action === "complete") {
-    let a = await asset(b.asset_id, user.id);
-    if (a.status === "ready" || a.status === "uploaded") {
-      if (a.kind === "profile_picture") a = await promote(a);
-      return { asset_id: a.id, status: a.status, public_key: a.public_key };
-    }
-    if (a.status !== "pending" || Date.parse(a.expires_at) < Date.now())
-      throw new HttpError(409, "Upload expired");
-    const head = await r2("HEAD", env("R2_UPLOAD_BUCKET_NAME"), a.object_key);
-    const bytes = Number(head.headers.get("content-length"));
-    const etag = head.headers.get("etag");
-    if (
-      bytes !== Number(a.expected_bytes) ||
-      !etag ||
-      head.headers.get("content-type")?.split(";")[0] !== a.content_type
-    )
-      throw new HttpError(
-        422,
-        "Uploaded size or MIME type differs from reservation",
-      );
-    let metadata: { width: number; height: number; duration_seconds?: number };
-    try {
-      if (a.content_type === "image/webp")
-        metadata = inspectWebP(
-          await readRange(a.object_key, 0, bytes - 1, etag),
-        );
-      else {
-        const file = await readMoov(a.object_key, bytes, etag);
-        validateMp4Samples(file.moov, file.fileSize, file.mdatRanges);
-        metadata = inspectMp4Moov(file.moov);
-      }
-    } catch (e) {
-      if (e instanceof HttpError) throw e;
-      throw new HttpError(
-        422,
-        "Unsupported or malformed media. Export WebP or H.264/AAC MP4.",
-      );
-    }
-    a = checked(
-      await admin().rpc("backend_verify_asset", {
-        p_id: a.id,
-        p_owner: user.id,
-        p_bytes: bytes,
-        p_etag: etag,
-        p_width: metadata.width,
-        p_height: metadata.height,
-        p_duration: metadata.duration_seconds ?? null,
-      }),
-    ) as Asset;
-    // Profile images are deliberately public; film media remains private until explicit publication.
-    if (a.kind === "profile_picture") a = await promote(a);
-    return { asset_id: a.id, status: a.status, public_key: a.public_key };
-  }
+  if (b.action === "complete") return verifyCompletedAsset(b.asset_id, user.id);
   const f = checked(
     await client
       .from("films")

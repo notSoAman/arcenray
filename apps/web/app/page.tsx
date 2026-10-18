@@ -92,6 +92,11 @@ export default async function WelcomePage() {
           <span className="kicker">
             For the work that hasn&apos;t been discovered yet
           </span>
+          <nav aria-label="Legal">
+            <Link href="/privacy">Privacy Policy</Link>
+            {" · "}
+            <Link href="/terms">Terms of Service</Link>
+          </nav>
         </div>
       </footer>
     </div>

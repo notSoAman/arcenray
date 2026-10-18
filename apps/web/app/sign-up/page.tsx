@@ -39,6 +39,11 @@ export default function SignUpPage() {
           <Link href="/home" className="text-link">
             Browse films without an account
           </Link>
+          <p className={styles.legal}>
+            <Link href="/privacy">Privacy Policy</Link>
+            {" · "}
+            <Link href="/terms">Terms of Service</Link>
+          </p>
         </div>
       </main>
     </div>
