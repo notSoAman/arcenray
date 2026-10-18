@@ -271,3 +271,79 @@
     display: none;
   }
 }
+
+.vibeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.vibeCard {
+  min-width: 0;
+  min-height: 190px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background:
+    radial-gradient(
+      ellipse at 20% 5%,
+      color-mix(in srgb, var(--vibe-accent) 45%, transparent),
+      transparent 75%
+    ),
+    var(--graphite);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: end;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+.vibeCard[data-tone="mist"] {
+  --vibe-accent: var(--text-faint);
+}
+.vibeCard[data-tone="ember"] {
+  --vibe-accent: var(--ember-crimson);
+}
+.vibeCard[data-tone="lime"] {
+  --vibe-accent: var(--lime-mist);
+}
+.vibeCard[data-tone="violet"] {
+  --vibe-accent: var(--orchid-violet);
+}
+.vibeCard[data-tone="shadow"] {
+  --vibe-accent: var(--deep-plum);
+}
+.vibeCard[data-tone="pink"] {
+  --vibe-accent: var(--signal-pink);
+}
+.vibeCard strong {
+  font-size: 17px;
+}
+.vibeCard > span:last-child {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--bone);
+}
+.vibeCard[aria-pressed="true"] {
+  border-color: var(--bone);
+  box-shadow: inset 0 0 0 1px var(--bone);
+}
+.vibeCard:disabled:not([aria-pressed="true"]) {
+  opacity: 0.5;
+  cursor: default;
+}
+.vibeNumber {
+  margin-bottom: auto;
+  font-family: var(--font-courier-prime);
+  font-size: 13px;
+}
+@media (max-width: 520px) {
+  .vibeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .vibeCard {
+    min-height: 165px;
+  }
+}

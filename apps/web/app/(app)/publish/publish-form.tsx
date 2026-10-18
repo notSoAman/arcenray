@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { filmDraftSchema, type Database, type FilmDraft } from "@repo/shared";
+import { DeleteFilm } from "../../../components/delete-film";
+import { FilmCreditsEditor } from "../../../components/film-credits-editor";
 import { browserApi } from "../../../lib/client-api";
 import { inspectVideo, prepareImage } from "../../../lib/media/prepare";
 import { createUploadTask, type UploadState } from "../../../lib/media/upload";
@@ -52,10 +54,12 @@ export function PublishForm({
   initial,
   drafts,
   handle,
+  viewerId,
 }: {
   initial: Film | null;
   drafts: Film[];
   handle: string;
+  viewerId: string;
 }) {
   const [form, setForm] = useState<FilmDraft>(() =>
     initial
@@ -533,6 +537,18 @@ export function PublishForm({
             Abandoned reservations are cleaned up automatically.
           </p>
         </form>
+        {draftId ? (
+          <FilmCreditsEditor
+            key={draftId}
+            filmId={draftId}
+            viewerId={viewerId}
+            editable={!locked}
+          />
+        ) : (
+          <p className={styles.muted}>
+            Save your draft to add your collaborators’ film credits.
+          </p>
+        )}
         <section className={styles.publish}>
           <h2>3 / Ready for your audience?</h2>
           <label className={styles.check}>
@@ -600,6 +616,14 @@ export function PublishForm({
               )}
             </div>
           </div>
+        )}
+        {draftId && (
+          <DeleteFilm
+            filmId={draftId}
+            title={form.title}
+            disabled={busy || preparing !== null}
+            onBusyChange={setBusy}
+          />
         )}
       </section>
       <aside className={styles.sidebar}>

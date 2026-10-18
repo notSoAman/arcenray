@@ -55,11 +55,18 @@ async function promote(a: Asset) {
   if (a.status === "ready") return a;
   if (a.status !== "uploaded" || !a.etag)
     throw new HttpError(409, "Complete and verify media before publishing");
-  await copyPublic(a.object_key, a.id, a.etag, a.content_type);
-  const result = checked(
-    await admin().rpc("backend_promote_asset", {
+  const token = checked(
+    await admin().rpc("backend_begin_promotion", {
       p_id: a.id,
       p_owner: a.owner_id,
+    }),
+  );
+  await copyPublic(a.object_key, a.id, a.etag, a.content_type);
+  const result = checked(
+    await admin().rpc("backend_finish_promotion", {
+      p_id: a.id,
+      p_owner: a.owner_id,
+      p_token: token,
     }),
   ) as Asset;
   // The verified immutable copy is now authoritative; remove the private duplicate.

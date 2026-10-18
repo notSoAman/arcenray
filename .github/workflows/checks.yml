@@ -1,0 +1,36 @@
+# Founder approved secret-free checks, 2026-10-18.
+name: Checks
+on:
+  pull_request:
+  push:
+    branches: [codex/project-backup]
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4; packageManager pins pnpm
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2
+        with:
+          deno-version: "2.9.6"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm lint
+      - run: pnpm check-types
+      - run: pnpm build
+      - run: deno task --config supabase/functions/deno.json check
+      - run: deno task --config supabase/functions/deno.json test
+# Live SQL, R2, Clerk and hosted journeys are separate founder-approved release gates.
+# This workflow receives no application secrets and does not deploy or mutate cloud data.

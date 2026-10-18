@@ -199,6 +199,14 @@ export default async function FilmPage({
                   </span>
                 </span>
               </Link>
+              {isOwner ? (
+                <Link
+                  className="btn btn-ghost"
+                  href={`/publish?draft=${film.id}`}
+                >
+                  Manage film
+                </Link>
+              ) : null}
               {!isOwner ? (
                 <div className={styles.creatorActions}>
                   <MessageButton userId={creator.id} className={styles.message}>
@@ -244,6 +252,11 @@ export default async function FilmPage({
             </ul>
           ) : null}
 
+          {isOwner ? (
+            <Link className="btn btn-ghost" href={`/publish?draft=${film.id}`}>
+              Manage film
+            </Link>
+          ) : null}
           {!isOwner ? (
             <ReportButton
               target={{ film_id: film.id }}

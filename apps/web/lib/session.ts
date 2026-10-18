@@ -1,6 +1,7 @@
 import "server-only";
 import { auth } from "@clerk/nextjs/server";
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 
 /** True when `pnpm setup:web` (or an equivalent .env.local) supplied public config. */
@@ -40,8 +41,17 @@ export const getViewer = cache(async function getViewer() {
     "ensure_current_profile",
   );
   // A Clerk user with a provisioning error must not be treated as an anonymous viewer.
-  if (identityError || !id)
+  if (identityError || !id) {
+    const { data: state } = await supabase.rpc("get_account_status");
+    if (
+      state &&
+      typeof state === "object" &&
+      !Array.isArray(state) &&
+      ["suspended", "deleting", "deleted"].includes(String(state.status))
+    )
+      redirect("/account-unavailable");
     throw new Error("Could not initialize your account. Please retry shortly.");
+  }
   const user = { id, email: null as string | null, clerkId: session.userId };
   const { data: profile, error } = await supabase
     .from("profiles")

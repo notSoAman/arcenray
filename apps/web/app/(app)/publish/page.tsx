@@ -54,6 +54,7 @@ export default async function PublishPage({
         initial={selected}
         drafts={drafts ?? []}
         handle={profile.handle}
+        viewerId={user.id}
       />
     </main>
   );

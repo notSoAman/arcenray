@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CreditInvitations } from "../../../../components/credit-invitations";
 import { WideCard } from "../../../../components/film-cards";
 import { IconPin } from "../../../../components/icons";
 import { Avatar } from "../../../../components/media";
@@ -17,7 +18,7 @@ import {
 } from "../../../../lib/feed";
 import { personRole } from "../../../../lib/roles";
 import { getViewer } from "../../../../lib/session";
-import { BlockButton, CreditResponse } from "./profile-actions";
+import { BlockButton } from "./profile-actions";
 import styles from "./profile.module.css";
 
 export const dynamic = "force-dynamic";
@@ -220,7 +221,7 @@ export default async function ProfilePage({
                 </h2>
                 <p>
                   {isSelf
-                    ? "Publishing from the web app is coming next. Your films will show here."
+                    ? "Use Publish a film to save a draft and share your work. Your films will show here."
                     : "When they publish, their short films will show here."}
                 </p>
               </div>
@@ -245,6 +246,9 @@ export default async function ProfilePage({
             )
           ) : null}
 
+          {tab === "credits" && isSelf && user ? (
+            <CreditInvitations viewerId={user.id} />
+          ) : null}
           {tab === "credits" ? (
             credits.length === 0 ? (
               <div className="state-panel">
@@ -285,13 +289,12 @@ export default async function ProfilePage({
                           >
                             {c.verification_state === "declined"
                               ? " · Declined"
-                              : " · Waiting for you"}
+                              : f?.owner_id === profile.id
+                                ? " · Unverified self-credit"
+                                : " · Awaiting confirmation"}
                           </span>
                         ) : null}
                       </span>
-                      {isSelf && c.verification_state === "pending" ? (
-                        <CreditResponse creditId={c.id} />
-                      ) : null}
                     </li>
                   );
                 })}

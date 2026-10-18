@@ -47,6 +47,7 @@ export default function RootLayout({
         {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
         process.env.CLERK_SECRET_KEY ? (
           <ClerkProvider
+            dynamic
             signInUrl="/sign-in"
             signUpUrl="/sign-up"
             signInFallbackRedirectUrl="/home"

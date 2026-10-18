@@ -119,3 +119,55 @@ export async function readMoov(key: string, size: number, etag: string) {
     throw new HttpError(422, "MP4 media or metadata missing");
   return { moov, fileSize: size, mdatRanges };
 }
+
+/** Lifecycle operations explicitly accept an already-absent object, never other errors. */
+export async function r2Lifecycle(
+  method: "HEAD" | "DELETE",
+  bucket: string,
+  key: string,
+  timeoutMs = 5000,
+) {
+  const signed = await signer().sign(objectUrl(bucket, key), { method });
+  // Queue retries are durable: avoid aws4fetch's implicit exponential retries,
+  // which can sleep beyond this invocation's deadline on upstream 429/5xx.
+  const response = await fetch(signed, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok && response.status !== 404)
+    throw new HttpError(502, "Media storage request failed");
+  return response.status === 404 ? null : response;
+}
+
+/** Server-side conditional copy; video bytes never enter the function. */
+export async function copyLifecycleObject(
+  sourceBucket: string,
+  sourceKey: string,
+  destinationBucket: string,
+  destinationKey: string,
+  etag: string,
+  type: string,
+  isPublic: boolean,
+  timeoutMs = 10000,
+) {
+  const signed = await signer().sign(
+    objectUrl(destinationBucket, destinationKey),
+    {
+      method: "PUT",
+      headers: {
+        "x-amz-copy-source": `/${sourceBucket}/${sourceKey.split("/").map(encodeURIComponent).join("/")}`,
+        "x-amz-copy-source-if-match": etag,
+        "x-amz-metadata-directive": "REPLACE",
+        "Content-Type": type,
+        "Cache-Control": isPublic
+          ? "public,max-age=31536000,immutable"
+          : "private,no-store",
+      },
+    },
+  );
+  const response = await fetch(signed, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok) throw new HttpError(502, "Media copy failed");
+  if ((await response.text()).includes("<Error>"))
+    throw new HttpError(502, "Media copy failed");
+}

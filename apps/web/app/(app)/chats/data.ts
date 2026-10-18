@@ -33,13 +33,9 @@ export async function loadChats(
       .select("conversation_id,user_id")
       .in("conversation_id", ids)
       .neq("user_id", me),
-    supabase
-      .from("messages")
-      .select("conversation_id,sender_id,body,created_at")
-      .in("conversation_id", ids)
-      .order("created_at", { ascending: false })
-      .limit(300),
+    supabase.rpc("get_chat_summaries"),
   ]);
+  if (others.error || messages.error) return null;
   const otherBy = new Map(
     (others.data ?? []).map((o) => [o.conversation_id, o.user_id]),
   );
