@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -35,23 +36,26 @@ type Local = ThreadMessage & { status?: "sending" | "failed" };
 
 function merge(list: Local[], msg: Local) {
   const i = list.findIndex(
-    (m) => m.id === msg.id || m.client_id === msg.client_id,
+    (m) =>
+      m.id === msg.id ||
+      (m.sender_id === msg.sender_id && m.client_id === msg.client_id),
   );
-  if (i === -1)
-    return [...list, msg].sort((a, b) =>
-      a.created_at.localeCompare(b.created_at),
-    );
   const next = list.slice();
-  next[i] = { ...msg, status: undefined };
-  return next;
+  if (i === -1) next.push(msg);
+  else next[i] = { ...msg, status: undefined };
+  return next.sort(
+    (a, b) =>
+      a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
+  );
 }
 
-/** One-to-one thread with Realtime delivery, optimistic send and retry. */
+/** RLS-scoped history uses a stable timestamp/ID cursor; older pages never mark new messages read. */
 export function Thread({
   conversationId,
   me,
   other,
   initialMessages,
+  initialHasOlder,
   films,
   loadFailed,
 }: {
@@ -59,11 +63,19 @@ export function Thread({
   me: string;
   other: FeedCreator | null;
   initialMessages: ThreadMessage[];
+  initialHasOlder: boolean;
   films: Record<string, ThreadFilm>;
   loadFailed: boolean;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<Local[]>(initialMessages);
+  const [filmMap, setFilmMap] = useState(films);
+  const [hasOlder, setHasOlder] = useState(initialHasOlder || loadFailed);
+  const [historyError, setHistoryError] = useState(loadFailed);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const historyLock = useRef(false);
+  const cursor = useRef(initialMessages[0] ?? null);
+  const restoreScroll = useRef<{ height: number; top: number } | null>(null);
   const [draft, setDraft] = useState("");
   const [live, setLive] = useState<"connecting" | "live" | "offline">(
     "connecting",
@@ -71,6 +83,76 @@ export function Thread({
   const scroller = useRef<HTMLDivElement>(null);
   const name = other?.full_name ?? "Someone on arcenray";
   const first = name.split(/\s+/)[0];
+
+  useLayoutEffect(() => {
+    const previous = restoreScroll.current;
+    if (previous && scroller.current) {
+      scroller.current.scrollTop =
+        previous.top + scroller.current.scrollHeight - previous.height;
+      restoreScroll.current = null;
+    }
+  }, [messages]);
+
+  async function loadOlder() {
+    if (historyLock.current) return;
+    historyLock.current = true;
+    setHistoryBusy(true);
+    setHistoryError(false);
+    try {
+      const db = browserApi().supabase;
+      let query = db
+        .from("messages")
+        .select("id,client_id,sender_id,body,created_at,film_id")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(51);
+      const before = cursor.current;
+      if (before) {
+        // Cursor values are server-returned timestamps and UUIDs, never user input.
+        query = query.or(
+          `created_at.lt.${before.created_at},and(created_at.eq.${before.created_at},id.lt.${before.id})`,
+        );
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      const rows = (data ?? []).slice(0, 50);
+      const ids = [
+        ...new Set(
+          rows
+            .map((row) => row.film_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
+      if (ids.length) {
+        const { data: linkedFilms } = await db
+          .from("films")
+          .select("id,title,poster_key,duration_seconds,genres")
+          .in("id", ids);
+        setFilmMap((current) => ({
+          ...current,
+          ...Object.fromEntries(
+            (linkedFilms ?? []).map((film) => [film.id, film]),
+          ),
+        }));
+      }
+      if (scroller.current && before)
+        restoreScroll.current = {
+          height: scroller.current.scrollHeight,
+          top: scroller.current.scrollTop,
+        };
+      cursor.current = rows[rows.length - 1] ?? before;
+      setHasOlder((data?.length ?? 0) > 50);
+      setMessages((current) =>
+        rows.reduce((list, row) => merge(list, row), current),
+      );
+    } catch {
+      setHistoryError(true);
+    } finally {
+      historyLock.current = false;
+      setHistoryBusy(false);
+    }
+  }
 
   // Live delivery: RLS restricts events to participants. Clean up on unmount.
   useEffect(() => {
@@ -127,7 +209,7 @@ export function Thread({
     };
     setMessages((list) =>
       merge(
-        list.filter((m) => m.client_id !== clientId),
+        list.filter((m) => m.sender_id !== me || m.client_id !== clientId),
         optimistic,
       ),
     );
@@ -139,7 +221,9 @@ export function Thread({
     if (error || !data) {
       setMessages((list) =>
         list.map((m) =>
-          m.client_id === clientId ? { ...m, status: "failed" } : m,
+          m.sender_id === me && m.client_id === clientId
+            ? { ...m, status: "failed" }
+            : m,
         ),
       );
       return;
@@ -192,7 +276,21 @@ export function Thread({
       </header>
 
       <div ref={scroller} className={styles.messages} aria-live="polite">
-        {loadFailed ? (
+        {hasOlder || historyError ? (
+          <button
+            type="button"
+            className="pill"
+            disabled={historyBusy}
+            onClick={() => void loadOlder()}
+          >
+            {historyBusy
+              ? "Loading older messages…"
+              : historyError
+                ? "Retry loading messages"
+                : "Load older messages"}
+          </button>
+        ) : null}
+        {historyError ? (
           <p className="field-error" role="alert">
             Older messages didn&apos;t load. New ones will still appear.
           </p>
@@ -208,10 +306,10 @@ export function Thread({
         ) : null}
         {messages.map((m) => {
           const mine = m.sender_id === me;
-          const film = m.film_id ? films[m.film_id] : undefined;
+          const film = m.film_id ? filmMap[m.film_id] : undefined;
           return (
             <div
-              key={m.client_id || m.id}
+              key={`${m.sender_id}:${m.client_id || m.id}`}
               className={styles.msgWrap}
               data-mine={mine ? "true" : undefined}
             >

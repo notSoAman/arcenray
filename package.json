@@ -13,7 +13,8 @@
     "backend:smoke": "node scripts/run-backend-smoke.mjs",
     "test:browser-media": "node scripts/check-browser-media.mjs",
     "backend:auth-check": "node scripts/check-auth-boundaries.mjs",
-    "backend:test-sql": "node scripts/check-db.mjs"
+    "backend:test-sql": "node scripts/check-db.mjs",
+    "test:web-security": "node scripts/check-web-security.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.6",

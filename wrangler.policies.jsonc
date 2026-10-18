@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "arcenray-public",
+  "account_id": "14274f9f3661b2279d864373166aaf17",
+  "compatibility_date": "2026-10-18",
+  "assets": {
+    "directory": ".policy-site",
+    "html_handling": "drop-trailing-slash",
+    "not_found_handling": "404-page",
+  },
+  "routes": [
+    { "pattern": "arcenray.com/privacy", "zone_name": "arcenray.com" },
+    { "pattern": "arcenray.com/privacy/*", "zone_name": "arcenray.com" },
+    { "pattern": "arcenray.com/terms", "zone_name": "arcenray.com" },
+    { "pattern": "arcenray.com/terms/*", "zone_name": "arcenray.com" },
+    { "pattern": "arcenray.com/policy-assets/*", "zone_name": "arcenray.com" },
+  ],
+}

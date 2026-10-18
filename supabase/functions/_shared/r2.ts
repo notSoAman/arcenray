@@ -1,6 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import { env, HttpError } from "./http.ts";
-function signer() {
+export function signer() {
   return new AwsClient({
     accessKeyId: env("R2_ACCESS_KEY_ID"),
     secretAccessKey: env("R2_SECRET_ACCESS_KEY"),
@@ -8,7 +8,7 @@ function signer() {
     region: "auto",
   });
 }
-function objectUrl(bucket: string, key: string) {
+export function objectUrl(bucket: string, key: string) {
   return new URL(
     `https://${env("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com/${bucket}/${key.split("/").map(encodeURIComponent).join("/")}`,
   );
@@ -42,13 +42,55 @@ export async function signUpload(key: string, bytes: number, type: string) {
     expires_at: new Date(Date.now() + 600000).toISOString(),
   };
 }
+/** CopyObject may return a destination ETag different from the multipart source. */
+export function copyResultEtag(xml: string) {
+  if (/<(?:[A-Za-z0-9_]+:)?Error(?:\s|>)/.test(xml))
+    throw new HttpError(502, "Media copy failed");
+  const matches = [
+    ...xml.matchAll(
+      /<(?:[A-Za-z0-9_]+:)?ETag>\s*([^<]+?)\s*<\/(?:[A-Za-z0-9_]+:)?ETag>/g,
+    ),
+  ];
+  const value = matches[0]?.[1]?.replace(/&quot;/g, '"').trim();
+  if (
+    matches.length !== 1 ||
+    !value ||
+    !/^(?:"[a-fA-F0-9-]+"|[a-fA-F0-9-]+)$/.test(value)
+  )
+    throw new HttpError(502, "Invalid media copy snapshot");
+  return value;
+}
+export function copiedHeadSnapshot(
+  head: Response,
+  etag: string,
+  bytes: number,
+  type: string,
+) {
+  const actual = {
+    bytes: Number(head.headers.get("content-length")),
+    etag: head.headers.get("etag") ?? "",
+    contentType: head.headers.get("content-type")?.split(";")[0]?.trim() ?? "",
+  };
+  if (
+    !head.ok ||
+    !Number.isSafeInteger(bytes) ||
+    bytes < 1 ||
+    actual.bytes !== bytes ||
+    actual.contentType !== type ||
+    actual.etag.replace(/^"|"$/g, "") !== etag.replace(/^"|"$/g, "")
+  ) {
+    throw new HttpError(502, "Copied media snapshot mismatch");
+  }
+  return actual;
+}
 export async function copyPublic(
   key: string,
   id: string,
   etag: string,
   type: string,
+  bytes: number,
 ) {
-  const source = `/${env("R2_UPLOAD_BUCKET_NAME")}/${key}`;
+  const source = `/${env("R2_UPLOAD_BUCKET_NAME")}/${key.split("/").map(encodeURIComponent).join("/")}`;
   const response = await r2("PUT", env("R2_BUCKET_NAME"), `assets/${id}`, {
     "x-amz-copy-source": source,
     "x-amz-copy-source-if-match": etag,
@@ -56,9 +98,11 @@ export async function copyPublic(
     "Content-Type": type,
     "Cache-Control": "public,max-age=31536000,immutable",
   });
-  // S3 may encode CopyObject errors in a successful HTTP response.
-  if ((await response.text()).includes("<Error>"))
-    throw new HttpError(502, "Media promotion failed");
+  const destinationEtag = copyResultEtag(await response.text());
+  const head = await r2("HEAD", env("R2_BUCKET_NAME"), `assets/${id}`, {
+    "If-Match": destinationEtag,
+  });
+  return copiedHeadSnapshot(head, destinationEtag, bytes, type);
 }
 export async function readRange(
   key: string,
@@ -118,4 +162,55 @@ export async function readMoov(key: string, size: number, etag: string) {
   if (offset !== size || !moov || !mdatRanges.length)
     throw new HttpError(422, "MP4 media or metadata missing");
   return { moov, fileSize: size, mdatRanges };
+}
+
+/** Lifecycle operations explicitly accept an already-absent object, never other errors. */
+export async function r2Lifecycle(
+  method: "HEAD" | "DELETE",
+  bucket: string,
+  key: string,
+  timeoutMs = 5000,
+) {
+  const signed = await signer().sign(objectUrl(bucket, key), { method });
+  // Queue retries are durable: avoid aws4fetch's implicit exponential retries,
+  // which can sleep beyond this invocation's deadline on upstream 429/5xx.
+  const response = await fetch(signed, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok && response.status !== 404)
+    throw new HttpError(502, "Media storage request failed");
+  return response.status === 404 ? null : response;
+}
+
+/** Server-side conditional copy; video bytes never enter the function. */
+export async function copyLifecycleObject(
+  sourceBucket: string,
+  sourceKey: string,
+  destinationBucket: string,
+  destinationKey: string,
+  etag: string,
+  type: string,
+  isPublic: boolean,
+  timeoutMs = 10000,
+) {
+  const signed = await signer().sign(
+    objectUrl(destinationBucket, destinationKey),
+    {
+      method: "PUT",
+      headers: {
+        "x-amz-copy-source": `/${sourceBucket}/${sourceKey.split("/").map(encodeURIComponent).join("/")}`,
+        "x-amz-copy-source-if-match": etag,
+        "x-amz-metadata-directive": "REPLACE",
+        "Content-Type": type,
+        "Cache-Control": isPublic
+          ? "public,max-age=31536000,immutable"
+          : "private,no-store",
+      },
+    },
+  );
+  const response = await fetch(signed, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok) throw new HttpError(502, "Media copy failed");
+  return copyResultEtag(await response.text());
 }

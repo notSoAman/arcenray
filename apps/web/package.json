@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit",
-    "test": "node --experimental-strip-types --test lib/media/upload.test.ts \"app/(app)/publish/film-link.test.ts\""
+    "test": "node --experimental-strip-types --test lib/media/upload.test.ts lib/media/multipart-upload.test.ts \"app/(app)/publish/film-link.test.ts\" lib/security-policy.test.ts app/onboarding/preferences.test.ts lib/account/policy.test.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "7.9.17",
@@ -17,12 +17,13 @@
     "@repo/ui": "workspace:*",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.3",
-    "next": "16.3.8",
+    "next": "16.4.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.12",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "26.4.1",

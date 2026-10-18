@@ -35,9 +35,10 @@ export default async function ChatPage({
       .select("id,client_id,sender_id,body,created_at,film_id")
       .eq("conversation_id", id)
       .order("created_at", { ascending: false })
-      .limit(50),
+      .order("id", { ascending: false })
+      .limit(51),
   ]);
-  const rows: ThreadMessage[] = (messages.data ?? []).reverse();
+  const rows: ThreadMessage[] = (messages.data ?? []).slice(0, 50).reverse();
   const filmIds = [
     ...new Set(
       rows.map((m) => m.film_id).filter((f): f is string => Boolean(f)),
@@ -63,6 +64,7 @@ export default async function ChatPage({
       me={user.id}
       other={otherId ? (profiles.get(otherId) ?? null) : null}
       initialMessages={rows}
+      initialHasOlder={(messages.data?.length ?? 0) > 50}
       films={filmMap}
       loadFailed={Boolean(messages.error)}
     />

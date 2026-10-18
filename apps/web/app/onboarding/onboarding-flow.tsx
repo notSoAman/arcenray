@@ -14,6 +14,7 @@ import { SignOutButton } from "../../components/sign-out-button";
 import { createClient } from "../../lib/supabase/client";
 import { roleLabels, roleOptions, type CreativeRole } from "../../lib/roles";
 import styles from "./onboarding.module.css";
+import { onboardingChoices, validOnboardingChoices } from "./preferences";
 
 type Initial = {
   roles: CreativeRole[];
@@ -56,7 +57,7 @@ export function OnboardingFlow({
   mode?: "onboarding" | "edit";
 }) {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [roles, setRoles] = useState<CreativeRole[]>(initial.roles);
   const [fullName, setFullName] = useState(initial.full_name);
   const [handle, setHandle] = useState(initial.handle);
@@ -69,6 +70,8 @@ export function OnboardingFlow({
   const [rolesError, setRolesError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [choices, setChoices] = useState<string[]>([]);
+  const saveLock = useRef(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);
 
@@ -132,6 +135,7 @@ export function OnboardingFlow({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saveLock.current) return;
     const pendingSkills = skillDraft.trim()
       ? [...skills, skillDraft.trim().slice(0, 80)]
       : skills;
@@ -162,23 +166,39 @@ export function OnboardingFlow({
           next.skills_gear = "Each skill must be 1–80 characters.";
         if (key === "roles") setStep(1);
       }
+      if (!parsed.error.issues.some((issue) => issue.path[0] === "roles"))
+        setStep(2);
       setErrors(next);
       return;
     }
 
     setErrors({});
     setSaveError(null);
+    if (mode === "onboarding" && step === 2) {
+      setStep(3);
+      return;
+    }
+    if (mode === "onboarding" && !validOnboardingChoices(choices)) {
+      setSaveError("Choose exactly three references to continue.");
+      return;
+    }
+    saveLock.current = true;
     setSaving(true);
     try {
       const api = createArcenrayClient(createClient());
-      const { error } = await api.profiles.update(parsed.data);
+      const { error } = await api.profiles.update({
+        ...parsed.data,
+        onboarding_completed: mode === "edit",
+      });
       if (error) {
         setSaving(false);
         if (error.code === "23505") {
+          setStep(2);
           setErrors({
             handle: `@${input.handle} is taken. Try another handle.`,
           });
         } else if (error.code === "23514") {
+          setStep(2);
           setErrors({
             handle: "Use 3–32 lowercase letters, numbers or underscores.",
           });
@@ -189,6 +209,18 @@ export function OnboardingFlow({
         }
         return;
       }
+      if (mode === "onboarding") {
+        const preferenceReply = await api.supabase.rpc(
+          "set_onboarding_preferences",
+          { p_choices: choices },
+        );
+        if (preferenceReply.error) throw preferenceReply.error;
+        const completionReply = await api.profiles.update({
+          ...parsed.data,
+          onboarding_completed: true,
+        });
+        if (completionReply.error) throw completionReply.error;
+      }
       // Search indexing runs in the background; a failure must not block entering the app.
       void api.index("profile", userId).catch(() => undefined);
       router.replace(mode === "edit" ? `/u/${input.handle}` : "/home");
@@ -198,6 +230,9 @@ export function OnboardingFlow({
       setSaveError(
         "We couldn't reach arcenray. Check your connection and try again.",
       );
+    } finally {
+      saveLock.current = false;
+      setSaving(false);
     }
   }
 
@@ -214,12 +249,17 @@ export function OnboardingFlow({
 
       <main className={styles.main}>
         <div className={styles.progressRow}>
-          {step === 2 ? (
+          {step > 1 ? (
             <button
               type="button"
               className={styles.back}
-              onClick={() => setStep(1)}
-              aria-label="Back to roles"
+              onClick={() => {
+                if (!saving) setStep(step === 3 ? 2 : 1);
+              }}
+              disabled={saving}
+              aria-label={
+                step === 3 ? "Back to profile details" : "Back to roles"
+              }
             >
               <svg
                 aria-hidden="true"
@@ -236,17 +276,21 @@ export function OnboardingFlow({
               </svg>
             </button>
           ) : null}
-          <span className={styles.stepLabel}>Step {step} of 2</span>
+          <span className={styles.stepLabel}>
+            Step {step} of {mode === "edit" ? 2 : 3}
+          </span>
         </div>
         <div
           className={styles.progress}
           role="progressbar"
           aria-label="Profile setup"
           aria-valuemin={1}
-          aria-valuemax={2}
+          aria-valuemax={mode === "edit" ? 2 : 3}
           aria-valuenow={step}
         >
-          <span style={{ width: step === 1 ? "50%" : "100%" }} />
+          <span
+            style={{ width: `${(step / (mode === "edit" ? 2 : 3)) * 100}%` }}
+          />
         </div>
 
         {step === 1 ? (
@@ -297,7 +341,7 @@ export function OnboardingFlow({
               </button>
             </div>
           </section>
-        ) : (
+        ) : step === 2 ? (
           <section className={styles.step} aria-labelledby="step-title">
             <h1
               id="step-title"
@@ -493,9 +537,84 @@ export function OnboardingFlow({
                     ? "Saving your profile…"
                     : mode === "edit"
                       ? "Save profile"
-                      : "Enter arcenray."}
+                      : "Continue to your taste"}
                 </button>
               </div>
+            </form>
+          </section>
+        ) : (
+          <section className={styles.step} aria-labelledby="step-title">
+            <h1
+              id="step-title"
+              ref={headingRef}
+              tabIndex={-1}
+              className={styles.title}
+            >
+              What draws you in?
+            </h1>
+            <p className={styles.lede}>
+              Choose three cinematic references. Start with what you love; your
+              taste can grow as you explore.
+            </p>
+            <form className={styles.form} onSubmit={onSubmit}>
+              <div
+                className={styles.vibeGrid}
+                role="group"
+                aria-label="Choose three cinematic references"
+              >
+                {onboardingChoices.map((choice, index) => {
+                  const selected = choices.includes(choice.id);
+                  return (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      className={styles.vibeCard}
+                      data-tone={choice.color}
+                      aria-pressed={selected}
+                      disabled={saving || (!selected && choices.length === 3)}
+                      onClick={() => {
+                        setSaveError(null);
+                        setChoices((current) =>
+                          current.includes(choice.id)
+                            ? current.filter((id) => id !== choice.id)
+                            : current.length < 3
+                              ? [...current, choice.id]
+                              : current,
+                        );
+                      }}
+                    >
+                      <span className={styles.vibeNumber} aria-hidden="true">
+                        {String(index + 1).padStart(2, "0")}
+                        {selected ? " ✓" : ""}
+                      </span>
+                      <strong>{choice.label}</strong>
+                      <span>{choice.detail}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p role="status" className={styles.lede}>
+                {choices.length} of 3 selected.{" "}
+                {choices.length === 3
+                  ? "Deselect a card to change your choices."
+                  : "Choose what feels like you."}
+              </p>
+              <p className="field-hint">
+                These are starting preferences, not a test. You can explore
+                immediately even while film recommendations are still building.
+              </p>
+              {saveError ? (
+                <div className="notice notice-error" role="alert">
+                  {saveError} Your choices are still here.
+                </div>
+              ) : null}
+              <button
+                type="submit"
+                className="btn btn-accent btn-block"
+                disabled={saving || choices.length !== 3}
+              >
+                {saving ? "Saving your profile…" : "Enter arcenray."}
+              </button>
             </form>
           </section>
         )}
