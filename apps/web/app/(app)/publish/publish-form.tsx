@@ -463,15 +463,14 @@ export function PublishForm({
         );
       if (!rights)
         throw new Error(
-          "Confirm that you have permission to publish the film, hook and poster.",
+          "Confirm that you have permission to publish the film, poster and any optional hook.",
         );
       if (
-        !value.hook_asset_id ||
         !value.poster_asset_id ||
         (value.source === "r2_native" && !value.film_asset_id)
       )
         throw new Error(
-          "Save and upload your film, hook and poster before publishing.",
+          "Save and upload your film and poster before publishing.",
         );
       const id = await persist(value);
       const reply = await browserApi().films.publish(id);
@@ -861,15 +860,20 @@ export function PublishForm({
                   placeholder="https://vimeo.com/123456789"
                 />
                 <small>
-                  Playback uses the provider’s embed. Supply your own hook and
-                  poster below.
+                  Playback uses the provider’s embed. Supply your poster below;
+                  a discovery hook is optional.
                 </small>
               </label>
             )}
             <p className={styles.muted}>
               MP4 with H.264/AAC and fast start. Main film: up to 1080p / 2 GiB.
-              Hook: up to 720p / 30 seconds / 50 MiB. Export your chosen hook in
-              your editor; browser video conversion is not enabled.
+              Optional hook: up to 720p / 30 seconds / 50 MiB. Export your
+              chosen hook in your editor; browser video conversion is not
+              enabled.
+            </p>
+            <p className={styles.muted}>
+              No hook? Your film will appear in Loop with its poster and
+              details.
             </p>
             {(["film", "hook", "poster"] as Kind[])
               .filter((kind) => kind !== "film" || form.source === "r2_native")
@@ -881,7 +885,7 @@ export function PublishForm({
                         ? "Reselect original Main film MP4 to resume"
                         : "Main film MP4"
                       : kind === "hook"
-                        ? "Discovery hook MP4 (required)"
+                        ? "Discovery hook MP4 (optional)"
                         : "Poster (required)"}
                     <input
                       key={kind === "film" ? fileVersion : kind}
@@ -992,8 +996,8 @@ export function PublishForm({
               disabled={locked}
               onChange={(e) => setRights(e.target.checked)}
             />
-            I have the rights or permission to publish this film, hook and
-            poster.
+            I have the rights or permission to publish this film, poster and any
+            optional discovery hook.
           </label>
           <button
             type="button"
