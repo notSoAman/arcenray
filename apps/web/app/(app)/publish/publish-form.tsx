@@ -17,6 +17,7 @@ import {
 import { createUploadTask, type UploadState } from "../../../lib/media/upload";
 import styles from "./publish.module.css";
 import { parseFilmLink } from "./film-link";
+import { FILM_GENRES, FILM_LANGUAGES } from "./film-options";
 
 type Film = Database["public"]["Tables"]["films"]["Row"];
 type Kind = "film" | "hook" | "poster";
@@ -45,11 +46,6 @@ const assetField = {
   hook: "hook_asset_id",
   poster: "poster_asset_id",
 } as const;
-const labels = (value: string) =>
-  value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
 const size = (bytes: number) => `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
 function message(error: unknown) {
   return error instanceof Error
@@ -87,8 +83,6 @@ export function PublishForm({
   );
   const [draftId, setDraftId] = useState(initial?.id ?? null);
   const savedId = useRef(initial?.id ?? null);
-  const [genreText, setGenreText] = useState(form.genres.join(", "));
-  const [moodText, setMoodText] = useState(form.mood_tags.join(", "));
   const [externalUrl, setExternalUrl] = useState(
     initial?.provider_id
       ? initial.source === "youtube_embed"
@@ -124,40 +118,10 @@ export function PublishForm({
   );
   const [published, setPublished] = useState(initial?.status === "published");
   const [indexed, setIndexed] = useState(false);
-  const [storage, setStorage] = useState<{
-    quota_bytes: number;
-    used_bytes: number;
-    reserved_bytes: number;
-  } | null>(null);
-  const [storageError, setStorageError] = useState(false);
   const [rights, setRights] = useState(false);
   const patch = (value: Partial<FilmDraft>) =>
     setForm((current) => ({ ...current, ...value }));
-  async function refreshStorage() {
-    const reply = await browserApi().media.storage();
-    if (
-      reply.error ||
-      !reply.data ||
-      typeof reply.data !== "object" ||
-      Array.isArray(reply.data)
-    ) {
-      setStorageError(true);
-      return;
-    }
-    const data = reply.data;
-    if (
-      ![data.quota_bytes, data.used_bytes, data.reserved_bytes].every(
-        (v) => typeof v === "number" && Number.isFinite(v),
-      )
-    ) {
-      setStorageError(true);
-      return;
-    }
-    setStorage(data as typeof storage);
-    setStorageError(false);
-  }
   useEffect(() => {
-    void refreshStorage().catch(() => setStorageError(true));
     return () => {
       for (const task of Object.values(tasks.current)) task?.cancel();
       mainTask.current?.pause();
@@ -334,8 +298,6 @@ export function PublishForm({
         : parseFilmLink(externalUrl);
     return filmDraftSchema.parse({
       ...form,
-      genres: labels(genreText),
-      mood_tags: labels(moodText),
       ...source,
       film_asset_id: source.source === "r2_native" ? form.film_asset_id : null,
     });
@@ -469,7 +431,6 @@ export function PublishForm({
       setUploading(false);
       operation.current = false;
       setBusy(false);
-      void refreshStorage().catch(() => setStorageError(true));
     }
   }
   async function index(id: string) {
@@ -597,36 +558,12 @@ export function PublishForm({
     } finally {
       operation.current = false;
       setBusy(false);
-      void refreshStorage().catch(() => setStorageError(true));
     }
   }
   const locked = busy || preparing !== null || published || resumeLoading;
   return (
     <div className={styles.layout}>
       <section className={styles.editor} aria-label="Film editor">
-        <div className={styles.storage}>
-          <strong>Your storage</strong>
-          {storage ? (
-            <span>
-              {size(storage.used_bytes)} used · {size(storage.reserved_bytes)}{" "}
-              reserved · {size(storage.quota_bytes)} total
-            </span>
-          ) : (
-            <span>
-              {storageError
-                ? "Storage unavailable. Server quota checks still apply."
-                : "Loading storage…"}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() =>
-              void refreshStorage().catch(() => setStorageError(true))
-            }
-          >
-            Refresh storage
-          </button>
-        </div>
         {!published && draftId && (
           <section
             className={styles.resumePanel}
@@ -804,21 +741,52 @@ export function PublishForm({
                 onChange={(e) => patch({ synopsis: e.target.value })}
               />
             </label>
-            <div className={styles.row}>
-              <label>
-                Genres (comma separated)
-                <input
-                  value={genreText}
-                  onChange={(e) => setGenreText(e.target.value)}
-                />
-              </label>
-              <label>
-                Moods (comma separated)
-                <input
-                  value={moodText}
-                  onChange={(e) => setMoodText(e.target.value)}
-                />
-              </label>
+            <div className={styles.genreField}>
+              <span id="film-genres-label">Genres</span>
+              <details className={styles.genreDropdown}>
+                <summary
+                  aria-labelledby="film-genres-label film-genres-selection"
+                  aria-disabled={locked}
+                >
+                  <span id="film-genres-selection">
+                    {form.genres.length
+                      ? form.genres.join(", ")
+                      : "Select genres"}
+                  </span>
+                </summary>
+                <div
+                  className={styles.genreOptions}
+                  role="group"
+                  aria-labelledby="film-genres-label"
+                >
+                  {[...new Set([...FILM_GENRES, ...form.genres])].map(
+                    (genre) => (
+                      <label key={genre}>
+                        <input
+                          type="checkbox"
+                          checked={form.genres.includes(genre)}
+                          disabled={
+                            locked ||
+                            (!form.genres.includes(genre) &&
+                              form.genres.length >= 8)
+                          }
+                          onChange={(e) =>
+                            patch({
+                              genres: e.target.checked
+                                ? [...form.genres, genre]
+                                : form.genres.filter(
+                                    (value) => value !== genre,
+                                  ),
+                            })
+                          }
+                        />
+                        {genre}
+                      </label>
+                    ),
+                  )}
+                </div>
+              </details>
+              <small>Select up to 8 genres.</small>
             </div>
             <div className={styles.row}>
               <label>
@@ -833,11 +801,22 @@ export function PublishForm({
               </label>
               <label>
                 Language
-                <input
-                  maxLength={80}
+                <select
                   value={form.language ?? ""}
                   onChange={(e) => patch({ language: e.target.value || null })}
-                />
+                >
+                  <option value="">Select a language</option>
+                  {[
+                    ...new Set([
+                      ...FILM_LANGUAGES,
+                      ...(form.language ? [form.language] : []),
+                    ]),
+                  ].map((language) => (
+                    <option key={language} value={language}>
+                      {language}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
           </fieldset>
