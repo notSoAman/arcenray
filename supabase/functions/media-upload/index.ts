@@ -1,29 +1,30 @@
+import { publicationAssetIds } from "../_shared/publication.ts";
 import { z } from "zod";
 import {
-  multipartSchema,
-  isMultipartAction,
   handleMultipart,
+  isMultipartAction,
+  multipartSchema,
 } from "../_shared/multipart.ts";
 import {
-  serve,
-  auth,
   admin,
+  auth,
   checked,
   env,
   HttpError,
   jsonBody,
   rateLimit,
+  serve,
 } from "../_shared/http.ts";
 import {
-  signUpload,
-  r2,
-  readRange,
-  readMoov,
   copyPublic,
+  r2,
+  readMoov,
+  readRange,
+  signUpload,
 } from "../_shared/r2.ts";
 import {
-  inspectWebP,
   inspectMp4Moov,
+  inspectWebP,
   validateMp4Samples,
 } from "../_shared/media-inspection.ts";
 const basicBodySchema = z.discriminatedUnion("action", [
@@ -59,8 +60,9 @@ async function asset(id: string, owner: string): Promise<Asset> {
 }
 async function promote(a: Asset) {
   if (a.status === "ready") return a;
-  if (a.status !== "uploaded" || !a.etag)
+  if (a.status !== "uploaded" || !a.etag) {
     throw new HttpError(409, "Complete and verify media before publishing");
+  }
   const token = checked(
     await admin().rpc("backend_begin_promotion", {
       p_id: a.id,
@@ -100,8 +102,9 @@ async function verifyCompletedAsset(id: string, owner: string) {
     if (a.kind === "profile_picture") a = await promote(a);
     return { asset_id: a.id, status: a.status, public_key: a.public_key };
   }
-  if (a.status !== "pending" || Date.parse(a.expires_at) < Date.now())
+  if (a.status !== "pending" || Date.parse(a.expires_at) < Date.now()) {
     throw new HttpError(409, "Upload expired");
+  }
   const head = await r2("HEAD", env("R2_UPLOAD_BUCKET_NAME"), a.object_key);
   const bytes = Number(head.headers.get("content-length"));
   const etag = head.headers.get("etag");
@@ -109,16 +112,17 @@ async function verifyCompletedAsset(id: string, owner: string) {
     bytes !== Number(a.expected_bytes) ||
     !etag ||
     head.headers.get("content-type")?.split(";")[0] !== a.content_type
-  )
+  ) {
     throw new HttpError(
       422,
       "Uploaded size or MIME type differs from reservation",
     );
+  }
   let metadata: { width: number; height: number; duration_seconds?: number };
   try {
-    if (a.content_type === "image/webp")
+    if (a.content_type === "image/webp") {
       metadata = inspectWebP(await readRange(a.object_key, 0, bytes - 1, etag));
-    else {
+    } else {
       const file = await readMoov(a.object_key, bytes, etag);
       validateMp4Samples(file.moov, file.fileSize, file.mdatRanges);
       metadata = inspectMp4Moov(file.moov);
@@ -150,16 +154,20 @@ serve(async (req) => {
   const b = bodySchema.parse(await jsonBody(req));
   await rateLimit(user.id, "media", 120);
   // Fail before reserving quota if credentials have not been configured.
-  for (const key of [
-    "R2_ACCOUNT_ID",
-    "R2_ACCESS_KEY_ID",
-    "R2_SECRET_ACCESS_KEY",
-    "R2_UPLOAD_BUCKET_NAME",
-    "R2_BUCKET_NAME",
-  ])
+  for (
+    const key of [
+      "R2_ACCOUNT_ID",
+      "R2_ACCESS_KEY_ID",
+      "R2_SECRET_ACCESS_KEY",
+      "R2_UPLOAD_BUCKET_NAME",
+      "R2_BUCKET_NAME",
+    ]
+  ) {
     env(key);
-  if (isMultipartAction(b))
+  }
+  if (isMultipartAction(b)) {
     return handleMultipart(b, user.id, verifyCompletedAsset);
+  }
   if (b.action === "create") {
     const a = checked(
       await client.rpc("reserve_upload", {
@@ -182,12 +190,12 @@ serve(async (req) => {
       .eq("owner_id", user.id)
       .single(),
   );
-  if (
-    !f.hook_asset_id ||
-    !f.poster_asset_id ||
-    (f.source === "r2_native" && !f.film_asset_id)
-  )
-    throw new HttpError(409, "Film, hook and poster assets are required");
+  let ids: string[];
+  try {
+    ids = publicationAssetIds(f);
+  } catch (error) {
+    throw new HttpError(409, (error as Error).message);
+  }
   const profile = checked(
     await client
       .from("profiles")
@@ -195,16 +203,13 @@ serve(async (req) => {
       .eq("id", user.id)
       .single(),
   );
-  if (!profile.onboarding_completed)
+  if (!profile.onboarding_completed) {
     throw new HttpError(409, "Complete onboarding first");
-  const ids = [
-    f.hook_asset_id,
-    f.poster_asset_id,
-    ...(f.source === "r2_native" ? [f.film_asset_id] : []),
-  ] as string[];
+  }
   const assets = await Promise.all(ids.map((id) => asset(id, user.id)));
-  if (assets.some((a) => !["uploaded", "ready"].includes(a.status)))
+  if (assets.some((a) => !["uploaded", "ready"].includes(a.status))) {
     throw new HttpError(409, "Verify all assets before publication");
+  }
   for (const a of assets) await promote(a);
   return checked(await client.rpc("publish_film", { p_film_id: f.id }));
 });

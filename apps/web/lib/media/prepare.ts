@@ -1,4 +1,5 @@
 import {
+  byteLimits,
   validateUpload,
   validateVideo,
   type VideoMetadata,
@@ -65,18 +66,28 @@ export async function prepareImage(
   signal?: AbortSignal,
 ) {
   signal?.throwIfAborted();
+  // Input resolution is independent of the compact, trusted upload limits.
   if (
-    !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
-    !file.size ||
-    file.size > 20 * 1024 ** 2
+    file.type === "image/svg+xml" ||
+    (file.type && !file.type.startsWith("image/"))
   )
-    throw new Error("Choose a JPEG, PNG or WebP image up to 20 MiB");
-  const bitmap = await createImageBitmap(file);
+    throw new Error("Choose a JPEG, PNG, WebP, AVIF, GIF or BMP image.");
+  if (!file.size || file.size > 100 * 1024 ** 2)
+    throw new Error(
+      "Choose a non-empty image up to 100 MiB. It will be resized automatically.",
+    );
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error(
+      "This browser cannot open that image. Try JPEG, PNG or WebP.",
+    );
+  }
   try {
     signal?.throwIfAborted();
     const { width, height } = bitmap;
-    if (!width || !height || width * height > 40_000_000)
-      throw new Error("Choose an image below 40 megapixels");
+    if (!width || !height) throw new Error("Could not read image dimensions");
     const square = kind === "profile_picture";
     const sw = square ? Math.min(width, height) : width;
     const sh = square ? sw : height;
@@ -102,14 +113,45 @@ export async function prepareImage(
       canvas.width,
       canvas.height,
     );
-    const blob = await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob(
-        (value) =>
-          value ? resolve(value) : reject(new Error("Image encoding failed")),
-        "image/webp",
-        square ? 0.8 : 0.82,
-      ),
-    );
+    const encode = (quality: number) =>
+      new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (value) =>
+            value ? resolve(value) : reject(new Error("Image encoding failed")),
+          "image/webp",
+          quality,
+        ),
+      );
+    const targetBytes = (square ? 25 : 100) * 1024;
+    let blob = await encode(square ? 0.8 : 0.82);
+    if (blob.type !== "image/webp")
+      throw new Error(
+        "This browser cannot prepare WebP images. Please use a current browser.",
+      );
+    for (const quality of [0.74, 0.66, 0.58]) {
+      if (blob.size <= targetBytes) break;
+      signal?.throwIfAborted();
+      blob = await encode(quality);
+    }
+    // Detailed/noisy artwork can remain large even at a lower quality. Reduce
+    // dimensions further rather than sending a blob the server will reject.
+    while (
+      blob.size > byteLimits[kind] &&
+      canvas.width > 64 &&
+      canvas.height > 64
+    ) {
+      const smaller = document.createElement("canvas");
+      smaller.width = Math.max(1, Math.round(canvas.width * 0.8));
+      smaller.height = Math.max(1, Math.round(canvas.height * 0.8));
+      const smallerCtx = smaller.getContext("2d");
+      if (!smallerCtx)
+        throw new Error("Image preparation is unavailable in this browser");
+      smallerCtx.drawImage(canvas, 0, 0, smaller.width, smaller.height);
+      canvas.width = smaller.width;
+      canvas.height = smaller.height;
+      ctx.drawImage(smaller, 0, 0);
+      blob = await encode(0.74);
+    }
     signal?.throwIfAborted();
     validateUpload(kind, blob);
     return { blob, width: canvas.width, height: canvas.height };
