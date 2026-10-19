@@ -236,7 +236,7 @@ export function PublishForm({
       if (kind === "poster") {
         const prepared = await prepareImage(file, "poster");
         blob = prepared.blob;
-        description = `${prepared.width} × ${prepared.height} WebP · ${size(blob.size)}`;
+        description = `${prepared.width} × ${prepared.height} WebP · ${Math.ceil(blob.size / 1024)} KB (automatically prepared)`;
       } else {
         const metadata = await inspectVideo(file, kind);
         description = `${metadata.width} × ${metadata.height} · ${metadata.duration.toFixed(1)} seconds · ${size(file.size)}`;
@@ -894,11 +894,7 @@ export function PublishForm({
                         kind === "film" &&
                         (resumeLoading || Boolean(resumeError))
                       }
-                      accept={
-                        kind === "poster"
-                          ? "image/jpeg,image/png,image/webp"
-                          : "video/mp4"
-                      }
+                      accept={kind === "poster" ? "image/*" : "video/mp4"}
                       onChange={(e) => void choose(kind, e.target.files?.[0])}
                     />
                   </label>
