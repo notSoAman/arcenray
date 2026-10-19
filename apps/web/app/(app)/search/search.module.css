@@ -195,13 +195,13 @@
 
 .filmGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   gap: 14px;
 }
 
 .peopleGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 10px;
 }
 
@@ -252,11 +252,57 @@
     padding: 18px;
   }
   .pills {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
+    flex-wrap: wrap;
   }
   .filmGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+.advanced,
+.group,
+.cityRow,
+.bar,
+.person {
+  min-width: 0;
+  max-width: 100%;
+}
+.prompt {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  padding-block: 8px;
+}
+.personText {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .layout {
+    flex-direction: column;
+    gap: 24px;
+  }
+  .advanced,
+  .results {
+    flex: none;
+    width: 100%;
+  }
+  .bar > svg {
+    flex: none;
+  }
+  .submit {
+    flex: none;
+  }
+}
+@media (max-width: 360px) {
+  .bar {
+    flex-wrap: wrap;
+    padding: 12px;
+    border-radius: 22px;
+  }
+  .input {
+    flex-basis: calc(100% - 40px);
+  }
+  .submit {
+    width: 100%;
   }
 }

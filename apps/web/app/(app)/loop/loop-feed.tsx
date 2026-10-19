@@ -243,7 +243,7 @@ export function LoopFeed({
                 <p className={styles.synopsis}>{film.synopsis}</p>
               ) : null}
               <div className={styles.actions}>
-                <Link href={`/watch/${film.id}`} className="btn btn-primary">
+                <Link href={`/watch/${film.id}`} className="btn btn-film-play">
                   <IconPlay size={15} /> Watch film
                 </Link>
                 <div

@@ -102,3 +102,17 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.title,
+.by,
+.rowTitle {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 360px) {
+  .rowPoster {
+    width: 76px;
+  }
+  .row {
+    gap: 10px;
+  }
+}

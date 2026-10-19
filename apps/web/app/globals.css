@@ -108,7 +108,7 @@ img {
   color: var(--text-faint);
 }
 
-/* Calls to action are Bone or Ember Crimson, nothing else. */
+/* Primary actions follow the accepted Bone/Ember palette; film playback uses the brand spectrum. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -340,4 +340,38 @@ textarea.input {
     padding: 20px var(--gutter) calc(120px + env(safe-area-inset-bottom));
     gap: 28px;
   }
+}
+
+/* Let nested flex/grid panels shrink to the available device width. */
+.app-main > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.input,
+.field,
+.notice {
+  min-width: 0;
+}
+.notice,
+.state-panel,
+.page-title {
+  overflow-wrap: anywhere;
+}
+.btn {
+  max-width: 100%;
+  text-align: center;
+}
+.btn-film-play {
+  background: linear-gradient(110deg, #713b9b, #a52c68 48%, #ad421e);
+  color: #fff;
+}
+.btn-film-play:not(:disabled):hover {
+  filter: brightness(1.12);
+}
+.btn-film-details {
+  background: #fff;
+  color: var(--void);
+}
+.btn-film-details:not(:disabled):hover {
+  background: var(--bone);
 }

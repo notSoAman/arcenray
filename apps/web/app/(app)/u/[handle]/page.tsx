@@ -6,7 +6,6 @@ import { WideCard } from "../../../../components/film-cards";
 import { IconPin } from "../../../../components/icons";
 import { Avatar } from "../../../../components/media";
 import { MessageButton } from "../../../../components/message-button";
-import { SignOutButton } from "../../../../components/sign-out-button";
 import {
   FollowButton,
   ReportButton,
@@ -168,10 +167,6 @@ export default async function ProfilePage({
                 <Link href="/publish" className="btn btn-accent">
                   Publish a film
                 </Link>
-                <Link href="/profile/edit" className="btn btn-primary">
-                  Edit profile
-                </Link>
-                <SignOutButton className="btn btn-ghost" />
               </>
             ) : blockRes.data ? (
               <BlockButton profileId={profile.id} blocked />
@@ -308,7 +303,7 @@ export default async function ProfilePage({
                 <p className={styles.bio}>{profile.bio}</p>
               ) : (
                 <p className={styles.muted}>
-                  {isSelf ? "Add a bio from Edit profile." : "No bio yet."}
+                  {isSelf ? "Add a bio in Settings." : "No bio yet."}
                 </p>
               )}
               {profile.skills_gear.length > 0 ? (

@@ -123,7 +123,7 @@
 
 .films {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
   gap: 20px 16px;
 }
 
@@ -288,5 +288,36 @@
   }
   .actions {
     justify-content: flex-start;
+  }
+}
+
+.card,
+.side,
+.about,
+.actions {
+  min-width: 0;
+  max-width: 100%;
+}
+.handle,
+.roles,
+.place,
+.bio,
+.skills li,
+.creditWork {
+  overflow-wrap: anywhere;
+}
+.tabs {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+@media (max-width: 720px) {
+  .identity,
+  .actions,
+  .main,
+  .side {
+    flex-basis: 100%;
+  }
+  .tab {
+    padding-inline: 14px;
   }
 }

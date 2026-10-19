@@ -50,11 +50,13 @@ export function OnboardingFlow({
   email,
   initial,
   mode = "onboarding",
+  signupHandleProvided = false,
 }: {
   userId: string;
   email: string | null;
   initial: Initial;
   mode?: "onboarding" | "edit";
+  signupHandleProvided?: boolean;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -385,44 +387,57 @@ export function OnboardingFlow({
                   ) : null}
                 </div>
 
-                <div className="field">
-                  <label className="field-label" htmlFor="handle">
-                    Handle
-                  </label>
-                  <div className={styles.prefixed}>
-                    <span aria-hidden="true">@</span>
-                    <input
-                      id="handle"
-                      className="input"
-                      autoComplete="username"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      value={handle}
-                      maxLength={32}
-                      onChange={(e) => {
-                        setHandleTouched(true);
-                        setHandle(
-                          e.target.value.toLowerCase().replace(/\s+/g, "_"),
-                        );
-                      }}
-                      aria-invalid={errors.handle ? true : undefined}
-                      aria-describedby={
-                        errors.handle
-                          ? "handle-error handle-hint"
-                          : "handle-hint"
-                      }
-                      required
-                    />
-                  </div>
-                  <span id="handle-hint" className="field-hint">
-                    Lowercase letters, numbers and underscores.
-                  </span>
-                  {errors.handle ? (
-                    <span id="handle-error" className="field-error">
-                      {errors.handle}
+                {mode === "onboarding" &&
+                signupHandleProvided &&
+                !errors.handle ? (
+                  <div className="field">
+                    <span className="field-label">Your handle</span>
+                    <p>@{handle}</p>
+                    <span className="field-hint">
+                      From your sign-up username. You can edit your public
+                      handle later in Settings.
                     </span>
-                  ) : null}
-                </div>
+                  </div>
+                ) : (
+                  <div className="field">
+                    <label className="field-label" htmlFor="handle">
+                      Handle
+                    </label>
+                    <div className={styles.prefixed}>
+                      <span aria-hidden="true">@</span>
+                      <input
+                        id="handle"
+                        className="input"
+                        autoComplete="username"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        value={handle}
+                        maxLength={32}
+                        onChange={(e) => {
+                          setHandleTouched(true);
+                          setHandle(
+                            e.target.value.toLowerCase().replace(/\s+/g, "_"),
+                          );
+                        }}
+                        aria-invalid={errors.handle ? true : undefined}
+                        aria-describedby={
+                          errors.handle
+                            ? "handle-error handle-hint"
+                            : "handle-hint"
+                        }
+                        required
+                      />
+                    </div>
+                    <span id="handle-hint" className="field-hint">
+                      Lowercase letters, numbers and underscores.
+                    </span>
+                    {errors.handle ? (
+                      <span id="handle-error" className="field-error">
+                        {errors.handle}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
               </div>
 
               <div className="field">
