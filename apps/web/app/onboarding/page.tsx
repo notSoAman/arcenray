@@ -1,3 +1,5 @@
+import { currentUser } from "@clerk/nextjs/server";
+import { initialProfileHandle, signupHandle } from "../../lib/signup-profile";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -8,9 +10,6 @@ import styles from "./onboarding.module.css";
 
 export const metadata: Metadata = { title: "Set up your profile" };
 export const dynamic = "force-dynamic";
-
-/** Pending profiles get a UUID-derived placeholder handle; don't suggest it back. */
-const placeholderHandle = /^[0-9a-f]{32}$/;
 
 export default async function OnboardingPage() {
   if (!isSupabaseConfigured()) redirect("/");
@@ -34,14 +33,18 @@ export default async function OnboardingPage() {
     );
   }
 
+  const clerkUser = await currentUser();
+  const initialHandle = initialProfileHandle(profile, clerkUser?.username);
+  const seeded = Boolean(signupHandle(clerkUser?.username));
   return (
     <OnboardingFlow
+      signupHandleProvided={seeded}
       userId={user.id}
       email={user.email ?? null}
       initial={{
         roles: profile.roles.filter(isCreativeRole),
-        full_name: profile.full_name,
-        handle: placeholderHandle.test(profile.handle) ? "" : profile.handle,
+        full_name: profile.full_name || clerkUser?.fullName || "",
+        handle: initialHandle,
         location_city: profile.location_city ?? "",
         bio: profile.bio,
         skills_gear: profile.skills_gear,

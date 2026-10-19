@@ -48,11 +48,11 @@ export function FeaturedFilm({
           </ul>
         ) : null}
         <div className={styles.actions}>
-          <Link href={`/watch/${film.id}`} className="btn btn-primary">
+          <Link href={`/watch/${film.id}`} className="btn btn-film-play">
             <IconPlay size={16} />
             Play
           </Link>
-          <Link href={`/films/${film.id}`} className="btn btn-ghost">
+          <Link href={`/films/${film.id}`} className="btn btn-film-details">
             Details
           </Link>
         </div>

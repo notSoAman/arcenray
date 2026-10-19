@@ -147,7 +147,7 @@
 
 .credits {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
   gap: 12px;
 }
 
@@ -186,7 +186,7 @@ a.credit:hover {
 
 .related {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
   gap: 16px;
 }
 
@@ -197,4 +197,10 @@ a.credit:hover {
   .playerCol {
     margin: 0 calc(-1 * var(--gutter) / 2);
   }
+}
+
+.info {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }

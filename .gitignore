@@ -47,3 +47,6 @@ yarn-error.log*
 
 # Per-developer Claude settings (never share machine-local approvals or credentials)
 .claude/settings.local.json
+
+# Private operator recovery snapshots (never commit)
+.private-backups/

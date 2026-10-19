@@ -102,3 +102,19 @@
     font-size: 15px;
   }
 }
+
+.copy {
+  min-width: 0;
+  max-width: 100%;
+}
+.tags li {
+  height: auto;
+  min-height: 34px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .copy {
+    flex-basis: 100%;
+  }
+}
