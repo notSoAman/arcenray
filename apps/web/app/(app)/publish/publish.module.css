@@ -31,27 +31,6 @@
   color: var(--text-muted);
   font-size: 14px;
 }
-.storage {
-  padding: 18px 20px;
-  border: 1px solid var(--line-strong);
-  border-radius: 16px;
-  display: grid;
-  gap: 5px;
-  margin-bottom: 26px;
-}
-.storage span {
-  font-size: 13px;
-  color: var(--text-soft);
-}
-.storage button {
-  width: fit-content;
-  border: 0;
-  background: none;
-  text-decoration: underline;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 8px 0;
-}
 .fields {
   border: 0;
   padding: 0;
@@ -241,4 +220,53 @@
   padding-top: 16px;
   display: grid;
   gap: 14px;
+}
+
+.genreField {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.genreDropdown {
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--graphite);
+}
+.genreDropdown summary {
+  padding: 12px 14px;
+  min-height: 48px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.genreDropdown summary:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+.genreOptions {
+  max-height: 280px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line-strong);
+  padding: 8px;
+}
+.genreOptions label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px;
+  cursor: pointer;
+}
+.genreOptions input[type="checkbox"] {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--ember-crimson);
+}
+.genreOptions label:has(input:disabled) {
+  opacity: 0.5;
+  cursor: default;
 }
