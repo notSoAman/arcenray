@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HookPreview } from "../../../components/hook-preview";
 import { IconPlay } from "../../../components/icons";
-import { Avatar } from "../../../components/media";
+import { Avatar, Poster } from "../../../components/media";
 import { browserApi } from "../../../lib/client-api";
 import { formatDuration, withCreators, type FeedFilm } from "../../../lib/feed";
 import styles from "./loop.module.css";
@@ -184,17 +184,25 @@ export function LoopFeed({
             }}
           >
             <div className={styles.preview}>
-              <HookPreview
-                filmId={film.id}
-                hookKey={film.hook_key}
-                posterKey={film.poster_key}
-                title={film.title}
-                sizes="(max-width: 800px) 100vw, 800px"
-                active={activeId === film.id}
-                controlled={true}
-              />
+              {film.hook_key ? (
+                <HookPreview
+                  filmId={film.id}
+                  hookKey={film.hook_key}
+                  posterKey={film.poster_key}
+                  title={film.title}
+                  sizes="(max-width: 800px) 100vw, 800px"
+                  active={activeId === film.id}
+                  controlled={true}
+                />
+              ) : (
+                <Poster
+                  posterKey={film.poster_key}
+                  title={film.title}
+                  sizes="(max-width: 800px) 100vw, 800px"
+                />
+              )}
               <span className={`kicker glass ${styles.previewLabel}`}>
-                Film preview
+                {film.hook_key ? "Film preview" : "Film poster"}
               </span>
             </div>
             <div className={styles.details}>
@@ -276,7 +284,7 @@ export function LoopFeed({
           <p>
             {seenCount
               ? "Your preferences are saved. Come back for new films."
-              : "Published films and their previews will appear here."}
+              : "Published films will appear here."}
           </p>
           <Link
             href={viewerId ? "/publish" : "/sign-in?next=%2Fpublish"}
