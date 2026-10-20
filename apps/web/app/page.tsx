@@ -34,11 +34,11 @@ export default async function WelcomePage() {
               behind them, and start a conversation.
             </p>
             <div className={styles.heroActions}>
-              <Link href="/home" className="btn btn-primary">
+              <Link href="/home" className="btn btn-film-play">
                 Explore films
               </Link>
-              <Link href="/sign-in" className="btn btn-ghost">
-                Sign in
+              <Link href="/sign-up" className="btn btn-film-details">
+                Join Us
               </Link>
             </div>
           </div>
