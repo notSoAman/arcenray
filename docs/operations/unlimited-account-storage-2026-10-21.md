@@ -9,3 +9,9 @@ The migration updates the current hardened reservation functions with assertions
 The web checks the explicit NULL marker instead of coercing it to zero. Malformed/missing quota data still fails closed. Rollback-only SQL tests reserve more than 2 GiB through both single and multipart paths and test accounting, ownership, invalid formats, suspension and per-file limits. Existing finite-cap regression fixtures configure their cap explicitly.
 
 Recovery: redeploy the prior web release and restore an explicit founder-selected quota/default together if a capped policy is reinstated. This release does not remove media, accounts or usage records. No large blobs or durable QA accounts are created by the SQL tests.
+
+## Release verification
+
+The founder-approved migration passed rollback tests and was applied alone after a dry run. Database types were regenerated (public types unchanged). All 15 rollback-only SQL suites, all 41 web tests, TypeScript, the production OpenNext build and GitHub CI run 39491707687 passed. Supabase security advisors found no issues. Active policy inspection confirms NULL default and no configured finite account caps.
+
+Deployed Cloudflare Worker version `105cef09-edae-40ba-a7f3-a3e1711b305a` from code commit `e0752cf`, preserving existing secrets/configuration. Previous Worker version: `433efb58-bfcd-4c8f-8bad-784fe63d7f63`. The existing staging/apex hostnames share this Worker and updated together. No Stream or billing changes. Tests reserve bytes transactionally without uploading actual multi-GiB objects.
