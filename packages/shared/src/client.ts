@@ -152,6 +152,18 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
       },
     },
     credits: {
+      search: (query: string) =>
+        supabase.rpc("search_credit_collaborators", {
+          p_query: query.trim().slice(0, 80),
+          p_limit: 8,
+        }),
+      invite: (filmId: string, profileId: string, role: string) =>
+        supabase.rpc("invite_film_credit", {
+          p_film_id: uuidSchema.parse(filmId),
+          p_profile_id: uuidSchema.parse(profileId),
+          p_role: role.trim(),
+        }),
+      invitations: () => supabase.rpc("get_my_credit_invitations"),
       respond: (id: string, accept: boolean) =>
         supabase.rpc("respond_to_credit", {
           p_credit_id: uuidSchema.parse(id),
@@ -171,12 +183,48 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
     },
     media: {
       multipart: {
-        create: (input: MultipartCreateInput) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_create", ...multipartCreateSchema.parse(input)}}),
-        list: (draftId: string) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_list", draft_id: uuidSchema.parse(draftId)}}),
-        status: (assetId: string) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_status", asset_id: uuidSchema.parse(assetId)}}),
-        sign: (input: MultipartSignInput) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_sign", ...multipartSignSchema.parse(input)}}),
-        finish: (assetId: string) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_finish", asset_id: uuidSchema.parse(assetId)}}),
-        abort: (assetId: string) => supabase.functions.invoke<unknown>("media-upload", {body: {action: "multipart_abort", asset_id: uuidSchema.parse(assetId)}}),
+        create: (input: MultipartCreateInput) =>
+          supabase.functions.invoke<unknown>("media-upload", {
+            body: {
+              action: "multipart_create",
+              ...multipartCreateSchema.parse(input),
+            },
+          }),
+        list: (draftId: string) =>
+          supabase.functions.invoke<unknown>("media-upload", {
+            body: {
+              action: "multipart_list",
+              draft_id: uuidSchema.parse(draftId),
+            },
+          }),
+        status: (assetId: string) =>
+          supabase.functions.invoke<unknown>("media-upload", {
+            body: {
+              action: "multipart_status",
+              asset_id: uuidSchema.parse(assetId),
+            },
+          }),
+        sign: (input: MultipartSignInput) =>
+          supabase.functions.invoke<unknown>("media-upload", {
+            body: {
+              action: "multipart_sign",
+              ...multipartSignSchema.parse(input),
+            },
+          }),
+        finish: (assetId: string) =>
+          supabase.functions.invoke<unknown>("media-upload", {
+            body: {
+              action: "multipart_finish",
+              asset_id: uuidSchema.parse(assetId),
+            },
+          }),
+        abort: (assetId: string) =>
+          supabase.functions.invoke<unknown>("media-upload", {
+            body: {
+              action: "multipart_abort",
+              asset_id: uuidSchema.parse(assetId),
+            },
+          }),
       },
       storage: () => supabase.rpc("get_my_storage"),
       create: (input: UploadInput) =>

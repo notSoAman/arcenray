@@ -818,6 +818,19 @@ export type Database = {
         }
       }
       get_my_asset: { Args: { p_asset_id: string }; Returns: Json }
+      get_my_credit_invitations: {
+        Args: never
+        Returns: {
+          credit_id: string
+          film_id: string
+          film_status: string
+          film_title: string
+          invited_at: string
+          owner_handle: string
+          owner_name: string
+          role: string
+        }[]
+      }
       get_my_film_feedback: {
         Args: never
         Returns: {
@@ -876,6 +889,10 @@ export type Database = {
           summary: string
           title: string
         }[]
+      }
+      invite_film_credit: {
+        Args: { p_film_id: string; p_profile_id: string; p_role: string }
+        Returns: string
       }
       is_moderator: { Args: never; Returns: boolean }
       moderate_film: {
@@ -940,6 +957,15 @@ export type Database = {
       respond_to_credit: {
         Args: { p_accept: boolean; p_credit_id: string }
         Returns: undefined
+      }
+      search_credit_collaborators: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          full_name: string
+          handle: string
+          profile_id: string
+          profile_pic_key: string
+        }[]
       }
       set_film_feedback: {
         Args: { p_film_id: string; p_preference: string }

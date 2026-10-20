@@ -1,0 +1,20 @@
+.page {
+  width: min(100%, 900px);
+  margin: 0 auto;
+  padding: 40px 24px 120px;
+  min-width: 0;
+}
+.page h1 {
+  font-size: clamp(32px, 6vw, 56px);
+  overflow-wrap: anywhere;
+}
+.intro {
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin-top: 16px;
+}
+@media (max-width: 480px) {
+  .page {
+    padding: 28px 16px 120px;
+  }
+}

@@ -13,6 +13,7 @@ import { Lockup } from "../../components/brand";
 import { SignOutButton } from "../../components/sign-out-button";
 import { createClient } from "../../lib/supabase/client";
 import { roleLabels, roleOptions, type CreativeRole } from "../../lib/roles";
+import { LocationInput } from "../../components/location-input";
 import styles from "./onboarding.module.css";
 import { onboardingChoices, validOnboardingChoices } from "./preferences";
 
@@ -444,14 +445,14 @@ export function OnboardingFlow({
                 <label className="field-label" htmlFor="city">
                   City <span className={styles.optional}>optional</span>
                 </label>
-                <input
+                <LocationInput
                   id="city"
                   className="input"
                   autoComplete="address-level2"
                   placeholder="e.g. Bengaluru"
                   value={city}
                   maxLength={100}
-                  onChange={(e) => setCity(e.target.value)}
+                  onValueChange={setCity}
                   aria-invalid={errors.location_city ? true : undefined}
                   aria-describedby="city-hint"
                 />

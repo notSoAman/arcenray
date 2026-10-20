@@ -72,3 +72,47 @@
   padding: 12px 0;
   cursor: pointer;
 }
+.results {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.results button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  background: var(--graphite);
+  color: var(--bone);
+  cursor: pointer;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.results button:hover,
+.results button:focus-visible {
+  background: #ffffff12;
+  outline: 2px solid var(--bone);
+  outline-offset: -2px;
+}
+.results span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.selected {
+  padding: 12px 14px;
+  background: var(--graphite);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.fields .actions button[aria-pressed="true"] {
+  border-color: var(--bone);
+}
+.fields > div > label {
+  display: grid;
+  gap: 8px;
+}

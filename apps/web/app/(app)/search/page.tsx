@@ -18,6 +18,7 @@ import {
   isCreativeRole,
 } from "../../../lib/roles";
 import { getViewer } from "../../../lib/session";
+import { LocationInput } from "../../../components/location-input";
 import styles from "./search.module.css";
 
 export const metadata: Metadata = { title: "Search" };
@@ -202,7 +203,8 @@ export default async function SearchPage({
               Location
             </label>
             <div className={styles.cityRow}>
-              <input
+              <LocationInput
+                key={params.city ?? ""}
                 id="search-city"
                 name="city"
                 defaultValue={params.city ?? ""}

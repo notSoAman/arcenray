@@ -16,3 +16,36 @@
   outline: 2px solid var(--bone);
   outline-offset: 3px;
 }
+.menu {
+  position: relative;
+  flex: 0 0 44px;
+}
+.button {
+  cursor: pointer;
+  background: transparent;
+}
+.dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 100;
+  display: grid;
+  width: min(260px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--graphite);
+  box-shadow: 0 12px 36px #0008;
+}
+.dropdown a {
+  display: block;
+  padding: 14px 12px;
+  min-height: 48px;
+  border-radius: 8px;
+}
+.dropdown a:hover,
+.dropdown a:focus-visible {
+  background: #ffffff12;
+  outline: 2px solid var(--bone);
+  outline-offset: -2px;
+}

@@ -242,7 +242,7 @@ export default async function ProfilePage({
           ) : null}
 
           {tab === "credits" && isSelf && user ? (
-            <CreditInvitations viewerId={user.id} />
+            <CreditInvitations key={user.id} viewerId={user.id} />
           ) : null}
           {tab === "credits" ? (
             credits.length === 0 ? (
