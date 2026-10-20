@@ -37,8 +37,8 @@ export default async function WelcomePage() {
               <Link href="/home" className="btn btn-primary">
                 Explore films
               </Link>
-              <Link href="/sign-in" className="btn btn-ghost">
-                Sign in
+              <Link href="/sign-up" className="btn btn-ghost">
+                Join Us
               </Link>
             </div>
           </div>
