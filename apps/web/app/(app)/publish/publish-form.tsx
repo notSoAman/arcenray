@@ -15,6 +15,7 @@ import {
   type MultipartState,
 } from "../../../lib/media/multipart-upload";
 import { createUploadTask, type UploadState } from "../../../lib/media/upload";
+import { LocationInput } from "../../../components/location-input";
 import styles from "./publish.module.css";
 import { parseFilmLink } from "./film-link";
 import { FILM_GENRES, FILM_LANGUAGES } from "./film-options";
@@ -790,11 +791,11 @@ export function PublishForm({
             <div className={styles.row}>
               <label>
                 City
-                <input
+                <LocationInput
                   maxLength={100}
                   value={form.location_city ?? ""}
-                  onChange={(e) =>
-                    patch({ location_city: e.target.value || null })
+                  onValueChange={(value) =>
+                    patch({ location_city: value || null })
                   }
                 />
               </label>
@@ -976,7 +977,7 @@ export function PublishForm({
             key={draftId}
             filmId={draftId}
             viewerId={viewerId}
-            editable={!locked}
+            editable={!busy && preparing === null && !resumeLoading}
           />
         ) : (
           <p className={styles.muted}>

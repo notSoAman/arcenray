@@ -9,6 +9,7 @@ import { prepareImage } from "../../lib/media/prepare";
 import { createUploadTask } from "../../lib/media/upload";
 import { Avatar } from "../../components/media";
 import { roleLabels, roleOptions, type CreativeRole } from "../../lib/roles";
+import { LocationInput } from "../../components/location-input";
 import styles from "./settings.module.css";
 
 export function ProfileSettings({ initial }: { initial: ViewerProfile }) {
@@ -186,13 +187,13 @@ export function ProfileSettings({ initial }: { initial: ViewerProfile }) {
           </label>
           <label className={styles.field}>
             Location
-            <input
+            <LocationInput
               value={draft.location_city ?? ""}
               readOnly={!editing}
               maxLength={100}
               autoComplete="address-level2"
-              onChange={(e) =>
-                setDraft({ ...draft, location_city: e.target.value })
+              onValueChange={(value) =>
+                setDraft({ ...draft, location_city: value })
               }
             />
           </label>

@@ -1,0 +1,22 @@
+{
+  "source": "GeoNames cities15000",
+  "source_urls": [
+    "https://download.geonames.org/export/dump/cities15000.zip",
+    "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+    "https://download.geonames.org/export/dump/countryInfo.txt"
+  ],
+  "retrieved": "2026-10-20",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "Contains GeoNames data (https://www.geonames.org/), licensed under CC BY 4.0.",
+  "records": 34173,
+  "columns": [
+    "id",
+    "city",
+    "region",
+    "country",
+    "population",
+    "aliases"
+  ],
+  "limitations": "City suggestions, not addresses or live geolocation. Coverage follows cities15000. Existing location_city fields store only the canonical city name; region/country disambiguate suggestions but are not persisted."
+}

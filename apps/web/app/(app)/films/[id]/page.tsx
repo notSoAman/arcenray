@@ -308,7 +308,7 @@ export default async function FilmPage({
                   </span>
                 </>
               );
-              return p ? (
+              return p && (verified || c.profile_id === film.owner_id) ? (
                 <Link
                   key={c.id}
                   href={`/u/${p.handle}`}
