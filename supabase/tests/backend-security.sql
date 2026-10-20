@@ -11,6 +11,8 @@ insert into auth.users(id,email) values
  ('10000000-0000-0000-0000-000000000001','backend-a-'||gen_random_uuid()||'@example.invalid'),
  ('10000000-0000-0000-0000-000000000002','backend-b-'||gen_random_uuid()||'@example.invalid'),
  ('10000000-0000-0000-0000-000000000003','backend-c-'||gen_random_uuid()||'@example.invalid');
+-- Explicit finite cap fixture tests reservation enforcement; signup now defaults unlimited.
+update private.user_state set quota_bytes=2147483648 where user_id='10000000-0000-0000-0000-000000000001';
 update public.profiles set full_name='Fixture',roles=array['director'],onboarding_completed=true where id::text like '10000000-%';
 insert into public.films(id,owner_id,title) values('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Private film');
 insert into public.film_credits(id,film_id,profile_id,display_name,role) values('30000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','Fixture B','editor');

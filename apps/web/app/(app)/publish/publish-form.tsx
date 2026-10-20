@@ -6,6 +6,7 @@ import { filmDraftSchema, type Database, type FilmDraft } from "@repo/shared";
 import { DeleteFilm } from "../../../components/delete-film";
 import { FilmCreditsEditor } from "../../../components/film-credits-editor";
 import { browserApi } from "../../../lib/client-api";
+import { canReserveStorage } from "../../../lib/media/storage";
 import { inspectVideo, prepareImage } from "../../../lib/media/prepare";
 import { multipartCheckpoint } from "../../../lib/media/multipart-checkpoint";
 import {
@@ -357,10 +358,6 @@ export function PublishForm({
         throw new Error(
           "Could not check storage. Your draft is saved; retry before uploading.",
         );
-      const remaining =
-        Number(quota.data.quota_bytes) -
-        Number(quota.data.used_bytes) -
-        Number(quota.data.reserved_bytes);
       const freshBytes =
         mainFreshBytes +
         Object.entries(tasks.current).reduce(
@@ -371,7 +368,7 @@ export function PublishForm({
               : total,
           0,
         );
-      if (!Number.isFinite(remaining) || freshBytes > remaining)
+      if (!canReserveStorage(quota.data, freshBytes))
         throw new Error(
           "These files exceed your available storage. Choose smaller exports or wait for abandoned reservations to clear.",
         );
