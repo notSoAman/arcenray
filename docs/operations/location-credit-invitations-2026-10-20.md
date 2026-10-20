@@ -29,3 +29,9 @@ Founder approved the scoped shared-pilot migration in chat. `20261020100228_cred
 The static city list is about 3.84 MB raw / 1.50 MB gzip, loaded only when suggestions are first needed and cached in the page session. It covers cities, not addresses. Region/country disambiguate suggestions but existing fields persist canonical city names only. Smaller unlisted places can be entered manually. It adds no per-search bill; normal hosting limits still apply.
 
 No web deployment or merge is part of the database approval. Before release: obtain founder approval, build with the production environment using the existing release procedure, deploy and smoke-test public city search and protected invitations. A real owner/recipient account pair should verify the workflow during pilot testing; no accounts or user media were created/deleted for these tests.
+
+## Approved release
+
+Founder approved the existing Cloudflare website deployment after CI. PR #13 checks passed (run 39406069869). Production-environment OpenNext build and Wrangler dry-run passed; Worker gzip 2635.60 KiB. Deployed version `f67d371e-27e3-4d45-a4c8-a74b11a5b6fc` on 2026-10-20; previous version `4db46a70-6249-493a-92ab-3cbdbe114de4` is the rollback target. Existing variables/secrets preserved with `--keep-vars`. No new service, plan, DNS or auth configuration.
+
+The existing staging and apex hostnames share one Worker and updated together; there was no isolated hosted staging rollout. Local browser/UI tests, database rollback tests, build, CI and dry-run preceded the approved rollout. Live browser verified Bombay→Mumbai keyboard selection, Bangalore→Bengaluru suggestions and signed-out `/invitations` redirect to `/sign-in?next=%2Finvitations`. Real two-account production OAuth invite/accept testing remains a pilot check.
