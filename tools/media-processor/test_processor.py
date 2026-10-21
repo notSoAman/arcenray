@@ -172,6 +172,17 @@ class FFmpegTests(unittest.TestCase):
         with self.assertRaisesRegex(ProcessingError, "square_pixel"):
             self.convert(source)
 
+    def test_attached_cover_does_not_bypass_single_video_policy(self):
+        source = self.fixture("without-cover.mp4")
+        covered = self.root / "with-cover.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-i", str(source), "-f", "lavfi", "-i",
+                        "color=c=red:size=32x32:duration=0.1", "-map", "0:v:0", "-map", "1:v:0",
+                        "-c:v:0", "copy", "-c:v:1", "mjpeg", "-threads:v:1", "1",
+                        "-frames:v:1", "1", "-disposition:v:1", "attached_pic", str(covered)],
+                       check=True, capture_output=True)
+        with self.assertRaisesRegex(ProcessingError, "select_one_video"):
+            self.convert(covered)
+
     def test_truncated_input_is_not_accepted_as_complete(self):
         source = self.fixture("truncated.mp4", extra=("-movflags", "+faststart"))
         with source.open("r+b") as dest:

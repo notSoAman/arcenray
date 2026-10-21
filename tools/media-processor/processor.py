@@ -69,7 +69,8 @@ def probe(path: Path, work: Path) -> dict:
         video = [s for s in streams if s["codec_type"] == "video"
                  and not s.get("disposition", {}).get("attached_pic")]
         audio = [s for s in streams if s["codec_type"] == "audio"]
-        if len(video) != 1 or len(audio) > 1:
+        if (len(video) != 1 or len(audio) > 1
+                or any(s.get("disposition", {}).get("attached_pic") for s in streams)):
             raise ProcessingError("select_one_video_and_at_most_one_audio_track")
         v = video[0]
         duration = float(data["format"]["duration"])
@@ -172,7 +173,8 @@ def process(source: Path, work: Path, policy: Policy = Policy()) -> tuple[Path, 
               "-xerror", "-err_detect", "explode", *LOCAL_MP4,
               "-threads", str(policy.threads), "-i", str(source),
               "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn"]
-    if mode == "preserve" and faststart and not fragmented and meta["streams"] <= 2:
+    expected_streams = 1 + int(meta["audio_codec"] is not None)
+    if mode == "preserve" and faststart and not fragmented and meta["streams"] == expected_streams:
         output = source  # Byte-for-byte preservation, no redundant temporary copy.
     else:
         if mode == "preserve":
@@ -204,7 +206,7 @@ def process(source: Path, work: Path, policy: Policy = Policy()) -> tuple[Path, 
             mode = "remux_no_size_saving"
     result = probe(output, work)
     seekable, fragmented = mp4_layout(output)
-    if (not compatible(result) or not seekable or fragmented
+    if (not compatible(result) or not seekable or fragmented or result["streams"] != expected_streams
             or abs(result["duration"] - meta["duration"]) > max(0.25, 2 / meta["fps"])
             or result["width"] > meta["width"] or result["height"] > meta["height"]
             or (meta["audio_codec"] is not None and result["audio_codec"] is None)):
