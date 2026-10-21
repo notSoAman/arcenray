@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { legalContact } from "../../../lib/legal";
 import styles from "../settings.module.css";
 export const metadata: Metadata = { title: "Support and reporting" };
 export default function SupportPage() {
-  const configured = process.env.SUPPORT_EMAIL;
-  const email =
-    configured &&
-    /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(configured) &&
-    !/[\r\n?&#]/.test(configured)
-      ? configured
-      : null;
+  const email = legalContact.email;
   return (
     <main className={styles.page}>
       <p className="kicker">Arcenray support</p>
@@ -22,20 +17,11 @@ export default function SupportPage() {
           report does not automatically establish wrongdoing or remove content.
         </p>
         <h2>Copyright, privacy or account requests</h2>
-        {email ? (
-          <p>
-            Contact <a href={`mailto:${email}`}>{email}</a>. Include the
-            relevant Arcenray film/profile URL and a description of the issue.
-            Never send passwords, sign-in codes or private access keys.
-          </p>
-        ) : (
-          <p role="status">
-            A public support contact has not been configured for this
-            development environment. Ask the founder through the project channel
-            you already use. Public launch is blocked until a monitored support
-            contact is published.
-          </p>
-        )}
+        <p>
+          Contact <a href={`mailto:${email}`}>{email}</a>. Include the relevant
+          Arcenray film/profile URL and a description of the issue. Never send
+          passwords, sign-in codes or private access keys.
+        </p>
         <p>
           For account deletion, use the confirmed deletion flow in account
           settings when it is enabled.

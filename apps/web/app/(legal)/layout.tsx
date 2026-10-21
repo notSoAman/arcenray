@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Lockup } from "../../components/brand";
+import { legalContact } from "../../lib/legal";
 import styles from "./legal.module.css";
 
 export default function LegalLayout({
@@ -22,7 +23,7 @@ export default function LegalLayout({
         <nav aria-label="Legal and support">
           <Link href="/privacy">Privacy Policy</Link>
           <Link href="/terms">Terms of Service</Link>
-          <a href="mailto:office.arcenray@gmail.com">Contact</a>
+          <a href={`mailto:${legalContact.email}`}>Contact</a>
         </nav>
       </footer>
     </div>

@@ -1,6 +1,6 @@
 # Production sign-in setup
 
-Founder-approved domain: `arcenray.com`. Support: `office.arcenray@gmail.com`.
+Founder-approved domain: `arcenray.com`. Support: `office@arcenray.com`.
 Clerk production instance: `ins_3KsKWRoqHBRWlVrmKzya2JxBj8L`.
 Phone login and SMS MFA are disabled for launch by founder decision; no plan was purchased.
 
