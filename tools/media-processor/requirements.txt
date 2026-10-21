@@ -1,0 +1,2 @@
+# R2 S3 client only. Local FFmpeg processing/tests require no Python dependencies.
+boto3==1.43.116
