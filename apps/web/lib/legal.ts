@@ -2,8 +2,8 @@
 export const legalContact = {
   operator: "Aman Singh Choudhary",
   country: "India",
-  email: "office.arcenray@gmail.com",
-  updated: "18 October 2026",
+  email: "office@arcenray.com",
+  updated: "21 October 2026",
 };
 
 export type LegalPolicy = {
@@ -70,7 +70,7 @@ export const privacyPolicy: LegalPolicy = {
       id: "choices",
       title: "7. Your choices and requests",
       paragraphs: [
-        "You can edit your profile, manage published work and change available discovery preferences in the application. Contact office.arcenray@gmail.com to request access to, correction, export or deletion of your information, raise a privacy concern or ask about a pending deletion. We may need to verify your identity before acting on a request. Rights and exceptions depend on the laws that apply to you.",
+        `You can edit your profile, manage published work and change available discovery preferences in the application. Contact ${legalContact.email} to request access to, correction, export or deletion of your information, raise a privacy concern or ask about a pending deletion. We may need to verify your identity before acting on a request. Rights and exceptions depend on the laws that apply to you.`,
         "You can also remove Arcenray's Google connection through your Google Account settings. Revoking that connection does not by itself delete your Arcenray profile or previously published content; use our account-deletion process for that.",
       ],
     },
@@ -79,7 +79,7 @@ export const privacyPolicy: LegalPolicy = {
       title: "8. Security and updates",
       paragraphs: [
         "We use access controls, authenticated operations and other safeguards to protect information. No internet service can guarantee absolute security. Do not share passwords or verification codes, and contact us if you suspect unauthorized access. If you are not legally able to consent to the processing needed for an account, contact us before creating one.",
-        "We may update this policy as the service changes. We will show the updated date and provide additional notice or request consent where required. Contact the operator at office.arcenray@gmail.com with questions about this policy.",
+        `We may update this policy as the service changes. We will show the updated date and provide additional notice or request consent where required. Contact the operator at ${legalContact.email} with questions about this policy.`,
       ],
     },
   ],
@@ -87,8 +87,7 @@ export const privacyPolicy: LegalPolicy = {
 
 export const termsOfService: LegalPolicy = {
   title: "Terms of Service",
-  introduction:
-    "These terms govern your use of Arcenray, a platform for discovering independent films, showcasing creative work and connecting with collaborators. Arcenray is operated by Aman Singh Choudhary, based in India. Contact: office.arcenray@gmail.com. By using the service, you agree to these terms.",
+  introduction: `These terms govern your use of Arcenray, a platform for discovering independent films, showcasing creative work and connecting with collaborators. Arcenray is operated by Aman Singh Choudhary, based in India. Contact: ${legalContact.email}. By using the service, you agree to these terms.`,
   sections: [
     {
       id: "accounts",
@@ -127,7 +126,7 @@ export const termsOfService: LegalPolicy = {
       id: "reports",
       title: "5. Reports, takedowns and account restrictions",
       paragraphs: [
-        "Use the available report controls or email office.arcenray@gmail.com to report abuse, copyright infringement or a privacy issue. Include the relevant film or profile URL, explain the issue and provide enough information to assess your authority and request. Do not send passwords or verification codes.",
+        `Use the available report controls or email ${legalContact.email} to report abuse, copyright infringement or a privacy issue. Include the relevant film or profile URL, explain the issue and provide enough information to assess your authority and request. Do not send passwords or verification codes.`,
         "We may restrict content or accounts to investigate a report, enforce these terms, protect users or comply with law. We may preserve limited records for those purposes. If you believe a restriction was mistaken, contact the same address with the relevant URL and an explanation so the decision can be reviewed.",
       ],
     },
@@ -152,7 +151,7 @@ export const termsOfService: LegalPolicy = {
       title: "8. Leaving the service and changes to these terms",
       paragraphs: [
         "You can stop using Arcenray at any time and request account deletion through settings or by contacting us. Removal and limited retention are described in the Privacy Policy. Restrictions may also be applied for serious or repeated violations of these terms.",
-        "We may update these terms as the service develops. We will publish the revised text and updated date and provide further notice where required. Contact Aman Singh Choudhary at office.arcenray@gmail.com with questions or concerns.",
+        `We may update these terms as the service develops. We will publish the revised text and updated date and provide further notice where required. Contact Aman Singh Choudhary at ${legalContact.email} with questions or concerns.`,
       ],
     },
   ],
