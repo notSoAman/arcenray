@@ -120,6 +120,10 @@ export function PublishForm({
   );
   const [published, setPublished] = useState(initial?.status === "published");
   const [indexed, setIndexed] = useState(false);
+  const [processing, setProcessing] = useState<{
+    state: string;
+    error?: string;
+  } | null>(null);
   const [rights, setRights] = useState(false);
   const patch = (value: Partial<FilmDraft>) =>
     setForm((current) => ({ ...current, ...value }));
@@ -227,38 +231,69 @@ export function PublishForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial?.id]);
 
+  useEffect(() => {
+    const assetId = form.source === "r2_native" ? form.film_asset_id : null;
+    if (!assetId) {
+      setProcessing(null);
+      return;
+    }
+    let active = true;
+    const refresh = async () => {
+      const reply = await browserApi().media.processing.status(assetId);
+      if (!active || reply.error) return;
+      const value = reply.data as { state?: string; error?: string } | null;
+      setProcessing(
+        value?.state ? { state: value.state, error: value.error } : null,
+      );
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 5000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [form.film_asset_id, form.source]);
+
   async function choose(kind: Kind, file?: File) {
     if (!file || operation.current || busy || preparing) return;
     operation.current = true;
     setPreparing(kind);
     setError("");
     try {
-      let blob: Blob = file;
+      let selected = file;
+      if (kind === "film" && file.type !== "video/mp4") {
+        if (!/\.mp4$/i.test(file.name))
+          throw new Error("Choose an MP4 film file.");
+        selected = new File([file], file.name, { type: "video/mp4" });
+      }
+      let blob: Blob = selected;
       let description = "";
       if (kind === "poster") {
-        const prepared = await prepareImage(file, "poster");
+        const prepared = await prepareImage(selected, "poster");
         blob = prepared.blob;
         description = `${prepared.width} × ${prepared.height} WebP · ${Math.ceil(blob.size / 1024)} KB (automatically prepared)`;
       } else {
-        const metadata = await inspectVideo(file, kind);
-        description = `${metadata.width} × ${metadata.height} · ${metadata.duration.toFixed(1)} seconds · ${size(file.size)}`;
-        if (kind === "film" && (file.size * 8) / metadata.duration > 4_500_000)
-          description +=
-            " · High bitrate: consider an H.264/AAC, CRF 22 export for a smaller upload.";
+        try {
+          const metadata = await inspectVideo(selected, kind);
+          description = `${metadata.width} × ${metadata.height} · ${metadata.duration.toFixed(1)} seconds · ${size(selected.size)}`;
+        } catch (error) {
+          if (kind !== "film") throw error;
+          description = `MP4 · ${size(selected.size)} · dimensions and codecs checked by the server processor`;
+        }
       }
       if (kind === "film") {
         mainTask.current?.pause();
         mainTask.current = null;
-        mainFile.current = file;
+        mainFile.current = selected;
         setSlots((previous) => ({
           ...previous,
           film: {
-            name: file.name,
+            name: selected.name,
             description,
             state: {
               stage: "idle",
               bytesSent: 0,
-              totalBytes: file.size,
+              totalBytes: selected.size,
               hashedBytes: 0,
             },
           },
@@ -420,7 +455,9 @@ export function PublishForm({
       setNotice(
         pendingUploads.length && !mainFile.current
           ? "Draft saved privately. Reselect the original film below to resume its pending upload."
-          : "Draft saved privately. All selected files are verified. Review your details, then publish.",
+          : value.source === "r2_native" && value.film_asset_id
+            ? "Film uploaded privately. Server compression is running; you can leave this page and return to publish when it finishes."
+            : "Draft saved privately. All selected files are verified. Review your details, then publish.",
       );
     } catch (err) {
       setError(message(err));
@@ -470,6 +507,17 @@ export function PublishForm({
         throw new Error(
           "Save and upload your film and poster before publishing.",
         );
+      if (
+        value.source === "r2_native" &&
+        value.film_asset_id &&
+        processing?.state !== "complete"
+      ) {
+        throw new Error(
+          processing?.state === "failed"
+            ? "Automatic compression failed. Retry processing below before publishing."
+            : "Your film is being compressed on the server. Wait for processing to finish, then publish.",
+        );
+      }
       const id = await persist(value);
       const reply = await browserApi().films.publish(id);
       if (reply.error) {
@@ -864,10 +912,12 @@ export function PublishForm({
               </label>
             )}
             <p className={styles.muted}>
-              MP4 with H.264/AAC and fast start. Main film: up to 1080p / 2 GiB.
-              Optional hook: up to 720p / 30 seconds / 50 MiB. Export your
-              chosen hook in your editor; browser video conversion is not
-              enabled.
+              Main films must be MP4. They are checked and automatically
+              optimized to seekable 1080p H.264/AAC after upload; compatible
+              low-bitrate files are preserved. The available upload size is
+              based on the processing server's current scratch capacity.
+              Optional hooks remain MP4, up to 720p / 30 seconds / 50 MiB.
+              Export your chosen hook in your editor.
             </p>
             <p className={styles.muted}>
               No hook? Your film will appear in Loop with its poster and
@@ -905,6 +955,47 @@ export function PublishForm({
                           ? "Ready to upload"
                           : slots[kind]!.state.stage}
                       </p>
+                      {kind === "film" && processing && (
+                        <>
+                          <p
+                            className={
+                              processing.state === "failed"
+                                ? styles.error
+                                : styles.muted
+                            }
+                            role="status"
+                          >
+                            {processing.state === "complete"
+                              ? "Compression complete. Your film is ready to publish."
+                              : processing.state === "failed"
+                                ? "Automatic compression failed."
+                                : processing.state === "processing"
+                                  ? "Your film is being compressed on the server."
+                                  : "Your film is queued for automatic compression."}
+                          </p>
+                          {processing.state === "failed" &&
+                            form.film_asset_id && (
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                disabled={busy}
+                                onClick={async () => {
+                                  const reply =
+                                    await browserApi().media.processing.retry(
+                                      form.film_asset_id!,
+                                    );
+                                  if (reply.error || reply.data !== true)
+                                    setError(
+                                      "Could not retry compression. Refresh this draft and try again.",
+                                    );
+                                  else setProcessing({ state: "queued" });
+                                }}
+                              >
+                                Retry compression
+                              </button>
+                            )}
+                        </>
+                      )}
                       {kind === "film" &&
                         slots.film &&
                         "hashedBytes" in slots.film.state &&

@@ -34,7 +34,7 @@ export function multipartCheckpoint(
         typeof data.bytes !== "number" ||
         !Number.isSafeInteger(data.bytes) ||
         data.bytes <= 0 ||
-        data.bytes > 2 * 1024 ** 3
+      data.bytes > 5 * 1024 ** 4
       )
         throw new Error(
           "Saved upload checkpoint is unreadable. Review pending uploads before discarding it.",

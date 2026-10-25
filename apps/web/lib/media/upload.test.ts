@@ -81,7 +81,8 @@ test("preflight rejects MIME, empty and oversized files; accepts portrait and ex
   assert.throws(() =>
     validateVideo("hook", { width: 720, height: 1280, duration: 30.01 }),
   );
-  assert.throws(() =>
+  validateUpload("film", { type: "video/mp4", size: 3 * 1024 ** 3 } as Blob);
+  assert.doesNotThrow(() =>
     validateVideo("film", { width: 3840, height: 2160, duration: 10 }),
   );
   assert.throws(() =>

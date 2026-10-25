@@ -65,7 +65,7 @@ export function validateMediaJob(job: MediaJob) {
     job.attempts < 1 ||
     !Number.isSafeInteger(job.bytes) ||
     job.bytes <= 0 ||
-    job.bytes > 2147483648 ||
+    job.bytes > 5 * 1024 ** 4 ||
     !["video/mp4", "image/webp"].includes(job.content_type) ||
     !Number.isFinite(Date.parse(job.private_delete_after)) ||
     [job.etag, job.source_etag, job.backup_etag].some(

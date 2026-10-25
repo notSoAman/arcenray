@@ -1,0 +1,39 @@
+[Unit]
+Description=Arcenray private FFmpeg media processor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=arcenray
+Group=arcenray
+WorkingDirectory=/opt/arcenray/media-processor
+EnvironmentFile=/etc/arcenray/media-worker.env
+Environment=PROCESSOR_PYTHON=/opt/arcenray/venv/bin/python
+Environment=PROCESSOR_SCRATCH=/var/lib/arcenray/scratch
+ExecStart=/opt/arcenray/venv/bin/python /opt/arcenray/media-processor/worker.py
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=10G
+CPUQuota=200%
+TasksMax=128
+LimitNOFILE=128
+ReadWritePaths=/var/lib/arcenray/scratch
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

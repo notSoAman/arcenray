@@ -569,6 +569,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      backend_claim_media_processing_job: {
+        Args: { p_lease_seconds?: number }
+        Returns: Json
+      }
       backend_claim_multipart_operation: {
         Args: { p_asset: string; p_operation: string; p_owner: string }
         Returns: Json
@@ -620,6 +624,10 @@ export type Database = {
         Args: { p_asset: string; p_error: string; p_version: number }
         Returns: undefined
       }
+      backend_fail_media_processing_job: {
+        Args: { p_error: string; p_job: string; p_token: string }
+        Returns: boolean
+      }
       backend_finish_account_deletion: {
         Args: { p_job: string }
         Returns: boolean
@@ -635,6 +643,19 @@ export type Database = {
       }
       backend_finish_media_job: {
         Args: { p_asset: string; p_version: number }
+        Returns: boolean
+      }
+      backend_finish_media_processing_job: {
+        Args: {
+          p_duration: number
+          p_height: number
+          p_job: string
+          p_output_bytes: number
+          p_output_etag: string
+          p_sha256: string
+          p_token: string
+          p_width: number
+        }
         Returns: boolean
       }
       backend_finish_promotion:
@@ -653,6 +674,10 @@ export type Database = {
             }
             Returns: Json
           }
+      backend_heartbeat_media_processing_job: {
+        Args: { p_job: string; p_lease_seconds?: number; p_token: string }
+        Returns: boolean
+      }
       backend_initialize_multipart: {
         Args: {
           p_asset: string
@@ -674,6 +699,10 @@ export type Database = {
         Args: { p_job: string }
         Returns: undefined
       }
+      backend_mark_processing_object_deleted: {
+        Args: { p_cleanup: string }
+        Returns: undefined
+      }
       backend_multipart: {
         Args: { p_asset: string; p_owner: string }
         Returns: Json
@@ -687,6 +716,19 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      backend_processing_cleanup_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          cleanup_id: string
+          job_id: string
+          object_key: string
+          purpose: string
+        }[]
+      }
+      backend_processing_output: {
+        Args: { p_job: string; p_token: string }
+        Returns: Json
       }
       backend_promote_asset: {
         Args: { p_id: string; p_owner: string }
@@ -798,6 +840,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_media_processing_state: { Args: { p_asset: string }; Returns: Json }
       get_moderation_reports: {
         Args: never
         Returns: {
@@ -958,6 +1001,7 @@ export type Database = {
         Args: { p_accept: boolean; p_credit_id: string }
         Returns: undefined
       }
+      retry_media_processing: { Args: { p_asset: string }; Returns: boolean }
       search_credit_collaborators: {
         Args: { p_limit?: number; p_query: string }
         Returns: {
@@ -970,6 +1014,10 @@ export type Database = {
       set_film_feedback: {
         Args: { p_film_id: string; p_preference: string }
         Returns: undefined
+      }
+      set_media_processor_capacity: {
+        Args: { p_available: number }
+        Returns: number
       }
       set_onboarding_preferences: {
         Args: { p_choices: string[] }

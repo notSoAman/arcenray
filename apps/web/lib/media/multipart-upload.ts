@@ -2,7 +2,8 @@ import { putBlob } from "./transport.ts";
 import { validateUpload } from "./validation.ts";
 import type { UploadReceipt } from "./upload.ts";
 
-export const MULTIPART_PART_SIZE = 16 * 1024 ** 2;
+export const MULTIPART_PART_SIZE = 64 * 1024 ** 2;
+const FINGERPRINT_CHUNK_SIZE = 16 * 1024 ** 2;
 type Reply = { data: unknown; error: unknown };
 export type MultipartApi = {
   create(input: {
@@ -118,11 +119,15 @@ export function parseMultipartDescriptor(value: unknown): MultipartDescriptor {
     typeof data.bytes !== "number" ||
     !Number.isSafeInteger(data.bytes) ||
     data.bytes <= 0 ||
-    data.bytes > 2 * 1024 ** 3 ||
+    data.bytes > 5 * 1024 ** 4 ||
     typeof data.fingerprint !== "string" ||
     !hash.test(data.fingerprint) ||
-    data.part_size !== MULTIPART_PART_SIZE ||
-    data.part_count !== Math.ceil(data.bytes / MULTIPART_PART_SIZE) ||
+    typeof data.part_size !== "number" ||
+    !Number.isInteger(data.part_size) ||
+    data.part_size < 16 * 1024 ** 2 ||
+    data.part_size > 512 * 1024 ** 2 ||
+    data.part_count !== Math.ceil(data.bytes / data.part_size) ||
+    data.part_count > 10000 ||
     !date(data.resume_expires_at) ||
     typeof data.status !== "string" ||
     !statuses.includes(data.status)
@@ -133,8 +138,8 @@ export function parseMultipartDescriptor(value: unknown): MultipartDescriptor {
     draft_id: data.draft_id,
     bytes: data.bytes,
     fingerprint: data.fingerprint,
-    part_size: MULTIPART_PART_SIZE,
-    part_count: Math.ceil(data.bytes / MULTIPART_PART_SIZE),
+    part_size: data.part_size,
+    part_count: data.part_count as number,
     resume_expires_at: data.resume_expires_at,
     status: data.status as MultipartDescriptor["status"],
   };
@@ -233,15 +238,15 @@ export async function fingerprintFilm(
 ) {
   validateUpload("film", blob);
   const parts: string[] = [];
-  for (let offset = 0; offset < blob.size; offset += MULTIPART_PART_SIZE) {
+  for (let offset = 0; offset < blob.size; offset += FINGERPRINT_CHUNK_SIZE) {
     signal?.throwIfAborted();
     const chunk = await blob
-      .slice(offset, Math.min(offset + MULTIPART_PART_SIZE, blob.size))
+      .slice(offset, Math.min(offset + FINGERPRINT_CHUNK_SIZE, blob.size))
       .arrayBuffer();
     signal?.throwIfAborted();
     parts.push(hex(await crypto.subtle.digest("SHA-256", chunk)));
     signal?.throwIfAborted();
-    onProgress?.(Math.min(offset + MULTIPART_PART_SIZE, blob.size));
+    onProgress?.(Math.min(offset + FINGERPRINT_CHUNK_SIZE, blob.size));
   }
   const manifest = JSON.stringify({
     version: 1,
