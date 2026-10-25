@@ -23,7 +23,7 @@ Deno.test(
         multipartSchema.safeParse({ ...valid, ...extra }).success,
         false,
       );
-    for (const part_numbers of [[], [1, 1], [0], [129], [1, 2, 3]])
+    for (const part_numbers of [[], [1, 1], [0], [10001], [1, 2, 3]])
       assert.equal(
         multipartSchema.safeParse({
           action: "multipart_sign",

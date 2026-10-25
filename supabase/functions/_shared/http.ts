@@ -98,7 +98,7 @@ export function serve(handler: (req: Request) => Promise<unknown>) {
       "Cache-Control": "no-store",
       Vary: "Origin",
       "Access-Control-Allow-Headers":
-        "authorization,apikey,content-type,x-client-info,x-cleanup-secret",
+        "authorization,apikey,content-type,x-client-info,x-cleanup-secret,x-media-processor-secret",
       "Access-Control-Allow-Methods": "POST,OPTIONS",
     };
     if (origin && allowed.includes(origin))

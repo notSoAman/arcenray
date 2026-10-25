@@ -427,6 +427,10 @@ import_map = "./functions/deno.json"
 verify_jwt = true
 import_map = "./functions/deno.json"
 
+[functions.media-processing]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
 [functions.index-pending]
 verify_jwt = true
 import_map = "./functions/deno.json"

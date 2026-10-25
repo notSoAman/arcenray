@@ -1,7 +1,7 @@
 import { env, HttpError } from "./http.ts";
 import { objectUrl, signer } from "./r2.ts";
 
-export const FILM_PART_BYTES = 16 * 1024 * 1024;
+export const FILM_PART_BYTES = 64 * 1024 * 1024;
 export type StoredPart = { part_number: number; bytes: number; etag: string };
 type Query = Record<string, string>;
 export type MultipartRequest = (
@@ -74,15 +74,26 @@ function etag(value: string) {
     throw new HttpError(502, "Invalid multipart storage ETag");
   return value;
 }
-export function validateStoredParts(bytes: number, parts: StoredPart[]) {
-  if (!Number.isSafeInteger(bytes) || bytes <= 0 || bytes > 2147483648)
+export function validateStoredParts(
+  bytes: number,
+  parts: StoredPart[],
+  partSize = FILM_PART_BYTES,
+) {
+  if (
+    !Number.isSafeInteger(bytes) ||
+    bytes <= 0 ||
+    bytes > 5 * 1024 ** 4 ||
+    !Number.isSafeInteger(partSize) ||
+    partSize < 16 * 1024 * 1024 ||
+    partSize > 512 * 1024 * 1024
+  )
     throw new HttpError(400, "Invalid film size");
-  const count = Math.ceil(bytes / FILM_PART_BYTES);
+  const count = Math.ceil(bytes / partSize);
   if (parts.length !== count)
     throw new HttpError(409, "Upload all film parts before completing");
   const sorted = [...parts].sort((a, b) => a.part_number - b.part_number);
   for (let i = 0; i < count; i++) {
-    const expected = Math.min(FILM_PART_BYTES, bytes - i * FILM_PART_BYTES);
+    const expected = Math.min(partSize, bytes - i * partSize);
     if (sorted[i]!.part_number !== i + 1 || sorted[i]!.bytes !== expected)
       throw new HttpError(409, "Film parts differ from the reserved size");
     etag(sorted[i]!.etag);
@@ -225,7 +236,7 @@ export function createMultipartStorage(
         if (
           !Number.isSafeInteger(part_number) ||
           part_number < 1 ||
-          part_number > 128 ||
+          part_number > 10000 ||
           !Number.isSafeInteger(bytes) ||
           bytes <= 0 ||
           bytes > FILM_PART_BYTES
@@ -238,7 +249,7 @@ export function createMultipartStorage(
         });
       }
       if (
-        parts.length > 128 ||
+        parts.length > 10000 ||
         new Set(parts.map((p) => p.part_number)).size !== parts.length
       )
         throw new HttpError(502, "Duplicate stored film parts");
@@ -249,10 +260,11 @@ export function createMultipartStorage(
       id: string,
       bytes: number,
       parts: StoredPart[],
+      partSize = FILM_PART_BYTES,
     ) {
       validatePrivateKey(key);
       validateUploadId(id);
-      const verified = validateStoredParts(bytes, parts);
+      const verified = validateStoredParts(bytes, parts, partSize);
       const body =
         "<CompleteMultipartUpload>" +
         verified
@@ -287,14 +299,15 @@ export async function signFilmParts(
   id: string,
   bytes: number,
   numbers: number[],
+  partSize = FILM_PART_BYTES,
 ) {
   validatePrivateKey(key);
   validateUploadId(id);
-  const count = Math.ceil(bytes / FILM_PART_BYTES);
+  const count = Math.ceil(bytes / partSize);
   if (
     !Number.isSafeInteger(bytes) ||
     bytes <= 0 ||
-    bytes > 2147483648 ||
+    bytes > 5 * 1024 ** 4 ||
     numbers.length < 1 ||
     numbers.length > 2 ||
     new Set(numbers).size !== numbers.length ||
@@ -303,10 +316,7 @@ export async function signFilmParts(
     throw new HttpError(400, "Invalid film part selection");
   return Promise.all(
     numbers.map(async (part_number) => {
-      const size = Math.min(
-        FILM_PART_BYTES,
-        bytes - (part_number - 1) * FILM_PART_BYTES,
-      );
+      const size = Math.min(partSize, bytes - (part_number - 1) * partSize);
       const url = objectUrl(env("R2_UPLOAD_BUCKET_NAME"), key);
       url.searchParams.set("uploadId", id);
       url.searchParams.set("partNumber", String(part_number));

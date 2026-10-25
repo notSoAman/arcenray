@@ -32,7 +32,7 @@ const basicBodySchema = z.discriminatedUnion("action", [
     .object({
       action: z.literal("create"),
       kind: z.enum(["film", "hook", "poster", "profile_picture"]),
-      bytes: z.number().int().positive().max(2147483648),
+      bytes: z.number().int().positive().max(5497558138880),
       content_type: z.enum(["video/mp4", "image/webp"]),
     })
     .strict(),
@@ -119,20 +119,28 @@ async function verifyCompletedAsset(id: string, owner: string) {
     );
   }
   let metadata: { width: number; height: number; duration_seconds?: number };
-  try {
-    if (a.content_type === "image/webp") {
-      metadata = inspectWebP(await readRange(a.object_key, 0, bytes - 1, etag));
-    } else {
-      const file = await readMoov(a.object_key, bytes, etag);
-      validateMp4Samples(file.moov, file.fileSize, file.mdatRanges);
-      metadata = inspectMp4Moov(file.moov);
+  if (a.kind === "film") {
+    // MP4 codecs and dimensions are not authoritative until FFmpeg has probed
+    // the complete private source. Do not fetch source media through the Edge runtime.
+    metadata = { width: 1, height: 1 };
+  } else {
+    try {
+      if (a.content_type === "image/webp") {
+        metadata = inspectWebP(
+          await readRange(a.object_key, 0, bytes - 1, etag),
+        );
+      } else {
+        const file = await readMoov(a.object_key, bytes, etag);
+        validateMp4Samples(file.moov, file.fileSize, file.mdatRanges);
+        metadata = inspectMp4Moov(file.moov);
+      }
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      throw new HttpError(
+        422,
+        "Unsupported or malformed media. Export WebP or a valid MP4.",
+      );
     }
-  } catch (e) {
-    if (e instanceof HttpError) throw e;
-    throw new HttpError(
-      422,
-      "Unsupported or malformed media. Export WebP or H.264/AAC MP4.",
-    );
   }
   a = checked(
     await admin().rpc("backend_verify_asset", {
@@ -154,15 +162,13 @@ serve(async (req) => {
   const b = bodySchema.parse(await jsonBody(req));
   await rateLimit(user.id, "media", 120);
   // Fail before reserving quota if credentials have not been configured.
-  for (
-    const key of [
-      "R2_ACCOUNT_ID",
-      "R2_ACCESS_KEY_ID",
-      "R2_SECRET_ACCESS_KEY",
-      "R2_UPLOAD_BUCKET_NAME",
-      "R2_BUCKET_NAME",
-    ]
-  ) {
+  for (const key of [
+    "R2_ACCOUNT_ID",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_UPLOAD_BUCKET_NAME",
+    "R2_BUCKET_NAME",
+  ]) {
     env(key);
   }
   if (isMultipartAction(b)) {
@@ -210,6 +216,24 @@ serve(async (req) => {
   if (assets.some((a) => !["uploaded", "ready"].includes(a.status))) {
     throw new HttpError(409, "Verify all assets before publication");
   }
-  for (const a of assets) await promote(a);
+  for (const a of assets) {
+    if (a.kind === "film") {
+      const processing = await client.rpc("get_media_processing_state", {
+        p_asset: a.id,
+      });
+      if (processing.error)
+        throw new HttpError(503, "Could not check film processing status");
+      const state = (processing.data as { state?: string } | null)?.state;
+      if (state !== "complete") {
+        throw new HttpError(
+          409,
+          state === "failed"
+            ? "Automatic film processing failed. Retry processing from your saved draft."
+            : "Your film is uploading or being compressed. Wait for processing to finish, then publish.",
+        );
+      }
+    }
+    await promote(a);
+  }
   return checked(await client.rpc("publish_film", { p_film_id: f.id }));
 });
