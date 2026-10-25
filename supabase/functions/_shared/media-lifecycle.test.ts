@@ -77,7 +77,7 @@ test("lifecycle refuses cross-owner/traversal/public-key mistakes and invalid sn
     { public_key: "assets/someone-else" },
     { etag: '"bad\r\nheader"' },
     { version: 0 },
-    { bytes: 2147483649 },
+    { bytes: 5 * 1024 ** 4 + 1 },
   ]) {
     const { ports, calls } = memory();
     await assert.rejects(executeMediaJob({ ...job(), ...changes }, ports));
