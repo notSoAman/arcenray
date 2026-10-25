@@ -149,17 +149,31 @@ export function safeNextPath(value: string | null | undefined): string {
   }
 }
 
-export const multipartCreateSchema = z.object({
-  draft_id: uuidSchema,
-  request_id: uuidSchema,
-  bytes: z.number().int().positive().max(2147483648),
-  content_type: z.literal("video/mp4"),
-  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
-}).strict();
-export const multipartSignSchema = z.object({
-  asset_id: uuidSchema,
-  part_numbers: z.array(z.number().int().min(1).max(128)).min(1).max(2)
-    .refine(parts => new Set(parts).size === parts.length, "Duplicate part numbers"),
-}).strict();
+export const multipartCreateSchema = z
+  .object({
+    draft_id: uuidSchema,
+    request_id: uuidSchema,
+    bytes: z
+      .number()
+      .int()
+      .positive()
+      .max(5 * 1024 ** 4),
+    content_type: z.literal("video/mp4"),
+    fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+export const multipartSignSchema = z
+  .object({
+    asset_id: uuidSchema,
+    part_numbers: z
+      .array(z.number().int().min(1).max(10000))
+      .min(1)
+      .max(2)
+      .refine(
+        (parts) => new Set(parts).size === parts.length,
+        "Duplicate part numbers",
+      ),
+  })
+  .strict();
 export type MultipartCreateInput = z.infer<typeof multipartCreateSchema>;
 export type MultipartSignInput = z.infer<typeof multipartSignSchema>;

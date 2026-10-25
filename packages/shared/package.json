@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./database": "./src/database.types.ts",
-    "./contracts": "./src/contracts.ts"
+    "./contracts": "./src/contracts.ts",
+    "./media": "./src/media/multipart.ts",
+    "./media-upload": "./src/media/upload.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",

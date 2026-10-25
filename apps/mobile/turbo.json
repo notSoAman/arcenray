@@ -1,0 +1,22 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "outputs": ["dist/**"],
+      "env": [
+        "EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "EXPO_PUBLIC_MEDIA_URL"
+      ]
+    },
+    "dev": {
+      "env": [
+        "EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "EXPO_PUBLIC_MEDIA_URL"
+      ]
+    }
+  }
+}

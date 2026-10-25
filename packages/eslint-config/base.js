@@ -1,4 +1,5 @@
 import babelParser from "@babel/eslint-parser";
+import { fileURLToPath } from "node:url";
 import js from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import turboPlugin from "eslint-plugin-turbo";
@@ -18,7 +19,10 @@ export const config = [
       parserOptions: {
         requireConfigFile: false,
         babelOptions: {
-          presets: ["@babel/preset-typescript"],
+          // Native workspaces can use another Babel major; resolve this config's own preset.
+          presets: [
+            fileURLToPath(import.meta.resolve("@babel/preset-typescript")),
+          ],
         },
       },
     },
