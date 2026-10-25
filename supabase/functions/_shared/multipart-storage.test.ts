@@ -81,6 +81,7 @@ Deno.test(
       part(1, 20) +
       "</ListPartsResult>";
     const store = createMultipartStorage(async () => new Response(xml));
+    await assert.rejects(store.parts(key, "2~bad<id"));
     assert.deepEqual(await store.parts(key, "2~id"), [
       { part_number: 1, bytes: 20, etag: '"abc123"' },
     ]);

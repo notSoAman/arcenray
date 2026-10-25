@@ -52,6 +52,13 @@ Deno.test("publish HTTP path accepts verified native/external films without a ho
         let data: unknown;
         if (path.endsWith("/rpc/current_profile_id")) data = owner;
         else if (path.endsWith("/rpc/backend_rate_limit")) data = true;
+        else if (path.endsWith("/rpc/get_media_processing_state")) {
+          const assetId = JSON.parse(String(init?.body)).p_asset;
+          if (assetId !== main) {
+            throw Error("Unexpected processing-state lookup");
+          }
+          data = { state: "complete" };
+        }
         else if (path.endsWith("/films")) data = film();
         else if (path.endsWith("/profiles")) {
           data = { onboarding_completed: true };

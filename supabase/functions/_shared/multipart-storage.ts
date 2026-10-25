@@ -239,7 +239,7 @@ export function createMultipartStorage(
           part_number > 10000 ||
           !Number.isSafeInteger(bytes) ||
           bytes <= 0 ||
-          bytes > 512 * 1024 * 1024
+          bytes > FILM_PART_BYTES
         )
           throw new HttpError(502, "Invalid stored film part");
         parts.push({
