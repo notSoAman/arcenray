@@ -227,6 +227,16 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
           }),
       },
       storage: () => supabase.rpc("get_my_storage"),
+      processing: {
+        status: (assetId: string) =>
+          supabase.rpc("get_media_processing_state", {
+            p_asset: uuidSchema.parse(assetId),
+          }),
+        retry: (assetId: string) =>
+          supabase.rpc("retry_media_processing", {
+            p_asset: uuidSchema.parse(assetId),
+          }),
+      },
       create: (input: UploadInput) =>
         supabase.functions.invoke("media-upload", {
           body: { action: "create", ...uploadSchema.parse(input) },
