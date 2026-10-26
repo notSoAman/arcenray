@@ -37,13 +37,13 @@ this app. The parser rejects Clerk secret keys and Supabase server/service keys.
 Do not copy the web/server environment wholesale. Production public configuration
 points at real user data and is subject to the existing authorization rules.
 
-The existing Clerk Native API was already enabled. Android app registration and hosted
-redirect approval are pending: package `com.arcenray.mobile.dev`, callback
-`clerk://com.arcenray.mobile.dev.hosted-callback`. The prepared debug certificate
-fingerprint and approval boundary are recorded in the architecture document. No provider,
-trusted issuer or production authentication configuration has been changed. A store
-build needs a separately reviewed package/signing registration. The general application
-scheme is `arcenray-dev://`; no verified HTTPS App Links or DNS changes are included.
+The existing Clerk Native API was already enabled. On 26 October 2026 the founder approved
+and Codex saved package `com.arcenray.mobile.dev` with the matching local debug certificate
+and callback `clerk://com.arcenray.mobile.dev.hosted-callback`. Clerk also created its
+standard `clerk://com.arcenray.mobile.dev.callback` entry when registering the Android app.
+The certificate and approval boundary are recorded in the architecture document. Providers
+and trusted issuers were not changed. A store build needs a separately reviewed
+package/signing registration. The general application scheme is `arcenray-dev://`; no verified HTTPS App Links or DNS changes are included.
 The SDK activates the browser session; arbitrary deep-link JWTs are not accepted.
 
 ## Local development and Android build
@@ -124,13 +124,21 @@ pnpm build
   on the existing Pixel_9_Pro Android 16/API 36 emulator. Native tabs/icons rendered.
 - Live public feed completed and displayed its actual empty catalogue. Emulator testing
   found and fixed an endless reload caused by Clerk's changing token-helper identity.
+- On 26 October 2026 the approved Clerk registration/callback were saved. The installed
+  app opened the real hosted sign-in form at `accounts.arcenray.com`, and Android
+  resolved the callback to the app. Cancelling returned to guest browsing. Actual login
+  and callback redemption remain unverified; the founder chose to continue signed out.
+- A controlled 17,856,833-byte local MP4 was selected through Android's Downloads content
+  URI; native chunk fingerprinting matched the host calculation and native playback
+  reached completion at 3.03 seconds. A temporary local-only test route stopped before
+  any API call; the route and test clip were removed afterward.
 - Additional screen/link checks are recorded in the architecture document. Local evidence
   lives under ignored `.expo/`; no private account screenshots are committed.
 
 Not yet verified: actual Clerk browser login/callback/session persistence, authenticated
-production user journeys/RLS, real film playback, multipart transfers/Android provider
-interruption or process-death recovery, and physical ARM phones. No production test user,
-film, upload, credit, message or session was fabricated through administrative APIs.
+production user journeys/RLS, network R2/provider playback, multipart transfers/remote
+Android providers, interruption or process-death recovery, and physical ARM phones. No
+production test user, film, upload, credit, message or session was fabricated through administrative APIs.
 A controlled account/media fixture and actual user sign-in are needed for those checks.
 
 ## Remaining boundaries

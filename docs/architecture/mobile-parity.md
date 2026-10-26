@@ -26,12 +26,14 @@ still resolves via ensure_current_profile/current_profile_id. New sessions boots
 pending profile. Session/account changes remount native screen state and do not expose
 previous account data. The existing Native API was already enabled when inspected.
 
-Production native-app registration and exact hosted redirect require separate founder
-approval because they expand the allowed production clients. Prepared registration:
+On 26 October 2026 the founder explicitly approved the prepared production Android
+registration and exact hosted redirect. Codex saved and verified registration:
 com.arcenray.mobile.dev, debug certificate SHA-256
 FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C,
-redirect clerk://com.arcenray.mobile.dev.hosted-callback. Store builds require their own
-reviewed package/signing certificate registration. Provider methods and trusted issuers
+redirect clerk://com.arcenray.mobile.dev.hosted-callback. Clerk automatically created
+its standard clerk://com.arcenray.mobile.dev.callback entry with the Android registration.
+Android resolves the hosted callback to the installed application's MainActivity.
+Store builds require their own reviewed package/signing certificate registration. Provider methods and trusted issuers
 are not changed by this implementation.
 
 ## Native flow coverage
@@ -108,12 +110,60 @@ bounded fingerprint reads and rejection of native content changed while paused.
 The root test script does not include mobile tests, which were run separately.
 
 NOT VERIFIED: real Clerk login/callback/session persistence; authenticated production
-journeys/RLS; actual R2/provider playback; Android file-provider selection, multi-GiB
+journeys/RLS; actual R2/provider playback; remote/cloud Android file providers, multi-GiB
 transfer/interruption/process-death recovery on device; physical ARM phone or store build.
+Local Downloads selection/fingerprinting/playback was subsequently checked below.
 No real production film/chat/credit/account mutation is claimed as tested. Authenticated
-user journeys require approved native registration and the founder's actual sign-in;
+user journeys require the founder's actual sign-in;
 no users/sessions/films are fabricated through privileged APIs to simulate success.
-Clerk registration/redirect remain prepared and unsaved pending the founder's answer.
+Clerk registration and the hosted redirect were subsequently approved and saved on
+26 October 2026. This narrowly scoped authentication change is the only production
+configuration change in the mobile work.
 Native visual sign-off, verified HTTPS links, release signing and durable Android
 background transfer remain separate work. No merge, deployment, schema/resource/provider
 or DNS changes were performed. Native screenshots/UI dumps remain ignored in .expo/.
+
+## Approved Android authentication setup — 26 October 2026
+
+Founder approval covered the prepared Android registration and exact hosted callback.
+Codex registered only com.arcenray.mobile.dev with the
+previously reviewed SHA-256 debug certificate in the existing Clerk production instance,
+then added the exact clerk://com.arcenray.mobile.dev.hosted-callback redirect. Clerk also
+automatically added clerk://com.arcenray.mobile.dev.callback with the Android registration.
+The native API was already enabled; no provider, trusted issuer, account credential,
+database schema, DNS or production website deployment was changed.
+
+Verified the saved package/callback rows in the Clerk dashboard. Android's intent resolver
+selects com.arcenray.mobile.dev/.MainActivity for the hosted callback. Restarted the
+existing Pixel_9_Pro emulator with 2 GiB RAM and two virtual CPUs, reusing the previously
+verified APK and local Metro. From the native account screen, the sign-in button opened
+a Chrome authentication tab at accounts.arcenray.com and rendered the actual Arcenray
+Google/email/username sign-in form. No user credentials or session tokens were copied.
+Actual login, callback redemption and authenticated screens remain unverified: the founder
+chose to continue without signing in. Cancelling the Chrome auth tab returned to guest
+browsing, and retry reopened the hosted accounts.arcenray.com browser tab. Evidence is
+stored locally under ignored apps/mobile/.expo/.
+
+### Local native media smoke check
+
+A temporary local-only QA route exercised the existing selectFilm and mainFilmTask native
+adapters, plus expo-video, while signed out. A generated three-second H.264/AAC MP4 with
+an additional free atom totalled 17,856,833 bytes, crossing the 16 MiB fingerprint boundary.
+Android's Downloads document picker returned a content URI without copying the film into
+app cache. Native FileHandle/Crypto fingerprinting matched the independently computed
+host manifest (9fad8c299c11c1a931c9582daec734e911136fae98206743a94b52896847fe96).
+The upload API was replaced only in the temporary test route with a local stub that
+stopped after fingerprint creation: no request, reservation, PUT or production write
+was sent. The local checkpoint was cleared. Native playback of that content URI reached
+3.03 seconds and playToEnd. The test route and disposable downloaded clip were removed;
+only ignored local evidence/test-harness text remains in .expo/.
+
+This verifies this local Android file provider, bounded native reads/crypto and local
+native video decoding. It does not verify remote/cloud document providers, actual R2 PUT
+or Range delivery, server processing, multi-GiB transfer, interruption/process-death
+recovery, provider embeds or authenticated publication. No app source/dependency changed
+in this approval follow-up; mobile types, lint and all 10 tests passed again. A final
+Android export succeeded, and its bundle was checked to exclude the temporary QA route.
+The existing emulator is left running in guest mode. The previous full native APK build
+and monorepo checks remain the recorded 25 October results; no new native dependency
+or binary rebuild was necessary for the approved dashboard configuration.
