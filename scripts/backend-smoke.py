@@ -116,8 +116,19 @@ try:
     try:code=ET.fromstring(e.read()).findtext('Code')
     except ET.ParseError:code='unrecognized_error'
     raise AssertionError(f'R2 direct upload failed HTTP {e.code}, code {code}') from None
+   # Verification enqueues main-film processing only after the asset belongs to
+   # an active draft. Attach the reserved asset before completing it.
+   if kind=='film':api('/rest/v1/films?id=eq.'+film['id'],'PATCH',{'film_asset_id':aid},a['token'],True)
    complete=fn('media-upload',{'action':'complete','asset_id':aid},a['token']);assert complete['status'] in ('uploaded','ready')
-   if kind!='profile_picture':api('/rest/v1/films?id=eq.'+film['id'],'PATCH',{kind+'_asset_id':aid},a['token'],True)
+   if kind not in ('film','profile_picture'):api('/rest/v1/films?id=eq.'+film['id'],'PATCH',{kind+'_asset_id':aid},a['token'],True)
+   if kind=='film':
+    deadline=time.monotonic()+300
+    while True:
+     state=api('/rest/v1/rpc/get_media_processing_state','POST',{'p_asset':aid},a['token'],True)
+     if state and state.get('state')=='complete':break
+     if state and state.get('state') in ('failed','cancelled'):raise AssertionError('Film processing failed: '+str(state.get('state')))
+     if time.monotonic()>=deadline:raise AssertionError('Film processing timed out')
+     time.sleep(5)
   published=fn('media-upload',{'action':'publish','film_id':film['id']},a['token']);assert published['status']=='published'
   assert len(api('/rest/v1/films?id=eq.'+film['id'],token=b['token'],public=True))==1
   url=os.environ['R2_PUBLIC_URL']+'/'+published['film_key']

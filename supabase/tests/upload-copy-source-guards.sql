@@ -7,6 +7,12 @@ insert into private.media_assets(id,owner_id,kind,object_key,expected_bytes,actu
 ('4b000000-0000-0000-0000-000000000002','1b000000-0000-0000-0000-000000000001','film','1b000000-0000-0000-0000-000000000001/5b000000-0000-0000-0000-000000000002',100,100,'video/mp4','ready','"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-6"',now()+interval '1 day'),
 ('4b000000-0000-0000-0000-000000000003','1b000000-0000-0000-0000-000000000001','poster','1b000000-0000-0000-0000-000000000001/5b000000-0000-0000-0000-000000000003',100,100,'image/webp','ready','"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',now()+interval '1 hour');
 insert into private.multipart_uploads(asset_id,owner_id,draft_id,request_id,fingerprint,upload_id,status) values('4b000000-0000-0000-0000-000000000002','1b000000-0000-0000-0000-000000000001','2b000000-0000-0000-0000-000000000001','3b000000-0000-0000-0000-000000000001',repeat('a',64),'provider-test','uploading');
+do $$ begin
+ begin perform public.backend_begin_promotion('4b000000-0000-0000-0000-000000000001','1b000000-0000-0000-0000-000000000001');raise exception 'FAIL promotion before processing';exception when object_not_in_prerequisite_state then null;end;
+end $$;
+-- Simulate an already verified processing result for the copy lifecycle tests.
+insert into private.media_processing_jobs(asset_id,owner_id,draft_id,source_key,source_etag,source_bytes,state)
+values('4b000000-0000-0000-0000-000000000001','1b000000-0000-0000-0000-000000000001','2b000000-0000-0000-0000-000000000001','fixture-source','fixture-etag',100,'complete');
 select set_config('copy.test.token',public.backend_begin_promotion('4b000000-0000-0000-0000-000000000001','1b000000-0000-0000-0000-000000000001')::text,true);
 set local role service_role;
 do $$ begin

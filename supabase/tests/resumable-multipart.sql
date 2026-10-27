@@ -15,7 +15,7 @@ insert into public.films(id,owner_id,title) values
 ('29000000-0000-0000-0000-000000000003','19000000-0000-0000-0000-000000000001','Multipart test other draft');
 set local role service_role;
 insert into multipart_test values('a',public.backend_create_multipart('19000000-0000-0000-0000-000000000001','29000000-0000-0000-0000-000000000001','39000000-0000-0000-0000-000000000001',17825792,repeat('a',64)));
-select pg_temp.assert_true((select payload->>'part_size'='16777216' and payload->>'part_count'='2' and payload->>'asset_status'='pending' from multipart_test where name='a'),'fixed 16MiB slices with final partial part');
+select pg_temp.assert_true((select payload->>'part_size'='67108864' and payload->>'part_count'='1' and payload->>'asset_status'='pending' from multipart_test where name='a'),'64MiB slices with final partial part');
 select pg_temp.assert_true((select film_asset_id is null from public.films where id='29000000-0000-0000-0000-000000000001'),'unverified session is private association, not film asset');
 select pg_temp.assert_true((public.backend_create_multipart('19000000-0000-0000-0000-000000000001','29000000-0000-0000-0000-000000000001','39000000-0000-0000-0000-000000000001',17825792,repeat('a',64))->>'asset_id')::uuid=pg_temp.multipart_asset('a'),'same request idempotent');
 select pg_temp.assert_true((public.backend_create_multipart('19000000-0000-0000-0000-000000000001','29000000-0000-0000-0000-000000000001','39000000-0000-0000-0000-000000000002',17825792,repeat('a',64))->>'asset_id')::uuid=pg_temp.multipart_asset('a'),'lost request checkpoint with same full fingerprint reuses active upload');

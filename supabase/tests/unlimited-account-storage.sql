@@ -27,7 +27,7 @@ set local role service_role;
 select public.backend_create_multipart('73000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000001',gen_random_uuid(),2147483648,repeat('a',64));
 select public.backend_create_multipart('73000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000002',gen_random_uuid(),1073741824,repeat('b',64));
 select pg_temp.denied($q$select public.backend_create_multipart('73000000-0000-0000-0000-000000000002','74000000-0000-0000-0000-000000000001',gen_random_uuid(),1,repeat('c',64))$q$);
-select pg_temp.denied($q$select public.backend_create_multipart('73000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000001',gen_random_uuid(),2147483649,repeat('c',64))$q$);
+select pg_temp.denied($q$select public.backend_create_multipart('73000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000001',gen_random_uuid(),5497558138881,repeat('c',64))$q$);
 select pg_temp.denied($q$select public.backend_create_multipart('73000000-0000-0000-0000-000000000099','74000000-0000-0000-0000-000000000001',gen_random_uuid(),1,repeat('c',64))$q$);
 reset role;
 set local role authenticated;

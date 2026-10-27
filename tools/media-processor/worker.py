@@ -52,7 +52,7 @@ def capacity_bytes() -> int:
     # processor itself separately requires 3x input + 1 GiB free scratch.
     usage = shutil.disk_usage(SCRATCH)
     reserve = max(20 * 1024**3, usage.total // 5)
-    return max(0, min(usage.free, usage.total - reserve))
+    return max(0, usage.free - reserve)
 
 
 def report_capacity() -> None:
