@@ -8,6 +8,10 @@ import { FilmCreditsEditor } from "../../../components/film-credits-editor";
 import { browserApi } from "../../../lib/client-api";
 import { canReserveStorage } from "../../../lib/media/storage";
 import { inspectVideo, prepareImage } from "../../../lib/media/prepare";
+import {
+  filmRequirements,
+  inspectMp4Tracks,
+} from "@repo/shared/media-preflight";
 import { multipartCheckpoint } from "../../../lib/media/multipart-checkpoint";
 import {
   createMultipartUploadTask,
@@ -268,6 +272,12 @@ export function PublishForm({
       }
       let blob: Blob = selected;
       let description = "";
+      let tracksChecked = false;
+      if (kind === "film") {
+        const tracks = await inspectMp4Tracks(selected);
+        if (tracks.status === "unsupported") throw new Error(tracks.message);
+        tracksChecked = tracks.status === "checked";
+      }
       if (kind === "poster") {
         const prepared = await prepareImage(selected, "poster");
         blob = prepared.blob;
@@ -299,7 +309,9 @@ export function PublishForm({
           },
         }));
         setNotice(
-          "Film checked. Save draft & upload will check the complete file fingerprint before resuming any saved parts.",
+          tracksChecked
+            ? "Track count checked. The server will verify codecs and the complete file after upload."
+            : "Could not check this file's tracks before upload. It may be rejected by the server; confirm it has one video track and at most one audio track.",
         );
         return;
       }
@@ -321,6 +333,16 @@ export function PublishForm({
         "File checked. Save draft & upload to send it directly to media storage.",
       );
     } catch (err) {
+      if (kind === "film") {
+        mainTask.current?.pause();
+        mainTask.current = null;
+        mainFile.current = null;
+        setSlots((previous) => {
+          const next = { ...previous };
+          delete next.film;
+          return next;
+        });
+      }
       setError(message(err));
     } finally {
       operation.current = false;
@@ -912,12 +934,10 @@ export function PublishForm({
               </label>
             )}
             <p className={styles.muted}>
-              Main films must be MP4. They are checked and automatically
-              optimized to seekable 1080p H.264/AAC after upload; compatible
-              low-bitrate files are preserved. The available upload size is
-              based on the processing server's current scratch capacity.
-              Optional hooks remain MP4, up to 720p / 30 seconds / 50 MiB.
-              Export your chosen hook in your editor.
+              {filmRequirements} Compatible low-bitrate files are preserved;
+              other supported files are optimized after upload. Optional hooks
+              must be H.264/AAC MP4 (or silent), up to 720p, 30 seconds and 50
+              MiB. Export your chosen hook in your editor.
             </p>
             <p className={styles.muted}>
               No hook? Your film will appear in Loop with its poster and

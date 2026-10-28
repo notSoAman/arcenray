@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./database": "./src/database.types.ts",
-    "./contracts": "./src/contracts.ts"
+    "./contracts": "./src/contracts.ts",
+    "./media-preflight": "./src/media/preflight.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
