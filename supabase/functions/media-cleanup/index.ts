@@ -8,7 +8,7 @@ import {
   jsonBody,
 } from "../_shared/http.ts";
 import { r2Lifecycle } from "../_shared/r2.ts";
-import { processMediaJobs } from "../_shared/media-lifecycle.ts";
+import { processMediaJobs, processProcessingCleanup } from "../_shared/media-lifecycle.ts";
 import { processAccountDeletions } from "../_shared/account-cleanup.ts";
 serve(async (req) => {
   // The platform verifies JWTs; this dedicated secret additionally restricts operations.
@@ -35,7 +35,10 @@ serve(async (req) => {
       .rpc("backend_enqueue_expired_media")
       .abortSignal(AbortSignal.timeout(2000)),
   );
-  const jobs = await processMediaJobs(Math.min(deadline, started + 40000));
+  const jobs = await processMediaJobs(Math.min(deadline, started + 30000));
+  let processingObjectsRemoved = 0;
+  if (Date.now() - started < 40000)
+    processingObjectsRemoved = await processProcessingCleanup(Math.min(deadline, started + 45000));
   const accountSkipped = Date.now() - started > 35000;
   const accounts = accountSkipped
     ? {
@@ -86,6 +89,7 @@ serve(async (req) => {
   return {
     enqueued,
     ...jobs,
+    processing_objects_removed: processingObjectsRemoved,
     ...accounts,
     account_cleanup_deferred: accountSkipped,
     source_cleanup_deferred: duplicateSkipped,

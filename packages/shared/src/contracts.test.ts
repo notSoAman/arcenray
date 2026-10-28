@@ -40,7 +40,7 @@ test("profile contract rejects privilege fields and invalid handles", () => {
     false,
   );
 });
-test("upload validation rejects quota overflow and mismatched MIME", () => {
+test("upload validation allows films above 2 GiB and rejects mismatched MIME", () => {
   assert.equal(
     uploadSchema.safeParse({
       kind: "hook",
@@ -61,6 +61,14 @@ test("upload validation rejects quota overflow and mismatched MIME", () => {
     uploadSchema.safeParse({
       kind: "film",
       bytes: 2 * 1024 ** 3 + 1,
+      content_type: "video/mp4",
+    }).success,
+    true,
+  );
+  assert.equal(
+    uploadSchema.safeParse({
+      kind: "film",
+      bytes: 512 * 1024 ** 2 * 10_000 + 1,
       content_type: "video/mp4",
     }).success,
     false,

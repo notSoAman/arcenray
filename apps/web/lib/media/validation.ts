@@ -1,7 +1,10 @@
 export type MediaKind = "film" | "hook" | "poster" | "profile_picture";
 export type VideoMetadata = { width: number; height: number; duration: number };
+// Application protocol ceiling; the processing worker applies a lower live
+// scratch-capacity limit before it accepts a reservation.
+export const MAX_FILM_BYTES = 512 * 1024 ** 2 * 10_000;
 export const byteLimits: Record<MediaKind, number> = {
-  film: 2 * 1024 ** 3,
+  film: MAX_FILM_BYTES,
   hook: 50 * 1024 ** 2,
   poster: 512 * 1024,
   profile_picture: 100 * 1024,

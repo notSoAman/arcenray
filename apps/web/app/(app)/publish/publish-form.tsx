@@ -24,6 +24,11 @@ import { FILM_GENRES, FILM_LANGUAGES } from "./film-options";
 type Film = Database["public"]["Tables"]["films"]["Row"];
 type Kind = "film" | "hook" | "poster";
 type Task = ReturnType<typeof createUploadTask>;
+type FilmProcessingStatus = {
+  state: "queued" | "processing" | "complete" | "failed" | "cancelled";
+  error: string | null;
+  updated_at: string;
+};
 type Slot = {
   name: string;
   task?: Task;
@@ -120,6 +125,7 @@ export function PublishForm({
   );
   const [published, setPublished] = useState(initial?.status === "published");
   const [indexed, setIndexed] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<FilmProcessingStatus | null>(null);
   const [rights, setRights] = useState(false);
   const patch = (value: Partial<FilmDraft>) =>
     setForm((current) => ({ ...current, ...value }));
@@ -129,6 +135,27 @@ export function PublishForm({
       mainTask.current?.pause();
     };
   }, []);
+  useEffect(() => {
+    const assetId = form.source === "r2_native" ? form.film_asset_id : null;
+    if (!assetId) {
+      setProcessingStatus(null);
+      return;
+    }
+    let active = true;
+    const refresh = async () => {
+      const result = await browserApi().media.processing.status(assetId);
+      if (!active || result.error || !result.data || typeof result.data !== "object") return;
+      const value = result.data as FilmProcessingStatus;
+      if (["queued", "processing", "complete", "failed", "cancelled"].includes(value.state))
+        setProcessingStatus(value);
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [form.source, form.film_asset_id]);
   useEffect(() => {
     if (!busy) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -420,7 +447,9 @@ export function PublishForm({
       setNotice(
         pendingUploads.length && !mainFile.current
           ? "Draft saved privately. Reselect the original film below to resume its pending upload."
-          : "Draft saved privately. All selected files are verified. Review your details, then publish.",
+          : value.source === "r2_native"
+            ? "Draft saved. Your film is uploaded privately and is being prepared for playback; you can publish after processing finishes."
+            : "Draft saved privately. All selected files are verified. Review your details, then publish.",
       );
     } catch (err) {
       setError(message(err));
@@ -471,6 +500,18 @@ export function PublishForm({
           "Save and upload your film and poster before publishing.",
         );
       const id = await persist(value);
+      if (value.source === "r2_native" && value.film_asset_id) {
+        const status = await browserApi().media.processing.status(value.film_asset_id);
+        if (status.error || !status.data || typeof status.data !== "object")
+          throw new Error("Could not confirm film processing. Your draft is safe; retry in a moment.");
+        const processing = status.data as FilmProcessingStatus;
+        setProcessingStatus(processing);
+        if (processing.state !== "complete") {
+          if (processing.state === "failed")
+            throw new Error("Film processing failed. Retry processing below before publishing.");
+          throw new Error("Your film is still being prepared for playback. You can publish as soon as processing finishes.");
+        }
+      }
       const reply = await browserApi().films.publish(id);
       if (reply.error) {
         // A timed-out response can follow a committed publication. Read back before retrying.
@@ -864,7 +905,8 @@ export function PublishForm({
               </label>
             )}
             <p className={styles.muted}>
-              MP4 with H.264/AAC and fast start. Main film: up to 1080p / 2 GiB.
+              MP4 with H.264/AAC and fast start. Films can exceed 2 GiB; the
+              upload is resumable and checks available processing capacity.
               Optional hook: up to 720p / 30 seconds / 50 MiB. Export your
               chosen hook in your editor; browser video conversion is not
               enabled.
@@ -943,6 +985,35 @@ export function PublishForm({
               ))}
           </fieldset>
           {preparing && <p role="status">Checking {preparing}…</p>}
+          {form.source === "r2_native" && processingStatus && (
+            <section aria-live="polite" className={styles.asset}>
+              <strong>Film processing: {processingStatus.state}</strong>
+              <p className={styles.muted}>
+                {processingStatus.state === "queued" || processingStatus.state === "processing"
+                  ? "Your original is private while we prepare a seekable MP4. This can take a while for large films. This page checks for updates automatically."
+                  : processingStatus.state === "complete"
+                    ? "Playback copy is ready. You can publish this film."
+                    : processingStatus.state === "failed"
+                      ? "Processing did not finish. Retry the saved original; your draft remains private."
+                      : "Processing was cancelled because this upload is no longer active."}
+              </p>
+              {processingStatus.state === "failed" && form.film_asset_id && (
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  disabled={busy}
+                  onClick={async () => {
+                    const result = await browserApi().media.processing.retry(form.film_asset_id!);
+                    if (result.error) setError("Could not retry processing. Refresh the draft and try again.");
+                    else {
+                      setProcessingStatus({ ...processingStatus, state: "queued", error: null, updated_at: new Date().toISOString() });
+                      setError("");
+                    }
+                  }}
+                >Retry processing</button>
+              )}
+            </section>
+          )}
           <div className={styles.actions}>
             <button className="btn btn-ghost" type="submit" disabled={locked}>
               Save draft & upload

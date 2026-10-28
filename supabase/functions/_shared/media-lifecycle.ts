@@ -65,7 +65,7 @@ export function validateMediaJob(job: MediaJob) {
     job.attempts < 1 ||
     !Number.isSafeInteger(job.bytes) ||
     job.bytes <= 0 ||
-    job.bytes > 2147483648 ||
+    job.bytes > 512 * 1024 ** 2 * 10_000 ||
     !["video/mp4", "image/webp"].includes(job.content_type) ||
     !Number.isFinite(Date.parse(job.private_delete_after)) ||
     [job.etag, job.source_etag, job.backup_etag].some(
@@ -200,6 +200,33 @@ export function lifecycleTimeout(
   if (remaining <= 0) throw new MediaJobError("storage");
   return Math.min(maximum, remaining);
 }
+
+/** Remove only exact source/attempt keys queued by the processing lifecycle. */
+export async function processProcessingCleanup(deadline: number) {
+  const jobs = admin();
+  const claimed = await jobs.rpc("backend_processing_cleanup_batch", { p_limit: 10 });
+  if (claimed.error) throw new MediaJobError("database");
+  const items = (claimed.data ?? []) as {
+    cleanup_id: string; job_id: string; object_key: string; purpose: "source" | "attempt";
+  }[];
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  let removed = 0;
+  for (const item of items) {
+    const source = /^[0-9a-f-]{36}\/[0-9a-f-]{36}$/.test(item.object_key)
+      && uuid.test(item.object_key.split("/")[0]) && uuid.test(item.object_key.split("/")[1]);
+    const attempt = item.object_key === `processing/${item.job_id}/${item.object_key.split("/")[2]}/film.mp4`
+      && uuid.test(item.job_id) && uuid.test(item.object_key.split("/")[2]);
+    if (!uuid.test(item.cleanup_id) || !uuid.test(item.job_id) || !(source || attempt))
+      throw new MediaJobError("storage");
+    await r2Lifecycle("DELETE", env("R2_UPLOAD_BUCKET_NAME"), item.object_key,
+      lifecycleTimeout(deadline, 5000));
+    const marked = await jobs.rpc("backend_mark_processing_object_deleted", { p_cleanup: item.cleanup_id });
+    if (marked.error) throw new MediaJobError("database");
+    removed++;
+  }
+  return removed;
+}
+
 function productionPorts(deadline: number, job: MediaJob): MediaPorts {
   // Validate purge configuration before deleting origin media. Missing credentials
   // leave the durable job failed/retryable, never falsely marked removed.

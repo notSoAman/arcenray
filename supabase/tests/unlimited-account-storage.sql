@@ -22,16 +22,21 @@ select pg_temp.denied($q$update private.user_state set quota_bytes=null where us
 reset role;
 insert into public.films(id,owner_id,title) values
 ('74000000-0000-0000-0000-000000000001','73000000-0000-0000-0000-000000000001','Unlimited storage fixture'),
-('74000000-0000-0000-0000-000000000002','73000000-0000-0000-0000-000000000001','Unlimited second draft fixture');
+('74000000-0000-0000-0000-000000000002','73000000-0000-0000-0000-000000000001','Unlimited second draft fixture'),
+('74000000-0000-0000-0000-000000000003','73000000-0000-0000-0000-000000000001','Large resumable draft fixture');
 set local role service_role;
+select public.set_media_processor_capacity(100000000000);
 select public.backend_create_multipart('73000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000001',gen_random_uuid(),2147483648,repeat('a',64));
 select public.backend_create_multipart('73000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000002',gen_random_uuid(),1073741824,repeat('b',64));
+select pg_temp.assert_true(
+  (public.backend_create_multipart('73000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000003',gen_random_uuid(),2147483649,repeat('d',64))->>'part_count')::integer=33,
+  'multipart accepts >2 GiB with the persisted 64 MiB part boundary');
 select pg_temp.denied($q$select public.backend_create_multipart('73000000-0000-0000-0000-000000000002','74000000-0000-0000-0000-000000000001',gen_random_uuid(),1,repeat('c',64))$q$);
-select pg_temp.denied($q$select public.backend_create_multipart('73000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000001',gen_random_uuid(),2147483649,repeat('c',64))$q$);
+select pg_temp.denied($q$select public.backend_create_multipart('73000000-0000-0000-0000-000000000001','74000000-0000-0000-0000-000000000001',gen_random_uuid(),5368709120001,repeat('c',64))$q$);
 select pg_temp.denied($q$select public.backend_create_multipart('73000000-0000-0000-0000-000000000099','74000000-0000-0000-0000-000000000001',gen_random_uuid(),1,repeat('c',64))$q$);
 reset role;
 set local role authenticated;
-select pg_temp.assert_true((public.get_my_storage()->>'reserved_bytes')::bigint=6442451944,'multipart also exceeds old cap without losing reservation tracking');
+select pg_temp.assert_true((public.get_my_storage()->>'reserved_bytes')::bigint=8589935593,'large multipart reservation stays accurately accounted');
 reset role;
 -- A finite administrative cap remains effective, and suspensions are not bypassed.
 update private.user_state set quota_bytes=1 where user_id='73000000-0000-0000-0000-000000000001';
@@ -43,4 +48,4 @@ set local role authenticated;
 select pg_temp.denied($q$select public.reserve_upload('poster',1,'image/webp')$q$);
 reset role;
 rollback;
-select 'Unlimited account storage, accounting, per-file and access assertions passed; fixtures rolled back' as result;
+select 'Unlimited account storage, large multipart upload, accounting and access assertions passed; fixtures rolled back' as result;

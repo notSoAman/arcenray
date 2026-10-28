@@ -2,6 +2,7 @@ import type {
   MultipartCheckpoint,
   MultipartCheckpointPort,
 } from "./multipart-upload.ts";
+import { MAX_FILM_BYTES } from "./validation.ts";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Owner/draft scoped hints only. The authenticated service remains authoritative. */
 export function multipartCheckpoint(
@@ -34,7 +35,7 @@ export function multipartCheckpoint(
         typeof data.bytes !== "number" ||
         !Number.isSafeInteger(data.bytes) ||
         data.bytes <= 0 ||
-        data.bytes > 2 * 1024 ** 3
+        data.bytes > MAX_FILM_BYTES
       )
         throw new Error(
           "Saved upload checkpoint is unreadable. Review pending uploads before discarding it.",

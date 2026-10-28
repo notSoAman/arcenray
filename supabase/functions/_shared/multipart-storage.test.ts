@@ -3,6 +3,7 @@ import {
   createMultipartStorage,
   validateStoredParts,
   FILM_PART_BYTES,
+  MAX_FILM_PART_BYTES,
   validatePrivateKey,
 } from "./multipart-storage.ts";
 const key =
@@ -23,6 +24,22 @@ Deno.test(
     await assert.rejects(store.parts(key, "../?uploadId=other"));
     await assert.rejects(store.initialize("foreign/key"));
     assert.equal(calls, 0);
+  },
+);
+Deno.test(
+  "multipart validator supports a >2 GiB file using larger stored part boundaries",
+  () => {
+    const bytes = 2 * 1024 ** 3 + 1;
+    const size = 64 * 1024 * 1024;
+    const count = Math.ceil(bytes / size);
+    const parts = Array.from({ length: count }, (_, i) => ({
+      part_number: i + 1,
+      bytes: Math.min(size, bytes - i * size),
+      etag: `"${(i + 1).toString(16)}"`,
+    }));
+    assert.equal(validateStoredParts(bytes, parts, size).length, count);
+    assert.throws(() => validateStoredParts(bytes, parts, FILM_PART_BYTES));
+    assert.equal(MAX_FILM_PART_BYTES, 512 * 1024 * 1024);
   },
 );
 Deno.test(

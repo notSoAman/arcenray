@@ -44,8 +44,10 @@ for the entire resume window. List/reap ambiguous exact-key multipart initiation
 After reload, reselecting the same film must match a bounded-memory full-content
 fingerprint (hash each16MiB slice, then hash the ordered digest manifest). Never skip
 parts merely because filename/size/timestamp or sampled ends match. Store no auth
-credentials in browser upload checkpoints. The2GiB quota includes hook/poster, so do
-not imply an exactly2GiB main film fits alongside mandatory media.
+credentials in browser upload checkpoints. Account storage is not quota-capped;
+the earlier 2GiB per-film cap is being replaced in the active large-media branch
+with R2 multipart bounds and worker scratch-capacity admission. Do not treat that
+branch behavior as live until migration and real large-upload verification pass.
 
 Tests: cross-user/guessed IDs, quota reuse, signature renewal, slice boundaries,
 wrong-file reselection, failed/overwritten parts, canonical completion, pause/discard,

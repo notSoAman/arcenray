@@ -4,6 +4,7 @@ import {
   createMultipartUploadTask,
   fingerprintFilm,
   MULTIPART_PART_SIZE as chunk,
+  parseMultipartDescriptor,
   type MultipartApi,
   type MultipartCheckpoint,
   type MultipartDescriptor,
@@ -145,19 +146,43 @@ function harness(blob: Blob) {
 }
 
 test("an unfinished completion can reach finish after reload without retransmitting parts", async () => {
-  const blob = film(), h = harness(blob);
+  const blob = film(),
+    h = harness(blob);
   const original = h.api.status;
   h.api.status = async (assetId) => {
     const reply = await original(assetId);
-    return { ...reply, data: { ...(reply.data as object), status: "completing", parts: [] } };
+    return {
+      ...reply,
+      data: { ...(reply.data as object), status: "completing", parts: [] },
+    };
   };
   const task = createMultipartUploadTask(blob, h.api, {
-    draftId: draft, checkpoint: h.port, transport: h.transport, now: h.now,
+    draftId: draft,
+    checkpoint: h.port,
+    transport: h.transport,
+    now: h.now,
   });
   assert.deepEqual(await task.start(), verified);
   assert.equal(h.counts().finishes, 1);
   assert.equal(h.counts().signs, 0);
   assert.equal(h.transfers.length, 0);
+});
+
+test("multipart descriptors accept files larger than 2 GiB with persisted larger parts", () => {
+  const bytes = 2 * 1024 ** 3 + 1;
+  const partSize = 64 * 1024 ** 2;
+  const descriptor = parseMultipartDescriptor({
+    asset_id: asset,
+    draft_id: draft,
+    bytes,
+    fingerprint: "a".repeat(64),
+    part_size: partSize,
+    part_count: Math.ceil(bytes / partSize),
+    resume_expires_at: new Date(Date.now() + 86400000).toISOString(),
+    status: "uploading",
+  });
+  assert.equal(descriptor.bytes, bytes);
+  assert.equal(descriptor.part_count, 33);
 });
 
 test("multipart hashes/sends bounded slices and never forwards auth or Content-Length", async () => {

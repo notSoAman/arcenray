@@ -71,8 +71,10 @@ These helpers do not publish films automatically or implement any screen design.
 Render public keys as `https://cdn.arcenray.com/${key}`. Native player supports
 HTTP Range. External films use compliant Vimeo/YouTube embeds from validated IDs;
 never scrape/download them. Hook <=30s and <=720p; film <=1080p; WebP profile <=256²;
-poster <=800x1200. Upload caps: hook50MiB, profile100KiB, poster512KiB, film2GiB.
-Total per-account quota is 2GiB and includes pending reservations.
+poster <=800x1200. Upload caps: hook50MiB, profile100KiB, poster512KiB. Native
+film uploads are admitted up to the live FFmpeg worker scratch capacity, with an
+R2 multipart protocol ceiling of 512MiB x 10,000 parts. Total account storage is
+not quota-capped; usage and pending reservations are still tracked.
 
 ## Discovery and search
 

@@ -96,11 +96,13 @@ Attached film assets are excluded from abandoned-upload deletion. Published medi
 keys are immutable. CDN cache may retain an asset after origin deletion; takedown
 needs deliberate origin deletion plus CDN cache purge by the founder.
 
-The initial 2GiB film limit uses a single direct PUT; multipart/resumable uploads are
-not implemented. Conversion/compression and hook selection are frontend work.
-Server checks actual MP4/WebP metadata, codec configuration, sample-table offsets,
-size/duration/dimensions; it does not fully decode every frame or transcode video.
-A dedicated transcoding/decoding pipeline is future work if device support requires it.
+The previously deployed web path imposed a 2GiB per-film cap. The current feature
+branch replaces that fixed cap with resumable multipart sessions and a live worker
+scratch-capacity admission check. Its database migration and FFmpeg worker journey
+have not yet been applied and verified in production; do not promise large uploads
+until that release gate passes. Server checks actual MP4/WebP metadata, codec
+configuration, sample-table offsets, size/duration/dimensions; it does not fully
+decode every frame or transcode video without the separate processing pipeline.
 
 Search embeddings use Supabase Edge Runtime built-in `gte-small` (384 dimensions),
 server-side only, with mean pooling and normalization. No external AI API key is needed.

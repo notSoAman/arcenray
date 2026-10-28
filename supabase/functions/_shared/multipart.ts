@@ -2,7 +2,9 @@ import { z } from "zod";
 import { admin, checked, HttpError } from "./http.ts";
 import {
   createMultipartStorage,
-  FILM_PART_BYTES,
+  MAX_FILM_PART_BYTES,
+  MAX_FILM_PARTS,
+  MIN_FILM_PART_BYTES,
   signFilmParts,
   validateStoredParts,
 } from "./multipart-storage.ts";
@@ -13,7 +15,11 @@ export const multipartSchema = z.discriminatedUnion("action", [
       action: z.literal("multipart_create"),
       draft_id: z.uuid(),
       request_id: z.uuid(),
-      bytes: z.number().int().positive().max(2147483648),
+      bytes: z
+        .number()
+        .int()
+        .positive()
+        .max(MAX_FILM_PART_BYTES * MAX_FILM_PARTS),
       content_type: z.literal("video/mp4"),
       fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
     })
@@ -29,7 +35,7 @@ export const multipartSchema = z.discriminatedUnion("action", [
       action: z.literal("multipart_sign"),
       asset_id: z.uuid(),
       part_numbers: z
-        .array(z.number().int().min(1).max(128))
+        .array(z.number().int().min(1).max(MAX_FILM_PARTS))
         .min(1)
         .max(2)
         .refine((x) => new Set(x).size === x.length),
@@ -60,7 +66,11 @@ const snapshotSchema = z.object({
   owner_id: z.uuid(),
   draft_id: z.uuid().nullable(),
   object_key: z.string(),
-  bytes: z.number().int().positive().max(2147483648),
+  bytes: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_FILM_PART_BYTES * MAX_FILM_PARTS),
   fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
   upload_id: z.string().nullable(),
   status: z.enum([
@@ -74,8 +84,8 @@ const snapshotSchema = z.object({
   resume_expires_at: z.iso.datetime({ offset: true }),
   op_token: z.uuid().nullable(),
   op_until: z.iso.datetime({ offset: true }).nullable(),
-  part_size: z.literal(FILM_PART_BYTES),
-  part_count: z.number().int().min(1).max(128),
+  part_size: z.number().int().min(MIN_FILM_PART_BYTES).max(MAX_FILM_PART_BYTES),
+  part_count: z.number().int().min(1).max(MAX_FILM_PARTS),
   asset_status: z.string(),
   public_key: z.string().nullable(),
 });
@@ -86,7 +96,7 @@ function snapshot(value: unknown, owner: string) {
   const record = snapshotSchema.parse(value);
   if (record.owner_id !== owner)
     throw new HttpError(403, "Upload not permitted");
-  if (record.part_count !== Math.ceil(record.bytes / FILM_PART_BYTES))
+  if (record.part_count !== Math.ceil(record.bytes / record.part_size))
     throw new HttpError(500, "Invalid multipart reservation");
   return record;
 }
@@ -116,7 +126,7 @@ export function multipartDescriptor(row: Snapshot) {
     draft_id: row.draft_id,
     bytes: row.bytes,
     fingerprint: row.fingerprint,
-    part_size: FILM_PART_BYTES,
+    part_size: row.part_size,
     part_count: row.part_count,
     resume_expires_at: row.resume_expires_at,
     status,
@@ -248,6 +258,7 @@ export async function handleMultipart(
         row.upload_id,
         row.bytes,
         b.part_numbers,
+        row.part_size,
       ),
     };
   }
@@ -262,7 +273,11 @@ export async function handleMultipart(
     // reach finish to recover an expired lease after a failed provider request.
     if (row.status !== "uploading" || !row.upload_id)
       return { ...multipartDescriptor(row), parts: [], receipt: receipt(row) };
-    const parts = await storage.parts(row.object_key, row.upload_id);
+    const parts = await storage.parts(
+      row.object_key,
+      row.upload_id,
+      row.part_size,
+    );
     if (parts === null)
       throw new HttpError(
         409,
@@ -273,8 +288,8 @@ export async function handleMultipart(
         p.part_number <= row.part_count &&
         p.bytes ===
           Math.min(
-            FILM_PART_BYTES,
-            row.bytes - (p.part_number - 1) * FILM_PART_BYTES,
+            row.part_size,
+            row.bytes - (p.part_number - 1) * row.part_size,
           ),
     );
     return {
@@ -300,14 +315,18 @@ export async function handleMultipart(
     throw new HttpError(409, "Upload is not ready for completion");
   const recovered = await assembled(row, owner, verify);
   if (recovered) return recovered;
-  const parts = await storage.parts(row.object_key, row.upload_id);
+  const parts = await storage.parts(
+    row.object_key,
+    row.upload_id,
+    row.part_size,
+  );
   if (parts === null)
     throw new HttpError(
       409,
       "Film assembly could not be confirmed; retry status before discarding",
     );
   try {
-    validateStoredParts(row.bytes, parts);
+    validateStoredParts(row.bytes, parts, row.part_size);
   } catch (error) {
     // ListParts is present and no CompleteMultipart request has started: release
     // only this exact lease so missing/overwritten parts can be retried immediately.
@@ -318,7 +337,13 @@ export async function handleMultipart(
     });
     throw error;
   }
-  await storage.complete(row.object_key, row.upload_id, row.bytes, parts);
+  await storage.complete(
+    row.object_key,
+    row.upload_id,
+    row.bytes,
+    parts,
+    row.part_size,
+  );
   checked(
     await admin().rpc("backend_complete_multipart", {
       p_owner: owner,

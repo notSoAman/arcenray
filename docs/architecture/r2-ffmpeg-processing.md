@@ -50,10 +50,13 @@ multi-gigabyte film instant.
 
 ## Required end-to-end integration before activation
 
-The live browser, shared contracts, multipart Edge code and database currently
-still enforce2GiB **per file** and compatible <=1080p input. Removing the separate
-account quota is already live; this preparation does not change the per-file cap.
-Simply loosening one validator would create failed/orphaned uploads.
+The earlier web/API/database paths enforced 2GiB per film. This branch removes
+that fixed cap across the browser, shared contracts, Edge multipart handling and
+the pending migration. Multipart boundaries are persisted per session; new
+sessions choose a part size between 64 and 512 MiB and stay under R2's 10,000-part
+limit. The worker's live scratch-capacity check remains authoritative, so an
+upload larger than current safe processing capacity is rejected before reserving
+storage. This code and migration are not yet deployed or verified in production.
 
 1. Introduce a versioned private Postgres job table and service-only claim,
    heartbeat, finish and fail RPCs; keep public wrappers unprivileged and privileged
@@ -64,7 +67,7 @@ Simply loosening one validator would create failed/orphaned uploads.
    Raw originals stay private, cannot be attached as ready assets, and retain their
    storage accounting until their actual deletion succeeds.
 3. Queue identity: `{job_id, asset_id, owner_id, draft_id, source_key, source_etag,
-   source_bytes, policy_version, version}`. Claim returns a fresh attempt UUID,
+source_bytes, policy_version, version}`. Claim returns a fresh attempt UUID,
    lease token and expiry. Heartbeat throughout download/probe/encode/validation/
    upload; loss of lease stops work and forbids completion. Host restart reclaims
    expired leases with bounded retries/backoff. Never run two workers on a source
@@ -82,11 +85,12 @@ Simply loosening one validator would create failed/orphaned uploads.
    closed. Failed jobs retain a retriable private source for a documented TTL;
    deletion/moderation must cancel processing and clean exact source/output keys.
    Existing cleanup needs explicit support for processing jobs and orphan attempts.
-6. Lift browser/SDK/Edge/SQL2GiB limits together, preserving safe-integer checks and
-   trusted actual-size verification. Store per-session part size; choose parts
-   dynamically to stay under R2's10,000-part limit, paginate ListParts, keep signing
-   batches bounded, and separate full-content fingerprint block size from upload
-   part size. Do not change existing sessions' part boundaries/fingerprints.
+6. The current branch lifts browser/shared-contract/Edge/SQL 2 GiB checks together,
+   preserves safe-integer and trusted actual-size checks, stores part size per
+   session, chooses boundaries under R2's 10,000-part ceiling and paginates
+   ListParts. Existing sessions retain their original part size and fingerprint
+   blocks remain independent from upload parts. Validate this with real interrupted
+   uploads above 2 GiB before release.
    Update resume deadlines, rate-limit accounting, retries and ambiguous completion
    recovery for longer transfers; current hourly action limits can block large
    uploads. Keep compatibility with existing completed and in-progress sessions.

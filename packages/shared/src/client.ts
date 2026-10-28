@@ -182,6 +182,16 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
       },
     },
     media: {
+      processing: {
+        status: (assetId: string) =>
+          supabase.functions.invoke<unknown>("media-upload", {
+            body: { action: "processing_status", asset_id: uuidSchema.parse(assetId) },
+          }),
+        retry: (assetId: string) =>
+          supabase.functions.invoke<unknown>("media-upload", {
+            body: { action: "processing_retry", asset_id: uuidSchema.parse(assetId) },
+          }),
+      },
       multipart: {
         create: (input: MultipartCreateInput) =>
           supabase.functions.invoke<unknown>("media-upload", {

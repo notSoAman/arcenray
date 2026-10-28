@@ -28,11 +28,18 @@ import {
   validateMp4Samples,
 } from "../_shared/media-inspection.ts";
 const basicBodySchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("processing_status"), asset_id: z.uuid() }).strict(),
+  z.object({ action: z.literal("processing_retry"), asset_id: z.uuid() }).strict(),
   z
     .object({
       action: z.literal("create"),
-      kind: z.enum(["film", "hook", "poster", "profile_picture"]),
-      bytes: z.number().int().positive().max(2147483648),
+      // Native films must use the capacity-checked resumable multipart flow.
+      kind: z.enum(["hook", "poster", "profile_picture"]),
+      bytes: z
+        .number()
+        .int()
+        .positive()
+        .max(512 * 1024 ** 2 * 10_000),
       content_type: z.enum(["video/mp4", "image/webp"]),
     })
     .strict(),
@@ -152,17 +159,23 @@ async function verifyCompletedAsset(id: string, owner: string) {
 serve(async (req) => {
   const { client, user } = await auth(req);
   const b = bodySchema.parse(await jsonBody(req));
+  if (b.action === "processing_status") {
+    await rateLimit(user.id, "media_processing_state", 120);
+    return checked(await client.rpc("get_media_processing_state", { p_asset: b.asset_id }));
+  }
+  if (b.action === "processing_retry") {
+    await rateLimit(user.id, "media", 120);
+    return { queued: checked(await client.rpc("retry_media_processing", { p_asset: b.asset_id })) };
+  }
   await rateLimit(user.id, "media", 120);
   // Fail before reserving quota if credentials have not been configured.
-  for (
-    const key of [
-      "R2_ACCOUNT_ID",
-      "R2_ACCESS_KEY_ID",
-      "R2_SECRET_ACCESS_KEY",
-      "R2_UPLOAD_BUCKET_NAME",
-      "R2_BUCKET_NAME",
-    ]
-  ) {
+  for (const key of [
+    "R2_ACCOUNT_ID",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_UPLOAD_BUCKET_NAME",
+    "R2_BUCKET_NAME",
+  ]) {
     env(key);
   }
   if (isMultipartAction(b)) {

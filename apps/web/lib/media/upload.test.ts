@@ -69,13 +69,19 @@ function setup() {
   return { api, counts: () => ({ creates, completes }) };
 }
 
-test("preflight rejects MIME, empty and oversized files; accepts portrait and exact hook boundary", () => {
+test("preflight allows films above 2 GiB while rejecting other invalid uploads", () => {
   assert.throws(() => validateUpload("poster", blob));
   assert.throws(() =>
     validateUpload("film", new Blob([], { type: "video/mp4" })),
   );
   assert.throws(() =>
     validateUpload("hook", { type: "video/mp4", size: 51 * 1024 ** 2 } as Blob),
+  );
+  assert.doesNotThrow(() =>
+    validateUpload("film", {
+      type: "video/mp4",
+      size: 2 * 1024 ** 3 + 1,
+    } as Blob),
   );
   validateVideo("hook", { width: 720, height: 1280, duration: 30 });
   assert.throws(() =>
