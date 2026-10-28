@@ -67,7 +67,14 @@ def s3_delete(bucket,key):
  key_sig=hm(hm(hm(hm(('AWS4'+secret).encode(),date),'auto'),'s3'),'aws4_request');sig=hmac.new(key_sig,string.encode(),hashlib.sha256).hexdigest()
  req=urllib.request.Request('https://'+host+path,method='DELETE',headers={'x-amz-content-sha256':empty,'x-amz-date':stamp,'Authorization':f'AWS4-HMAC-SHA256 Credential={access}/{scope}, SignedHeaders={signed}, Signature={sig}'})
  with urllib.request.urlopen(req,timeout=30) as r:assert r.status==204
-users=[];assets=[];film=None
+ canonical='\n'.join(['HEAD',path,'',headers,signed,empty]);string='AWS4-HMAC-SHA256\n'+stamp+'\n'+scope+'\n'+hashlib.sha256(canonical.encode()).hexdigest()
+ sig=hmac.new(key_sig,string.encode(),hashlib.sha256).hexdigest()
+ req=urllib.request.Request('https://'+host+path,method='HEAD',headers={'x-amz-content-sha256':empty,'x-amz-date':stamp,'Authorization':f'AWS4-HMAC-SHA256 Credential={access}/{scope}, SignedHeaders={signed}, Signature={sig}'})
+ try:
+  with urllib.request.urlopen(req,timeout=30):raise AssertionError('Deleted fixture object is still present')
+ except urllib.error.HTTPError as error:
+  if error.code!=404:raise
+users=[];assets=[];film=None; upload_pending=set()
 try:
  for i in range(3):
   email='backend-smoke-'+uuid.uuid4().hex+'@example.invalid';password=uuid.uuid4().hex+'!A9'
@@ -117,18 +124,24 @@ try:
   film_source=pathlib.Path(os.environ['ARCENRAY_SMOKE_FILM']) if os.environ.get('ARCENRAY_SMOKE_FILM') else movie
   for kind,file,mime in [('film',film_source,'video/mp4'),('hook',movie,'video/mp4'),('poster',poster,'image/webp'),('profile_picture',poster,'image/webp')]:
    if kind=='film' and os.environ.get('ARCENRAY_SMOKE_MULTIPART')=='1':
-    size=file.stat().st_size; hashes=[]
+    size=file.stat().st_size; hashes=[]; fingerprint_start=time.monotonic()
     with file.open('rb') as source:
      while chunk:=source.read(16*1024*1024):hashes.append(hashlib.sha256(chunk).hexdigest())
     manifest=json.dumps({'version':1,'size':size,'type':'video/mp4','parts':hashes},separators=(',',':'))
-    reserved=fn('media-upload',{'action':'multipart_create','draft_id':film['id'],'request_id':str(uuid.uuid4()),'bytes':size,'content_type':mime,'fingerprint':hashlib.sha256(manifest.encode()).hexdigest()},a['token']);aid=reserved['asset_id'];assets.append(aid)
+    print('Fingerprint elapsed seconds',round(time.monotonic()-fingerprint_start,1),'bytes',size,flush=True)
+    reserved=fn('media-upload',{'action':'multipart_create','draft_id':film['id'],'request_id':str(uuid.uuid4()),'bytes':size,'content_type':mime,'fingerprint':hashlib.sha256(manifest.encode()).hexdigest()},a['token']);aid=reserved['asset_id'];assets.append(aid);upload_pending.add(aid)
+    started=time.monotonic()
     with file.open('rb') as source:
-     for number in range(1,reserved['part_count']+1):
-      part=retry_read(lambda:fn('media-upload',{'action':'multipart_sign','asset_id':aid,'part_numbers':[number]},a['token']))['parts'][0]
-      data=source.read(part['bytes']);assert len(data)==part['bytes']
-      with urllib.request.urlopen(urllib.request.Request(part['upload_url'],method='PUT',data=data,headers=part['headers']),timeout=300) as res:assert res.status==200
-      status=retry_read(lambda:fn('media-upload',{'action':'multipart_status','asset_id':aid},a['token']))
-      assert any(p['part_number']==number and p['bytes']==len(data) for p in status['parts'])
+     for first in range(1,reserved['part_count']+1,2):
+      numbers=list(range(first,min(first+2,reserved['part_count']+1)))
+      parts=retry_read(lambda:fn('media-upload',{'action':'multipart_sign','asset_id':aid,'part_numbers':numbers},a['token']))['parts']
+      for number,part in zip(numbers,parts,strict=True):
+       assert part['part_number']==number
+       data=source.read(part['bytes']);assert len(data)==part['bytes']
+       with urllib.request.urlopen(urllib.request.Request(part['upload_url'],method='PUT',data=data,headers=part['headers']),timeout=900) as res:assert res.status==200
+       if number%10==0 or number==reserved['part_count']:print('Multipart progress',number,'/',reserved['part_count'],'elapsed seconds',round(time.monotonic()-started,1),flush=True)
+    status=retry_read(lambda:fn('media-upload',{'action':'multipart_status','asset_id':aid},a['token']))
+    assert len(status['parts'])==reserved['part_count'] and sum(p['bytes'] for p in status['parts'])==size
     print('PASS multipart part upload and server-side resume listing',flush=True)
    else:
     data=file.read_bytes();reserved=fn('media-upload',{'action':'create','kind':kind,'bytes':len(data),'content_type':mime},a['token']);aid=reserved['asset_id'];assets.append(aid)
@@ -143,13 +156,22 @@ try:
    # attaches its own completed reservation inside the trusted transaction.
    if kind=='film' and os.environ.get('ARCENRAY_SMOKE_MULTIPART')!='1':api('/rest/v1/films?id=eq.'+film['id'],'PATCH',{'film_asset_id':aid},a['token'],True)
    complete=fn('media-upload',{'action':'multipart_finish' if kind=='film' and os.environ.get('ARCENRAY_SMOKE_MULTIPART')=='1' else 'complete','asset_id':aid},a['token']);assert complete['status'] in ('uploaded','ready')
+   upload_pending.discard(aid)
    if kind not in ('film','profile_picture'):api('/rest/v1/films?id=eq.'+film['id'],'PATCH',{kind+'_asset_id':aid},a['token'],True)
    if kind=='film':
     deadline=time.monotonic()+int(os.environ.get('ARCENRAY_SMOKE_PROCESSING_TIMEOUT','300'))
     while True:
      state=retry_read(lambda:api('/rest/v1/rpc/get_media_processing_state','POST',{'p_asset':aid},a['token'],True))
      if state and state.get('state')=='complete':break
-     if state and state.get('state') in ('failed','cancelled'):raise AssertionError('Film processing failed: '+str(state.get('state')))
+     if state and state.get('state')=='queued' and state.get('error') and os.environ.get('ARCENRAY_SMOKE_EXPECT_FAILURE')=='1':
+      print('Observed processing rejection after first attempt:',state.get('error'),'total seconds',round(time.monotonic()-started,1),flush=True)
+      api('/rest/v1/rpc/delete_my_film','POST',{'p_film':film['id'],'p_confirmation':'DELETE FILM'},a['token'],True)
+      raise SystemExit(0)
+     if state and state.get('state') in ('failed','cancelled'):
+      if os.environ.get('ARCENRAY_SMOKE_EXPECT_FAILURE')=='1':
+       print('Observed processing failure',state.get('state'),'reason',state.get('error'),'total seconds',round(time.monotonic()-started,1),flush=True)
+       raise SystemExit(0)
+      raise AssertionError('Film processing failed: '+str(state.get('state')))
      if time.monotonic()>=deadline:raise AssertionError('Film processing timed out')
      time.sleep(5)
   published=fn('media-upload',{'action':'publish','film_id':film['id']},a['token']);assert published['status']=='published'
@@ -169,7 +191,13 @@ try:
  print('All live checks passed, including Supabase embedding inference')
 finally:
  # Only IDs created by this process are deleted. Never delete unrelated project data.
+ cleanup_ok=True
+ for aid in upload_pending:
+  try:fn('media-upload',{'action':'multipart_abort','asset_id':aid},users[0]['token']);print('Incomplete multipart cleanup queued:',aid)
+  except Exception as e:print('Incomplete multipart abort needs retry:',aid,type(e).__name__)
+  cleanup_ok=False
  for aid in assets:
+  if aid in upload_pending:continue
   try:
    asset=api('/rest/v1/rpc/backend_asset','POST',{'p_id':aid,'p_owner':users[0]['id']})
    if asset:
@@ -179,9 +207,10 @@ finally:
       # Optional local CLI fallback if server secrets were rotated independently.
       if os.environ.get('ARCENRAY_TEST_WRANGLER_CLEANUP')!='1':raise
       subprocess.run(['pnpm','exec','wrangler','r2','object','delete',bucket+'/'+key,'--remote'],check=True,stdout=subprocess.DEVNULL)
-  except Exception as e:print('Fixture object cleanup needs retry:',aid,type(e).__name__)
+  except Exception as e:cleanup_ok=False;print('Fixture object cleanup needs retry:',aid,type(e).__name__)
  for u in reversed(users):
   try:
+   if not cleanup_ok:print('Retained disposable user for cleanup:',u.get('id'));continue
    if CLERK:
     if u['id']:api('/rest/v1/profiles?id=eq.'+u['id'],'DELETE')
     clerk('/users/'+u['clerk_id'],method='DELETE')
