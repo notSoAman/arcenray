@@ -270,9 +270,11 @@ export function PublishForm({
       }
       let blob: Blob = selected;
       let description = "";
+      let tracksChecked = false;
       if (kind === "film") {
         const tracks = await inspectMp4Tracks(selected);
         if (tracks.status === "unsupported") throw new Error(tracks.message);
+        tracksChecked = tracks.status === "checked";
       }
       if (kind === "poster") {
         const prepared = await prepareImage(selected, "poster");
@@ -308,7 +310,9 @@ export function PublishForm({
           },
         }));
         setNotice(
-          "Film selected. Save draft & upload; we’ll prepare it on our servers.",
+          tracksChecked
+            ? "Film selected. Save draft & upload; we’ll prepare it on our servers."
+            : "Film selected. Our servers will check it during upload and let you know if it needs a different export.",
         );
         return;
       }
