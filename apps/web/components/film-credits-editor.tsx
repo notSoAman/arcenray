@@ -210,9 +210,7 @@ export function FilmCreditsEditor({
     >
       <h2>Film credits</h2>
       <p className={styles.muted}>
-        Credit your collaborators. Registered creatives receive an invitation
-        and confirm their role, even while the film is a draft. Your own and
-        manually entered credits remain unverified.
+        Add the people and roles that helped make this film.
       </p>
       {loading ? (
         <p role="status">Loading credits…</p>
@@ -222,18 +220,7 @@ export function FilmCreditsEditor({
             <li key={credit.id}>
               <div>
                 <strong>{credit.display_name}</strong>
-                <span>
-                  {credit.role} ·{" "}
-                  {credit.verification_state === "accepted"
-                    ? "Confirmed by creative"
-                    : credit.verification_state === "declined"
-                      ? "Declined"
-                      : credit.profile_id === viewerId
-                        ? "Unverified self-credit"
-                        : credit.profile_id
-                          ? "Awaiting confirmation"
-                          : "Unverified"}
-                </span>
+                <span>{credit.role}</span>
               </div>
               {editable && credit.verification_state === "pending" ? (
                 <button
@@ -370,8 +357,7 @@ export function FilmCreditsEditor({
             </label>
           ) : (
             <p className={styles.muted}>
-              Your contribution will be linked to your profile as an unverified
-              self-credit.
+              Your profile will appear in this film’s credits under this role.
             </p>
           )}
           <label>

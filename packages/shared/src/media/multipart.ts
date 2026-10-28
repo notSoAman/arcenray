@@ -264,7 +264,9 @@ async function data(reply: PromiseLike<Reply>, errorMessage: string) {
         "There isn’t enough processing capacity for this film right now. Try again later or choose a smaller export.",
       );
     if (status === 429)
-      throw new Error("Too many upload attempts. Wait a little, then try again.");
+      throw new Error(
+        "Too many upload attempts. Wait a little, then try again.",
+      );
     throw new Error(errorMessage);
   }
   return result.data;
@@ -532,11 +534,13 @@ export function createMultipartUploadTask(
             requested,
           );
           signal.throwIfAborted();
+          // Refresh signatures before starting the batch so both part PUTs can
+          // overlap without either waiting behind a slow transfer.
+          const parts: SignedPart[] = [];
           for (const number of requested) {
             let part = batch.find((part) => part.part_number === number)!;
-            // On a slow connection the second URL may expire before its turn. Refresh only that part.
             if (Date.parse(part.expires_at) <= now() + 5000) {
-              batch = signedParts(
+              const refreshed = signedParts(
                 await data(
                   api.sign({
                     asset_id: current.asset_id,
@@ -547,38 +551,62 @@ export function createMultipartUploadTask(
                 current,
                 [number],
               );
-              part = batch[0]!;
-              if (Date.parse(part.expires_at) <= now() + 5000)
-                throw new Error(
-                  "Storage signature expires too soon. Retry later.",
-                );
+              part = refreshed[0]!;
             }
-            signal.throwIfAborted();
-            emit({ stage: "uploading" });
-            const acknowledged = Array.from(done.values()).reduce(
-              (sum, bytes) => sum + bytes,
-              0,
-            );
+            if (Date.parse(part.expires_at) <= now() + 5000)
+              throw new Error(
+                "Storage signature expires too soon. Retry later.",
+              );
+            parts.push(part);
+          }
+
+          const inFlight = new Map<number, number>();
+          const acknowledged = () =>
+            Array.from(done.values()).reduce((sum, bytes) => sum + bytes, 0);
+          const sendPart = async (part: SignedPart) => {
+            const number = part.part_number;
             const slice = blob.slice(
               (number - 1) * current.part_size,
               Math.min(number * current.part_size, blob.size),
               "video/mp4",
             );
+            inFlight.set(number, 0);
+            emit({ stage: "uploading" });
             await transport(
               part.upload_url,
               part.headers,
               slice,
               signal,
-              (bytes) =>
+              (bytes) => {
+                inFlight.set(number, Math.max(0, Math.min(slice.size, bytes)));
                 emit({
                   bytesSent:
-                    acknowledged + Math.max(0, Math.min(slice.size, bytes)),
-                }),
+                    acknowledged() +
+                    Array.from(inFlight.values()).reduce(
+                      (sum, value) => sum + value,
+                      0,
+                    ),
+                });
+              },
             );
             done.set(number, part.bytes);
-            emit({ bytesSent: acknowledged + part.bytes });
+            inFlight.delete(number);
+            emit({
+              bytesSent:
+                acknowledged() +
+                Array.from(inFlight.values()).reduce(
+                  (sum, value) => sum + value,
+                  0,
+                ),
+            });
             signal.throwIfAborted();
-          }
+          };
+          const results = await Promise.allSettled(parts.map(sendPart));
+          const failed = results.find(
+            (result): result is PromiseRejectedResult =>
+              result.status === "rejected",
+          );
+          if (failed) throw failed.reason;
         }
       }
       current = await canonical(signal); // Never complete from client-local success flags or stale ETags.

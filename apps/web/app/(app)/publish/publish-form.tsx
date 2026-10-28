@@ -122,6 +122,10 @@ export function PublishForm({
   const [slots, setSlots] = useState<Partial<Record<Kind, Slot>>>({});
   const tasks = useRef<Partial<Record<Kind, Task>>>({});
   const active = useRef<{ cancel(): void } | null>(null);
+  const autoPublishStarted = useRef(false);
+  const publishRef = useRef<(automatically?: boolean) => Promise<void>>(
+    async () => {},
+  );
   const mainFile = useRef<File | null>(null);
   const mainTask = useRef<ReturnType<typeof createMultipartUploadTask> | null>(
     null,
@@ -152,6 +156,7 @@ export function PublishForm({
     error?: string;
   } | null>(null);
   const [rights, setRights] = useState(false);
+  const [autoPublish, setAutoPublish] = useState(false);
   const languageMenu = useRef<HTMLDetailsElement>(null);
   const patch = (value: Partial<FilmDraft>) =>
     setForm((current) => ({ ...current, ...value }));
@@ -260,6 +265,16 @@ export function PublishForm({
   }, [initial?.id]);
 
   useEffect(() => {
+    if (!draftId) return;
+    const rightsKey = `arcenray:publish-rights:${viewerId}:${draftId}`;
+    const autoKey = `arcenray:auto-publish:${viewerId}:${draftId}`;
+    const savedRights = window.localStorage.getItem(rightsKey);
+    const savedAuto = window.localStorage.getItem(autoKey);
+    if (savedRights !== null) setRights(savedRights === "1");
+    if (savedAuto !== null) setAutoPublish(savedAuto === "1");
+  }, [draftId, viewerId]);
+
+  useEffect(() => {
     const assetId = form.source === "r2_native" ? form.film_asset_id : null;
     if (!assetId) {
       setProcessing(null);
@@ -273,6 +288,18 @@ export function PublishForm({
       setProcessing(
         value?.state ? { state: value.state, error: value.error } : null,
       );
+      if (
+        value?.state === "complete" &&
+        autoPublish &&
+        rights &&
+        draftId &&
+        !busy &&
+        !published &&
+        !autoPublishStarted.current
+      ) {
+        autoPublishStarted.current = true;
+        void publishRef.current(true);
+      }
     };
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5000);
@@ -280,7 +307,15 @@ export function PublishForm({
       active = false;
       window.clearInterval(timer);
     };
-  }, [form.film_asset_id, form.source]);
+  }, [
+    autoPublish,
+    busy,
+    draftId,
+    form.film_asset_id,
+    form.source,
+    published,
+    rights,
+  ]);
 
   async function choose(kind: Kind, file?: File) {
     if (!file || operation.current || busy || preparing) return;
@@ -500,7 +535,9 @@ export function PublishForm({
         pendingUploads.length && !mainFile.current
           ? "Draft saved privately. Reselect the original film below to resume its pending upload."
           : value.source === "r2_native" && value.film_asset_id
-            ? "Film uploaded privately. Server compression is running; you can leave this page and return to publish when it finishes."
+            ? autoPublish
+              ? "Your film is uploaded. This page will publish it automatically when preparation finishes. If you leave, reopen this draft to complete publication."
+              : "Your film is uploaded. Preparation is running; you can publish as soon as it’s ready."
             : "Draft saved privately. All selected files are verified. Review your details, then publish.",
       );
     } catch (err) {
@@ -520,7 +557,7 @@ export function PublishForm({
       );
     setIndexed(true);
   }
-  async function publish() {
+  async function publish(automatically = false) {
     if (busy || preparing || operation.current) return;
     operation.current = true;
     setBusy(true);
@@ -559,7 +596,8 @@ export function PublishForm({
       if (
         value.source === "r2_native" &&
         value.film_asset_id &&
-        processing?.state !== "complete"
+        processing?.state !== "complete" &&
+        !automatically
       ) {
         throw new Error(
           processing?.state === "failed"
@@ -578,6 +616,10 @@ export function PublishForm({
           );
       }
       setPublished(true);
+      window.localStorage.removeItem(
+        `arcenray:publish-rights:${viewerId}:${id}`,
+      );
+      window.localStorage.removeItem(`arcenray:auto-publish:${viewerId}:${id}`);
       setNotice("Your film is published and available to watch.");
       await index(id);
     } catch (err) {
@@ -587,6 +629,7 @@ export function PublishForm({
       setBusy(false);
     }
   }
+  publishRef.current = publish;
   async function discardMain() {
     if (
       operation.current ||
@@ -1114,7 +1157,8 @@ export function PublishForm({
             )}
           </div>
           <p className={styles.muted}>
-            You can leave this draft and come back if your upload is interrupted.
+            You can leave this draft and come back if your upload is
+            interrupted.
           </p>
         </form>
         {draftId ? (
@@ -1136,19 +1180,75 @@ export function PublishForm({
               type="checkbox"
               checked={rights}
               disabled={locked}
-              onChange={(e) => setRights(e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setRights(checked);
+                const key = `arcenray:publish-rights:${viewerId}:${draftId}`;
+                if (draftId) {
+                  if (checked) window.localStorage.setItem(key, "1");
+                  else window.localStorage.removeItem(key);
+                }
+                if (!checked) {
+                  setAutoPublish(false);
+                  autoPublishStarted.current = false;
+                  if (draftId)
+                    window.localStorage.removeItem(
+                      `arcenray:auto-publish:${viewerId}:${draftId}`,
+                    );
+                }
+              }}
             />
             I have permission to publish this film and any optional poster or
             preview clip.
           </label>
+          {form.source === "r2_native" && draftId ? (
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={autoPublish}
+                disabled={locked || !rights || !form.film_asset_id || published}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setAutoPublish(checked);
+                  autoPublishStarted.current = false;
+                  const key = `arcenray:auto-publish:${viewerId}:${draftId}`;
+                  if (checked) window.localStorage.setItem(key, "1");
+                  else window.localStorage.removeItem(key);
+                }}
+              />
+              Publish automatically when your film is ready
+            </label>
+          ) : null}
           <button
             type="button"
             className="btn btn-accent"
-            disabled={locked || !rights}
+            disabled={
+              locked ||
+              !rights ||
+              (form.source === "r2_native" &&
+                (!form.film_asset_id || processing?.state !== "complete")) ||
+              (autoPublish && processing?.state !== "complete")
+            }
             onClick={() => void publish()}
           >
-            Publish film
+            {form.source === "r2_native" && !form.film_asset_id
+              ? "Upload film to publish"
+              : form.source === "r2_native" && processing?.state !== "complete"
+                ? autoPublish
+                  ? "Will publish when ready"
+                  : "Film is being prepared…"
+                : autoPublish
+                  ? processing?.state === "complete"
+                    ? "Publish now"
+                    : "Will publish when ready"
+                  : "Publish film"}
           </button>
+          {autoPublish ? (
+            <p className={styles.muted}>
+              Keep this draft open while it prepares. If you leave, reopen the
+              draft to finish publishing.
+            </p>
+          ) : null}
         </section>
         {notice && (
           <p role="status" className={styles.success}>
