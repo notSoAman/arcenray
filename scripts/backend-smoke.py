@@ -2,7 +2,7 @@
 Creates temporary users; always removes them. No tokens or signed URLs are printed.
 Run via the setup guide; this script is never part of frontend code.
 """
-import os, json, uuid, time, base64, pathlib, urllib.request, urllib.error, subprocess, tempfile, socket, xml.etree.ElementTree as ET
+import os, json, uuid, time, base64, hashlib, pathlib, urllib.request, urllib.error, subprocess, tempfile, socket, xml.etree.ElementTree as ET
 # Cache DNS per process to avoid repeated resolver latency during disposable tests.
 _real_getaddrinfo=socket.getaddrinfo
 _dns={}
@@ -49,6 +49,13 @@ def denied(path,body,token):
   assert e.status in (400,401,403,404,409),e.status;return
  raise AssertionError('Expected denial')
 def fn(name,body,token):return api('/functions/v1/'+name,'POST',body,token,True)
+def retry_read(fn_call):
+ # Only use for idempotent status/sign requests, never a reservation or finish.
+ for attempt in range(4):
+  try:return fn_call()
+  except ApiError as error:
+   if error.status not in (502,503,504) or attempt==3:raise
+   time.sleep(2**attempt)
 def s3_delete(bucket,key):
  # Cleanup requires separately supplied bucket-scoped R2 credentials; never log them.
  import datetime, hashlib, hmac, urllib.parse
@@ -65,7 +72,7 @@ try:
  for i in range(3):
   email='backend-smoke-'+uuid.uuid4().hex+'@example.invalid';password=uuid.uuid4().hex+'!A9'
   if CLERK:
-   u=clerk('/users',{'email_address':['backend-smoke-'+uuid.uuid4().hex+'+clerk_test@example.com'],'username':'smoke_'+uuid.uuid4().hex[:20],'phone_number':['+1555555019'+str(i+6)],'password':password})
+   u=clerk('/users',{'email_address':['backend-smoke-'+uuid.uuid4().hex+'+clerk_test@example.com'],'username':'smoke_'+uuid.uuid4().hex[:20],'password':password})
    fixture={'id':None,'clerk_id':u['id']};users.append(fixture)
    session=clerk('/sessions',{'user_id':u['id']});fixture['session']=session['id']
    fixture['token']=clerk('/sessions/'+session['id']+'/tokens',{})['jwt']
@@ -107,24 +114,40 @@ try:
   movie=pathlib.Path(tmp)/'film.mp4';poster=pathlib.Path(tmp)/'poster.webp'
   subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=320x240:d=1','-f','lavfi','-i','anullsrc=r=44100:cl=stereo','-t','1','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-movflags','+faststart',str(movie)],check=True)
   subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=256x256','-frames:v','1',str(poster)],check=True)
-  for kind,file,mime in [('film',movie,'video/mp4'),('hook',movie,'video/mp4'),('poster',poster,'image/webp'),('profile_picture',poster,'image/webp')]:
-   data=file.read_bytes();reserved=fn('media-upload',{'action':'create','kind':kind,'bytes':len(data),'content_type':mime},a['token']);aid=reserved['asset_id'];assets.append(aid)
-   req=urllib.request.Request(reserved['upload_url'],method='PUT',data=data,headers=reserved['headers'])
-   try:
-    with urllib.request.urlopen(req,timeout=60) as res:assert res.status==200
-   except urllib.error.HTTPError as e:
-    try:code=ET.fromstring(e.read()).findtext('Code')
-    except ET.ParseError:code='unrecognized_error'
-    raise AssertionError(f'R2 direct upload failed HTTP {e.code}, code {code}') from None
-   # Verification enqueues main-film processing only after the asset belongs to
-   # an active draft. Attach the reserved asset before completing it.
-   if kind=='film':api('/rest/v1/films?id=eq.'+film['id'],'PATCH',{'film_asset_id':aid},a['token'],True)
-   complete=fn('media-upload',{'action':'complete','asset_id':aid},a['token']);assert complete['status'] in ('uploaded','ready')
+  film_source=pathlib.Path(os.environ['ARCENRAY_SMOKE_FILM']) if os.environ.get('ARCENRAY_SMOKE_FILM') else movie
+  for kind,file,mime in [('film',film_source,'video/mp4'),('hook',movie,'video/mp4'),('poster',poster,'image/webp'),('profile_picture',poster,'image/webp')]:
+   if kind=='film' and os.environ.get('ARCENRAY_SMOKE_MULTIPART')=='1':
+    size=file.stat().st_size; hashes=[]
+    with file.open('rb') as source:
+     while chunk:=source.read(16*1024*1024):hashes.append(hashlib.sha256(chunk).hexdigest())
+    manifest=json.dumps({'version':1,'size':size,'type':'video/mp4','parts':hashes},separators=(',',':'))
+    reserved=fn('media-upload',{'action':'multipart_create','draft_id':film['id'],'request_id':str(uuid.uuid4()),'bytes':size,'content_type':mime,'fingerprint':hashlib.sha256(manifest.encode()).hexdigest()},a['token']);aid=reserved['asset_id'];assets.append(aid)
+    with file.open('rb') as source:
+     for number in range(1,reserved['part_count']+1):
+      part=retry_read(lambda:fn('media-upload',{'action':'multipart_sign','asset_id':aid,'part_numbers':[number]},a['token']))['parts'][0]
+      data=source.read(part['bytes']);assert len(data)==part['bytes']
+      with urllib.request.urlopen(urllib.request.Request(part['upload_url'],method='PUT',data=data,headers=part['headers']),timeout=300) as res:assert res.status==200
+      status=retry_read(lambda:fn('media-upload',{'action':'multipart_status','asset_id':aid},a['token']))
+      assert any(p['part_number']==number and p['bytes']==len(data) for p in status['parts'])
+    print('PASS multipart part upload and server-side resume listing',flush=True)
+   else:
+    data=file.read_bytes();reserved=fn('media-upload',{'action':'create','kind':kind,'bytes':len(data),'content_type':mime},a['token']);aid=reserved['asset_id'];assets.append(aid)
+    req=urllib.request.Request(reserved['upload_url'],method='PUT',data=data,headers=reserved['headers'])
+    try:
+     with urllib.request.urlopen(req,timeout=60) as res:assert res.status==200
+    except urllib.error.HTTPError as e:
+     try:code=ET.fromstring(e.read()).findtext('Code')
+     except ET.ParseError:code='unrecognized_error'
+     raise AssertionError(f'R2 direct upload failed HTTP {e.code}, code {code}') from None
+   # Direct uploads require an existing draft attachment. Multipart verification
+   # attaches its own completed reservation inside the trusted transaction.
+   if kind=='film' and os.environ.get('ARCENRAY_SMOKE_MULTIPART')!='1':api('/rest/v1/films?id=eq.'+film['id'],'PATCH',{'film_asset_id':aid},a['token'],True)
+   complete=fn('media-upload',{'action':'multipart_finish' if kind=='film' and os.environ.get('ARCENRAY_SMOKE_MULTIPART')=='1' else 'complete','asset_id':aid},a['token']);assert complete['status'] in ('uploaded','ready')
    if kind not in ('film','profile_picture'):api('/rest/v1/films?id=eq.'+film['id'],'PATCH',{kind+'_asset_id':aid},a['token'],True)
    if kind=='film':
-    deadline=time.monotonic()+300
+    deadline=time.monotonic()+int(os.environ.get('ARCENRAY_SMOKE_PROCESSING_TIMEOUT','300'))
     while True:
-     state=api('/rest/v1/rpc/get_media_processing_state','POST',{'p_asset':aid},a['token'],True)
+     state=retry_read(lambda:api('/rest/v1/rpc/get_media_processing_state','POST',{'p_asset':aid},a['token'],True))
      if state and state.get('state')=='complete':break
      if state and state.get('state') in ('failed','cancelled'):raise AssertionError('Film processing failed: '+str(state.get('state')))
      if time.monotonic()>=deadline:raise AssertionError('Film processing timed out')
@@ -133,7 +156,7 @@ try:
   assert len(api('/rest/v1/films?id=eq.'+film['id'],token=b['token'],public=True))==1
   url=os.environ['R2_PUBLIC_URL']+'/'+published['film_key']
   subprocess.run(['node','scripts/check-media-range.mjs'],env={**os.environ,'ARCENRAY_SMOKE_MEDIA_URL':url},check=True)
-  print('PASS direct R2 upload, actual media inspection, profile picture, publication, CDN Range playback')
+  print('PASS R2 upload, server processing, profile picture, publication, CDN Range playback')
   semantic=fn('search',{'query':'quiet films about leaving home','kind':'film'},b['token'])
   assert semantic['mode']=='hybrid' and any(row['id']==film['id'] and row['score']>0 for row in semantic['results']),semantic
   print('PASS published film retrieved with real gte-small query vector')
