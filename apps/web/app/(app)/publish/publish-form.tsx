@@ -8,10 +8,7 @@ import { FilmCreditsEditor } from "../../../components/film-credits-editor";
 import { browserApi } from "../../../lib/client-api";
 import { canReserveStorage } from "../../../lib/media/storage";
 import { inspectVideo, prepareImage } from "../../../lib/media/prepare";
-import {
-  filmRequirements,
-  inspectMp4Tracks,
-} from "@repo/shared/media-preflight";
+import { inspectMp4Tracks } from "@repo/shared/media-preflight";
 import { multipartCheckpoint } from "../../../lib/media/multipart-checkpoint";
 import {
   createMultipartUploadTask,
@@ -53,6 +50,32 @@ const assetField = {
   poster: "poster_asset_id",
 } as const;
 const size = (bytes: number) => `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
+function uploadLabel(stage: string) {
+  switch (stage) {
+    case "idle":
+      return "Ready when you are";
+    case "hashing":
+    case "reserving":
+      return "Getting your upload ready…";
+    case "uploading":
+      return "Uploading…";
+    case "verifying":
+      return "Finishing upload…";
+    case "complete":
+      return "Upload complete";
+    case "paused":
+      return "Upload paused";
+    case "error":
+      return "Upload needs attention";
+    case "cancelled":
+    case "aborting":
+      return "Upload cancelled";
+    case "aborted":
+      return "Upload removed";
+    default:
+      return "Preparing upload…";
+  }
+}
 function message(error: unknown) {
   return error instanceof Error
     ? error.message
@@ -129,6 +152,7 @@ export function PublishForm({
     error?: string;
   } | null>(null);
   const [rights, setRights] = useState(false);
+  const languageMenu = useRef<HTMLDetailsElement>(null);
   const patch = (value: Partial<FilmDraft>) =>
     setForm((current) => ({ ...current, ...value }));
   useEffect(() => {
@@ -265,11 +289,8 @@ export function PublishForm({
     setError("");
     try {
       let selected = file;
-      if (kind === "film" && file.type !== "video/mp4") {
-        if (!/\.mp4$/i.test(file.name))
-          throw new Error("Choose an MP4 film file.");
-        selected = new File([file], file.name, { type: "video/mp4" });
-      }
+      if (kind === "film" && !/\.mp4$/i.test(file.name))
+        throw new Error("Choose an MP4 film file.");
       let blob: Blob = selected;
       let description = "";
       let tracksChecked = false;
@@ -281,14 +302,17 @@ export function PublishForm({
       if (kind === "poster") {
         const prepared = await prepareImage(selected, "poster");
         blob = prepared.blob;
-        description = `${prepared.width} × ${prepared.height} WebP · ${Math.ceil(blob.size / 1024)} KB (automatically prepared)`;
+        description = "Image ready to upload.";
       } else {
         try {
-          const metadata = await inspectVideo(selected, kind);
-          description = `${metadata.width} × ${metadata.height} · ${metadata.duration.toFixed(1)} seconds · ${size(selected.size)}`;
+          await inspectVideo(selected, kind);
+          description =
+            kind === "film"
+              ? `Selected · ${size(selected.size)}`
+              : "Preview clip ready to upload.";
         } catch (error) {
           if (kind !== "film") throw error;
-          description = `MP4 · ${size(selected.size)} · dimensions and codecs checked by the server processor`;
+          description = `Selected · ${size(selected.size)}`;
         }
       }
       if (kind === "film") {
@@ -310,8 +334,8 @@ export function PublishForm({
         }));
         setNotice(
           tracksChecked
-            ? "Track count checked. The server will verify codecs and the complete file after upload."
-            : "Could not check this file's tracks before upload. It may be rejected by the server; confirm it has one video track and at most one audio track.",
+            ? "Film selected. Save draft & upload; we’ll prepare it on our servers."
+            : "Film selected. We’ll check it during upload and let you know if anything needs attention.",
         );
         return;
       }
@@ -329,9 +353,7 @@ export function PublishForm({
         [kind]: { name: file.name, task, state: task.state, description },
       }));
       patch({ [assetField[kind]]: null });
-      setNotice(
-        "File checked. Save draft & upload to send it directly to media storage.",
-      );
+      setNotice("File selected. Save draft & upload when you’re ready.");
     } catch (err) {
       if (kind === "film") {
         mainTask.current?.pause();
@@ -520,14 +542,19 @@ export function PublishForm({
         );
       if (!rights)
         throw new Error(
-          "Confirm that you have permission to publish the film, poster and any optional hook.",
+          "Confirm that you have permission to publish the film and any optional poster or preview clip.",
         );
+      if (value.source === "r2_native" && !value.film_asset_id)
+        throw new Error("Save and upload your film before publishing.");
       if (
-        !value.poster_asset_id ||
-        (value.source === "r2_native" && !value.film_asset_id)
+        (["hook", "poster"] as const).some(
+          (kind) =>
+            tasks.current[kind] &&
+            tasks.current[kind]!.state.stage !== "complete",
+        )
       )
         throw new Error(
-          "Save and upload your film and poster before publishing.",
+          "Upload the selected optional preview clip or poster first, or leave it out.",
         );
       if (
         value.source === "r2_native" &&
@@ -537,7 +564,7 @@ export function PublishForm({
         throw new Error(
           processing?.state === "failed"
             ? "Automatic compression failed. Retry processing below before publishing."
-            : "Your film is being compressed on the server. Wait for processing to finish, then publish.",
+            : "Your film is still being prepared. You can publish it as soon as it’s ready.",
         );
       }
       const id = await persist(value);
@@ -717,13 +744,9 @@ export function PublishForm({
                         {size(item.bytes)} · {item.status}. Resume before{" "}
                         {new Date(item.resume_expires_at).toLocaleString()}.
                       </p>
-                      <p className={styles.fingerprint}>
-                        File fingerprint: {item.fingerprint}
-                      </p>
                       <p>
-                        Reselect the original Main film MP4 below, then Save
-                        draft & upload. Every byte is fingerprint-checked before
-                        saved parts are reused.
+                        Choose the same film file below and save to continue the
+                        upload.
                       </p>
                     </div>
                   ))}
@@ -866,25 +889,51 @@ export function PublishForm({
                   }
                 />
               </label>
-              <label>
-                Language
-                <select
-                  value={form.language ?? ""}
-                  onChange={(e) => patch({ language: e.target.value || null })}
-                >
-                  <option value="">Select a language</option>
-                  {[
-                    ...new Set([
-                      ...FILM_LANGUAGES,
-                      ...(form.language ? [form.language] : []),
-                    ]),
-                  ].map((language) => (
-                    <option key={language} value={language}>
-                      {language}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className={styles.languageField}>
+                <span id="film-language-label">Language</span>
+                <details className={styles.genreDropdown} ref={languageMenu}>
+                  <summary aria-labelledby="film-language-label">
+                    {form.language || "Select a language"}
+                  </summary>
+                  <div
+                    className={styles.genreOptions}
+                    role="radiogroup"
+                    aria-label="Film language"
+                  >
+                    <label>
+                      <input
+                        type="radio"
+                        name="film-language"
+                        checked={!form.language}
+                        onChange={() => {
+                          patch({ language: null });
+                          languageMenu.current?.removeAttribute("open");
+                        }}
+                      />
+                      Select a language
+                    </label>
+                    {[
+                      ...new Set([
+                        ...FILM_LANGUAGES,
+                        ...(form.language ? [form.language] : []),
+                      ]),
+                    ].map((language) => (
+                      <label key={language}>
+                        <input
+                          type="radio"
+                          name="film-language"
+                          checked={form.language === language}
+                          onChange={() => {
+                            patch({ language });
+                            languageMenu.current?.removeAttribute("open");
+                          }}
+                        />
+                        {language}
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              </div>
             </div>
           </fieldset>
           <fieldset disabled={locked} className={styles.fields}>
@@ -928,20 +977,17 @@ export function PublishForm({
                   placeholder="https://vimeo.com/123456789"
                 />
                 <small>
-                  Playback uses the provider’s embed. Supply your poster below;
-                  a discovery hook is optional.
+                  Playback uses the provider’s embed. A poster and preview clip
+                  are optional.
                 </small>
               </label>
             )}
             <p className={styles.muted}>
-              {filmRequirements} Compatible low-bitrate files are preserved;
-              other supported files are optimized after upload. Optional hooks
-              must be H.264/AAC MP4 (or silent), up to 720p, 30 seconds and 50
-              MiB. Export your chosen hook in your editor.
+              Choose an MP4 film. We’ll check it and prepare it for playback.
             </p>
             <p className={styles.muted}>
-              No hook? Your film will appear in Loop with its poster and
-              details.
+              Preview clip and poster are optional. Films without a preview
+              appear with a film card in Loop.
             </p>
             {(["film", "hook", "poster"] as Kind[])
               .filter((kind) => kind !== "film" || form.source === "r2_native")
@@ -954,10 +1000,11 @@ export function PublishForm({
                         : "Main film MP4"
                       : kind === "hook"
                         ? "Discovery hook MP4 (optional)"
-                        : "Poster (required)"}
+                        : "Poster (optional)"}
                     <input
                       key={kind === "film" ? fileVersion : kind}
                       type="file"
+                      className={styles.fileInput}
                       disabled={
                         kind === "film" &&
                         (resumeLoading || Boolean(resumeError))
@@ -970,10 +1017,8 @@ export function PublishForm({
                     <>
                       <p>{slots[kind]!.name}</p>
                       <small>{slots[kind]!.description}</small>
-                      <p aria-live="polite">
-                        {slots[kind]!.state.stage === "idle"
-                          ? "Ready to upload"
-                          : slots[kind]!.state.stage}
+                      <p aria-live="polite" className={styles.uploadStatus}>
+                        {uploadLabel(slots[kind]!.state.stage)}
                       </p>
                       {kind === "film" && processing && (
                         <>
@@ -988,10 +1033,10 @@ export function PublishForm({
                             {processing.state === "complete"
                               ? "Compression complete. Your film is ready to publish."
                               : processing.state === "failed"
-                                ? "Automatic compression failed."
+                                ? "We couldn’t prepare this film. Try another export or try again."
                                 : processing.state === "processing"
-                                  ? "Your film is being compressed on the server."
-                                  : "Your film is queued for automatic compression."}
+                                  ? "Your film is being prepared. This may take a little while."
+                                  : "Your film is in line to be prepared."}
                           </p>
                           {processing.state === "failed" &&
                             form.film_asset_id && (
@@ -1011,7 +1056,7 @@ export function PublishForm({
                                   else setProcessing({ state: "queued" });
                                 }}
                               >
-                                Retry compression
+                                Try again
                               </button>
                             )}
                         </>
@@ -1020,11 +1065,8 @@ export function PublishForm({
                         slots.film &&
                         "hashedBytes" in slots.film.state &&
                         slots.film.state.stage === "hashing" && (
-                          <p>
-                            Checking complete file fingerprint:{" "}
-                            {size(slots.film.state.hashedBytes)} of{" "}
-                            {size(slots.film.state.totalBytes)}. No film bytes
-                            have been uploaded in this step.
+                          <p className={styles.muted}>
+                            Preparing secure upload…
                           </p>
                         )}
                       <progress
@@ -1072,12 +1114,7 @@ export function PublishForm({
             )}
           </div>
           <p className={styles.muted}>
-            Uploads travel directly to storage. Main films use resumable parts.
-            Pause to preserve transferred film parts; reopen this draft and
-            reselect the identical film before its displayed resume deadline.
-            Hooks and posters use single uploads and may need to restart after a
-            reload. Discard is a separate action; storage remains reserved until
-            cleanup is confirmed.
+            You can leave this draft and come back if your upload is interrupted.
           </p>
         </form>
         {draftId ? (
@@ -1101,8 +1138,8 @@ export function PublishForm({
               disabled={locked}
               onChange={(e) => setRights(e.target.checked)}
             />
-            I have the rights or permission to publish this film, poster and any
-            optional discovery hook.
+            I have permission to publish this film and any optional poster or
+            preview clip.
           </label>
           <button
             type="button"

@@ -1,0 +1,89 @@
+.root {
+  display: grid;
+  gap: 8px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.hint,
+.status,
+.error {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.error {
+  color: #ff9eac;
+}
+.hidden {
+  display: none;
+}
+.overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(0 0 0 / 72%);
+}
+.dialog {
+  width: min(100%, 440px);
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  background: var(--graphite);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+}
+.dialog h2,
+.dialog p {
+  margin: 0;
+  text-align: center;
+}
+.dialog p {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.crop {
+  width: min(100%, 320px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #090a09;
+  touch-action: none;
+  cursor: grab;
+}
+.crop:active {
+  cursor: grabbing;
+}
+.zoom {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+}
+.zoom input {
+  flex: 1;
+  accent-color: var(--signal-pink);
+}
+.actions {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+@media (max-width: 480px) {
+  .dialog {
+    padding: 18px;
+  }
+  .actions > * {
+    flex: 1 1 100%;
+  }
+}

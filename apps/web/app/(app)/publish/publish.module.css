@@ -64,9 +64,36 @@
 .fields textarea {
   resize: vertical;
 }
-.fields input[type="file"] {
-  font-weight: 400;
+.fields input[type="file"].fileInput {
+  display: block;
+  min-height: 56px;
+  padding: 8px;
+  color: var(--text-soft);
+  background: var(--graphite);
+  border-color: var(--line-strong);
   font-size: 13px;
+  cursor: pointer;
+}
+.fields input[type="file"].fileInput::file-selector-button {
+  min-height: 38px;
+  margin-right: 12px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: var(--bone);
+  background: var(--surface-raised, var(--graphite));
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.fields input[type="file"].fileInput::file-selector-button:hover {
+  background: var(--line);
+  border-color: var(--text-muted);
+}
+.fields input[type="file"].fileInput:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 3px;
 }
 .row {
   display: grid;
@@ -230,6 +257,7 @@
   font-weight: 600;
 }
 .genreDropdown {
+  position: relative;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   background: var(--graphite);
@@ -246,10 +274,20 @@
   border-radius: 10px;
 }
 .genreOptions {
+  position: absolute;
+  z-index: 20;
+  inset: calc(100% - 1px) 0 auto;
   max-height: 280px;
   overflow-y: auto;
-  border-top: 1px solid var(--line-strong);
+  overscroll-behavior: contain;
+  background: var(--graphite);
+  border: 1px solid var(--line-strong);
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 16px 32px rgb(0 0 0 / 36%);
   padding: 8px;
+}
+.genreDropdown:not([open]) .genreOptions {
+  display: none;
 }
 .genreOptions label {
   display: flex;
@@ -259,7 +297,8 @@
   padding: 8px;
   cursor: pointer;
 }
-.genreOptions input[type="checkbox"] {
+.genreOptions input[type="checkbox"],
+.genreOptions input[type="radio"] {
   width: 18px;
   min-height: 18px;
   height: 18px;
@@ -269,4 +308,17 @@
 .genreOptions label:has(input:disabled) {
   opacity: 0.5;
   cursor: default;
+}
+
+.languageField {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.uploadStatus {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 14px;
 }

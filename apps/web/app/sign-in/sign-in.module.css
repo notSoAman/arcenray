@@ -206,3 +206,17 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+.clerk {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.clerk :global(.cl-rootBox) {
+  width: 100%;
+  align-items: center;
+}
+.clerk :global(.cl-cardBox) {
+  width: 100%;
+  margin-inline: auto;
+}

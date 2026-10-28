@@ -11,17 +11,17 @@ Deno.test("native film without hook promotes poster and main film", () => {
   });
   assert(JSON.stringify(ids) === '["poster","main"]');
 });
-Deno.test("external film without hook promotes only poster", () => {
+Deno.test("external film without optional assets promotes none", () => {
   for (const source of ["youtube_embed", "vimeo_embed"]) {
     assert(
       JSON.stringify(
         publicationAssetIds({
           source,
           film_asset_id: null,
-          poster_asset_id: "poster",
+          poster_asset_id: null,
           hook_asset_id: null,
         }),
-      ) === '["poster"]',
+      ) === "[]",
     );
   }
 });
@@ -35,13 +35,8 @@ Deno.test("supplied hook is retained for verified promotion", () => {
     }).includes("hook"),
   );
 });
-Deno.test("poster and native film remain required", () => {
-  for (
-    const fields of [{ poster_asset_id: null, film_asset_id: "main" }, {
-      poster_asset_id: "poster",
-      film_asset_id: null,
-    }]
-  ) {
+Deno.test("native film remains required; poster is optional", () => {
+  for (const fields of [{ poster_asset_id: null, film_asset_id: null }]) {
     let denied = false;
     try {
       publicationAssetIds({

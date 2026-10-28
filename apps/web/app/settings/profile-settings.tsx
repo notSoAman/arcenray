@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { browserApi } from "../../lib/client-api";
 import type { ViewerProfile } from "../../lib/session";
-import { prepareImage } from "../../lib/media/prepare";
-import { createUploadTask } from "../../lib/media/upload";
 import { Avatar } from "../../components/media";
+import { ProfilePhotoPicker } from "../../components/profile-photo-picker";
 import { roleLabels, roleOptions, type CreativeRole } from "../../lib/roles";
 import { LocationInput } from "../../components/location-input";
 import styles from "./settings.module.css";
@@ -19,12 +18,9 @@ export function ProfileSettings({ initial }: { initial: ViewerProfile }) {
   const [skills, setSkills] = useState(initial.skills_gear.join(", "));
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [photo, setPhoto] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [progress, setProgress] = useState("");
   const lock = useRef(false);
-  const fileInput = useRef<HTMLInputElement>(null);
   const nameInput = useRef<HTMLInputElement>(null);
 
   async function save(event: FormEvent) {
@@ -60,33 +56,6 @@ export function ProfileSettings({ initial }: { initial: ViewerProfile }) {
     setBusy(true);
     try {
       const api = browserApi();
-      let pictureKey = saved.profile_pic_key;
-      // The trusted media completion attaches the verified, owned image to this profile.
-      if (photo) {
-        setProgress("Preparing your profile picture…");
-        const prepared = await prepareImage(photo, "profile_picture");
-        const receipt = await createUploadTask(
-          "profile_picture",
-          prepared.blob,
-          api.media,
-          (state) => {
-            setProgress(
-              state.stage === "uploading"
-                ? "Uploading profile picture…"
-                : state.stage === "verifying"
-                  ? "Verifying profile picture…"
-                  : "Preparing profile picture…",
-            );
-          },
-        ).start();
-        if (receipt.status !== "ready" || !receipt.public_key)
-          throw new Error("Profile picture is still processing. Please retry.");
-        pictureKey = receipt.public_key;
-        setSaved((current) => ({ ...current, profile_pic_key: pictureKey }));
-        setPhoto(null);
-        if (fileInput.current) fileInput.current.value = "";
-      }
-      setProgress("Saving profile…");
       const result = await api.profiles.update(input.data);
       if (result.error) {
         if (result.error.code === "23505")
@@ -95,7 +64,7 @@ export function ProfileSettings({ initial }: { initial: ViewerProfile }) {
           "Your profile details could not be saved. Please retry.",
         );
       }
-      const next = { ...saved, ...input.data, profile_pic_key: pictureKey };
+      const next = { ...saved, ...input.data };
       setSaved(next);
       setDraft(next);
       setSkills(next.skills_gear.join(", "));
@@ -110,7 +79,6 @@ export function ProfileSettings({ initial }: { initial: ViewerProfile }) {
           : "Could not save your profile. Please retry.",
       );
     } finally {
-      setProgress("");
       setBusy(false);
       lock.current = false;
     }
@@ -248,18 +216,19 @@ export function ProfileSettings({ initial }: { initial: ViewerProfile }) {
             </div>
           </div>
           {editing ? (
-            <label className={styles.field}>
-              Upload or update profile picture
-              <input
-                ref={fileInput}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/bmp"
-                onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            <div className={styles.field}>
+              <span>Profile photo</span>
+              <ProfilePhotoPicker
+                name={saved.full_name || saved.handle}
+                picKey={saved.profile_pic_key}
+                disabled={busy}
+                onUploaded={(key) => {
+                  setSaved((current) => ({ ...current, profile_pic_key: key }));
+                  setDraft((current) => ({ ...current, profile_pic_key: key }));
+                  setMessage("Profile photo updated.");
+                }}
               />
-              <span className="field-hint">
-                Your image is automatically cropped, resized and compressed.
-              </span>
-            </label>
+            </div>
           ) : null}
         </fieldset>
         {error ? (
@@ -267,7 +236,7 @@ export function ProfileSettings({ initial }: { initial: ViewerProfile }) {
             {error}
           </p>
         ) : null}
-        <p role="status">{progress || message}</p>
+        <p role="status">{message}</p>
         {editing ? (
           <div className={styles.actions}>
             <button className="btn btn-accent" type="submit" disabled={busy}>
@@ -280,7 +249,6 @@ export function ProfileSettings({ initial }: { initial: ViewerProfile }) {
               onClick={() => {
                 setDraft(saved);
                 setSkills(saved.skills_gear.join(", "));
-                setPhoto(null);
                 setEditing(false);
                 setError("");
               }}

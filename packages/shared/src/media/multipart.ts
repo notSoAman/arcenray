@@ -240,7 +240,33 @@ function signedParts(
 }
 async function data(reply: PromiseLike<Reply>, errorMessage: string) {
   const result = await reply;
-  if (result.error) throw new Error(errorMessage);
+  if (result.error) {
+    const error = result.error as {
+      message?: unknown;
+      context?: unknown;
+      status?: unknown;
+    };
+    let detail = typeof error.message === "string" ? error.message : "";
+    let status = typeof error.status === "number" ? error.status : 0;
+    if (error.context instanceof Response) {
+      status ||= error.context.status;
+      try {
+        const body = (await error.context.clone().json()) as {
+          error?: unknown;
+        };
+        if (typeof body.error === "string") detail = body.error;
+      } catch {
+        // Keep the calm fallback when the server response is not readable JSON.
+      }
+    }
+    if (/available processor capacity/i.test(detail))
+      throw new Error(
+        "There isn’t enough processing capacity for this film right now. Try again later or choose a smaller export.",
+      );
+    if (status === 429)
+      throw new Error("Too many upload attempts. Wait a little, then try again.");
+    throw new Error(errorMessage);
+  }
   return result.data;
 }
 function hex(value: ArrayBuffer) {

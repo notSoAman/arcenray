@@ -15,7 +15,11 @@ export function validateUpload(
   blob: { type: string; size: number },
 ) {
   const mime = kind === "film" || kind === "hook" ? "video/mp4" : "image/webp";
-  if (blob.type !== mime) throw new Error(`Choose a ${mime} file`);
+  const acceptableFilmType =
+    kind === "film" &&
+    ["video/mp4", "application/octet-stream", ""].includes(blob.type);
+  if (blob.type !== mime && !acceptableFilmType)
+    throw new Error(`Choose a ${mime} file`);
   if (blob.size <= 0 || blob.size > byteLimits[kind])
     throw new Error(`File exceeds the ${kind} upload limit or is empty`);
 }
