@@ -9,6 +9,7 @@ import {
   type FilmDraft,
 } from "@repo/shared";
 import type { MultipartState } from "@repo/shared/media";
+import { filmRequirements } from "@repo/shared/media-preflight";
 import { Gate, useSession } from "../src/session";
 import {
   mainFilmTask,
@@ -57,7 +58,11 @@ function Publisher() {
   const [moodText, setMoodText] = useState("");
   const [deletionConfirmation, setDeletionConfirmation] = useState("");
   const [external, setExternal] = useState("");
-  const [file, setFile] = useState<{ name: string; file: File } | null>(null);
+  const [file, setFile] = useState<{
+    name: string;
+    file: File;
+    tracksChecked: boolean;
+  } | null>(null);
   const [poster, setPoster] = useState<File | null>(null);
   const [hook, setHook] = useState<File | null>(null);
   const [state, setState] = useState<Readonly<MultipartState> | null>(null);
@@ -314,8 +319,9 @@ function Publisher() {
               <Button
                 title={file ? `Selected: ${file.name}` : "Select an MP4 film"}
                 disabled={a.busy}
-                onPress={() =>
-                  a.run(async () => {
+                onPress={() => {
+                  setFormError(null);
+                  void a.run(async () => {
                     if (
                       task.current &&
                       !["aborted", "complete"].includes(
@@ -323,15 +329,31 @@ function Publisher() {
                       )
                     )
                       throw new Error("Discard the current upload first");
-                    const selected = await selectFilm();
+                    let selected;
+                    try {
+                      selected = await selectFilm();
+                    } catch (error) {
+                      setFile(null);
+                      task.current = null;
+                      setState(null);
+                      throw error;
+                    }
                     if (selected) {
                       setFile(selected);
                       task.current = null;
                       setState(null);
                     }
-                  })
-                }
+                  });
+                }}
               />
+              <Muted>{filmRequirements}</Muted>
+              {file && (
+                <Muted>
+                  {file.tracksChecked
+                    ? "Track count checked. The server will verify codecs and the complete file after upload."
+                    : "Could not check this file's tracks before upload. It may be rejected by the server; confirm it has one video track and at most one audio track."}
+                </Muted>
+              )}
               <Muted>
                 Keep the app open during transfer. Leaving it pauses the upload;
                 return and retry. After restart, reopen the draft and reselect
@@ -380,6 +402,10 @@ function Publisher() {
               })
             }
           />
+          <Muted>
+            Optional hooks must be H.264/AAC MP4 (or silent), up to 720p, 30
+            seconds and 50 MiB. The server checks the uploaded file.
+          </Muted>
           {input.poster_asset_id ? (
             <Muted>Poster already uploaded.</Muted>
           ) : null}

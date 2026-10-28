@@ -10,6 +10,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link, type Href } from "expo-router";
+import {
+  invalidVideoTracksMessage,
+  multipleAudioTracksMessage,
+} from "@repo/shared/media-preflight";
 import { colors, styles } from "./theme";
 
 export function Screen({ children }: PropsWithChildren) {
@@ -196,9 +200,11 @@ export function useAction() {
     } catch (failure) {
       const localMessage =
         failure instanceof Error &&
-        /^(Choose |Select |Selected file |Image is |Not enough |Discard the |Use a public |Paste a supported)/.test(
+        (/^(Choose |Select |Selected file |Image is |Not enough |Discard the |Use a public |Paste a supported)/.test(
           failure.message,
-        )
+        ) ||
+          failure.message === multipleAudioTracksMessage ||
+          failure.message === invalidVideoTracksMessage)
           ? failure.message
           : null;
       setError(

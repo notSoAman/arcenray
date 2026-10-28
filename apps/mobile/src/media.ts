@@ -12,6 +12,7 @@ import {
   type MultipartState,
 } from "@repo/shared/media";
 import { createUploadTask } from "@repo/shared/media-upload";
+import { inspectMp4Tracks } from "@repo/shared/media-preflight";
 import { uuidSchema } from "@repo/shared";
 import type { Api } from "./session";
 
@@ -157,7 +158,13 @@ export async function selectFilm() {
   const file = new File(picked.uri);
   if (!file.size || file.size > 5 * 1024 ** 4)
     throw new Error("Selected file has invalid size");
-  return { name: picked.name, file };
+  const tracks = await inspectMp4Tracks(new NativeSource(file, "video/mp4"));
+  if (tracks.status === "unsupported") throw new Error(tracks.message);
+  return {
+    name: picked.name,
+    file,
+    tracksChecked: tracks.status === "checked",
+  };
 }
 export function mainFilmTask(
   file: File,
