@@ -48,6 +48,7 @@ export default async function OnboardingPage() {
         location_city: profile.location_city ?? "",
         bio: profile.bio,
         skills_gear: profile.skills_gear,
+        profile_pic_key: profile.profile_pic_key,
       }}
     />
   );

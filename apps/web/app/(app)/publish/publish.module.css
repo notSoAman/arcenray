@@ -259,7 +259,8 @@
   padding: 8px;
   cursor: pointer;
 }
-.genreOptions input[type="checkbox"] {
+.genreOptions input[type="checkbox"],
+.genreOptions input[type="radio"] {
   width: 18px;
   min-height: 18px;
   height: 18px;
@@ -269,4 +270,12 @@
 .genreOptions label:has(input:disabled) {
   opacity: 0.5;
   cursor: default;
+}
+
+.languageField {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
 }

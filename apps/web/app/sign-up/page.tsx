@@ -28,11 +28,13 @@ export default function SignUpPage() {
         <div className={styles.formWrap}>
           <h1 className={styles.title}>Create your account</h1>
           {configured ? (
-            <SignUp
-              routing="hash"
-              signInUrl="/sign-in"
-              forceRedirectUrl="/onboarding"
-            />
+            <div className={styles.clerk}>
+              <SignUp
+                routing="hash"
+                signInUrl="/sign-in"
+                forceRedirectUrl="/onboarding"
+              />
+            </div>
           ) : (
             <SetupNotice />
           )}

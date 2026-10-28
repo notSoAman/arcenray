@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { Lockup } from "../../components/brand";
+import { ProfilePhotoPicker } from "../../components/profile-photo-picker";
 import { SignOutButton } from "../../components/sign-out-button";
 import { createClient } from "../../lib/supabase/client";
 import { roleLabels, roleOptions, type CreativeRole } from "../../lib/roles";
@@ -24,6 +25,7 @@ type Initial = {
   location_city: string;
   bio: string;
   skills_gear: string[];
+  profile_pic_key?: string | null;
 };
 
 type FieldErrors = Partial<
@@ -68,6 +70,9 @@ export function OnboardingFlow({
   const [city, setCity] = useState(initial.location_city);
   const [bio, setBio] = useState(initial.bio);
   const [skills, setSkills] = useState<string[]>(initial.skills_gear);
+  const [profilePicKey, setProfilePicKey] = useState(
+    initial.profile_pic_key ?? null,
+  );
   const [skillDraft, setSkillDraft] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [rolesError, setRolesError] = useState(false);
@@ -359,6 +364,12 @@ export function OnboardingFlow({
             </p>
 
             <form className={styles.form} onSubmit={onSubmit} noValidate>
+              <ProfilePhotoPicker
+                name={fullName || handle || "Profile"}
+                picKey={profilePicKey}
+                disabled={saving}
+                onUploaded={setProfilePicKey}
+              />
               <div className={styles.row}>
                 <div className="field">
                   <label className="field-label" htmlFor="full_name">
