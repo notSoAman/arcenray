@@ -1,5 +1,10 @@
 # Local cities and credit invitations — 2026-10-20
 
+> Historical record. The credit invitation and confirmation workflow described
+> below was retired by the film-credit simplification release on 30 October 2026. Current behavior is documented in
+> [film credits](../architecture/film-credits.md). The city autocomplete work
+> remains current.
+
 Owner: Codex. Branch: `codex/location-credit-invitations`.
 
 ## Implemented

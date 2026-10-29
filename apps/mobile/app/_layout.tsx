@@ -21,7 +21,6 @@ export default function RootLayout() {
         <Stack.Screen name="u/[handle]" options={{ title: "Creative" }} />
         <Stack.Screen name="onboarding" options={{ title: "Your profile" }} />
         <Stack.Screen name="publish" options={{ title: "Publish" }} />
-        <Stack.Screen name="invitations" options={{ title: "Credits" }} />
         <Stack.Screen name="settings" options={{ title: "Settings" }} />
         <Stack.Screen name="chat/[id]" options={{ title: "Conversation" }} />
       </Stack>

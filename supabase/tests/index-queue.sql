@@ -63,9 +63,9 @@ insert into index_claims select * from public.backend_claim_index_jobs(3);
 select pg_temp.assert_true((select count(distinct version)>=3 from index_claims where kind='film' and entity_id='2a000000-0000-0000-0000-000000000002'),'expired lease gets a new compare-and-set token');
 
 insert into public.film_credits(id,film_id,profile_id,display_name,role) values('3a000000-0000-0000-0000-000000000001','2a000000-0000-0000-0000-000000000001','1a000000-0000-0000-0000-000000000002','Queue peer','editor');
-update public.film_credits set verification_state='accepted',verified_by='1a000000-0000-0000-0000-000000000002',verified_at=now() where id='3a000000-0000-0000-0000-000000000001';
-select pg_temp.assert_true(exists(select 1 from private.index_jobs where kind='film' and entity_id='2a000000-0000-0000-0000-000000000001'),'accepted credit queues film');
-select pg_temp.assert_true(not exists(select 1 from private.entity_embeddings where kind='film' and entity_id='2a000000-0000-0000-0000-000000000001'),'accepted credit invalidates vector transactionally');
+select pg_temp.assert_true(exists(select 1 from private.index_jobs where kind='film' and entity_id='2a000000-0000-0000-0000-000000000001'),'listed credit queues film');
+select pg_temp.assert_true(not exists(select 1 from private.entity_embeddings where kind='film' and entity_id='2a000000-0000-0000-0000-000000000001'),'listed credit invalidates vector transactionally');
+select pg_temp.assert_true((select content like '%Queue peer: editor%' from private.index_source('film','2a000000-0000-0000-0000-000000000001')),'listed credit enters film index source without confirmation');
 update public.profiles set full_name='Queue peer',roles=array['editor'],onboarding_completed=true where id='1a000000-0000-0000-0000-000000000002';
 select pg_temp.assert_true(exists(select 1 from private.index_jobs where kind='profile' and entity_id='1a000000-0000-0000-0000-000000000002'),'onboarding queues profile');
 update public.films set status='published',synopsis=repeat('x',5000),genres=array[repeat('g',2000)] where id='2a000000-0000-0000-0000-000000000003';
@@ -93,4 +93,4 @@ reset role;
 insert into private.identity_providers(issuer,provider) values('https://index-test.example.invalid/auth/v1','supabase');
 select pg_temp.expect_invalid('select private.invoke_index_pending()');
 rollback;
-select 'Durable indexing authorization, CAS, retries and lifecycle assertions passed; fixtures rolled back' as result;
+select 'Durable indexing authorization, CAS, retries, credit visibility and lifecycle assertions passed; fixtures rolled back' as result;

@@ -1,6 +1,6 @@
 # Backend foundation contract
 
-Scope: profiles/onboarding, films and verified credits, discovery/search, likes/bookmarks,
+Scope: profiles/onboarding, films and filmmaker-supplied credits, discovery/search, likes/bookmarks,
 private one-to-one chat, reports/blocks, quota-reserved R2 uploads. No stories,
 general social posts, hiring marketplace, payments, or mobile UI.
 
@@ -27,7 +27,6 @@ Public RPCs (all invoked with user JWT except public discovery/search):
   p_limit=20): {id,kind,title,summary,score} rows. Full-text fallback when embeddings unavailable.
 - open_conversation(p_other_user): UUID (idempotent per pair).
 - publish_film(p_film_id): film row; requires verified ready media.
-- respond_to_credit(p_credit_id,p_accept): void; only credited user can attest.
 - record_event(p_film_id,p_kind,p_idempotency_key,p_watch_seconds=0): void.
 - get_my_storage(): {quota_bytes,used_bytes,reserved_bytes}.
 

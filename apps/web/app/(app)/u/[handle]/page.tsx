@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CreditInvitations } from "../../../../components/credit-invitations";
 import { WideCard } from "../../../../components/film-cards";
 import { IconPin } from "../../../../components/icons";
 import { Avatar } from "../../../../components/media";
@@ -71,7 +70,7 @@ export default async function ProfilePage({
       .order("published_at", { ascending: false, nullsFirst: true }),
     supabase
       .from("film_credits")
-      .select("id,film_id,role,verification_state,created_at")
+      .select("id,film_id,role,created_at")
       .eq("profile_id", profile.id)
       .order("created_at", { ascending: false }),
     isSelf || !user
@@ -95,12 +94,10 @@ export default async function ProfilePage({
   const films = (filmsRes.data ?? []).filter(
     (f) => isSelf || f.status === "published",
   );
-  const credits = (creditsRes.data ?? []).filter(
-    (c) => isSelf || c.verification_state === "accepted",
-  );
+  const allCredits = creditsRes.data ?? [];
 
   // Titles + owners for credited films (RLS returns only films this viewer may see).
-  const creditFilmIds = [...new Set(credits.map((c) => c.film_id))];
+  const creditFilmIds = [...new Set(allCredits.map((c) => c.film_id))];
   const { data: creditFilms } = creditFilmIds.length
     ? await supabase
         .from("films")
@@ -115,6 +112,9 @@ export default async function ProfilePage({
         }[],
       };
   const filmById = new Map((creditFilms ?? []).map((f) => [f.id, f]));
+  const credits = isSelf
+    ? allCredits
+    : allCredits.filter((credit) => filmById.has(credit.film_id));
 
   // "Made with": people credited on their films, and owners of films they're credited on.
   const ownFilmIds = films.map((f) => f.id);
@@ -123,7 +123,6 @@ export default async function ProfilePage({
         .from("film_credits")
         .select("profile_id")
         .in("film_id", ownFilmIds)
-        .eq("verification_state", "accepted")
     : { data: [] as { profile_id: string | null }[] };
   const collaboratorIds = [
     ...(teamCredits ?? []).map((c) => c.profile_id),
@@ -241,17 +240,14 @@ export default async function ProfilePage({
             )
           ) : null}
 
-          {tab === "credits" && isSelf && user ? (
-            <CreditInvitations key={user.id} viewerId={user.id} />
-          ) : null}
           {tab === "credits" ? (
             credits.length === 0 ? (
               <div className="state-panel">
                 <h2>No credits yet</h2>
                 <p>
                   {isSelf
-                    ? "When a filmmaker credits you on their film, it appears here for you to confirm."
-                    : "Credits appear here once they're confirmed."}
+                    ? "Credits added to your films appear here."
+                    : "No film credits have been listed for this creative yet."}
                 </p>
               </div>
             ) : (
@@ -277,18 +273,6 @@ export default async function ProfilePage({
                         {f?.published_at
                           ? ` · ${new Date(f.published_at).getFullYear()}`
                           : ""}
-                        {isSelf && c.verification_state !== "accepted" ? (
-                          <span
-                            className={styles.creditState}
-                            data-state={c.verification_state}
-                          >
-                            {c.verification_state === "declined"
-                              ? " · Declined"
-                              : f?.owner_id === profile.id
-                                ? " · Unverified self-credit"
-                                : " · Awaiting confirmation"}
-                          </span>
-                        ) : null}
                       </span>
                     </li>
                   );

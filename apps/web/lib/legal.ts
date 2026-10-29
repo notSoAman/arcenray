@@ -22,7 +22,7 @@ export const privacyPolicy: LegalPolicy = {
       title: "1. Information we handle",
       paragraphs: [
         "Account information includes your authentication provider identifier, email address and account details needed to sign you in. Clerk manages authentication. If you choose Google sign-in, Clerk receives the basic identity information you authorize, such as your name, email address and profile image. We do not request access to your Gmail messages, Google Drive files, contacts or calendar for sign-in.",
-        "Information you provide includes your profile name, handle, creative roles, city, biography, skills, profile picture, films, discovery clips, posters and film credits. We also store messages you send, reports and support requests, and your responses to credit invitations.",
+        "Information you provide includes your profile name, handle, creative roles, city, biography, skills, profile picture, films, discovery clips, posters and film credits. We also store messages you send, reports and support requests.",
         "When you use discovery features, we may store account-linked preferences and interactions such as likes, saves, more/less feedback and meaningful watch events. Our infrastructure providers process technical information such as IP addresses, browser information, request times and error logs to deliver and secure the service.",
       ],
     },
@@ -103,7 +103,7 @@ export const termsOfService: LegalPolicy = {
       paragraphs: [
         "You retain ownership of the films, music, images, text and other material you submit. Upload or link only material you are entitled to share, including the necessary music, performance, likeness and other permissions. You must have permission to upload a discovery clip or poster even when the full film is hosted elsewhere.",
         "By submitting content, you grant Arcenray a non-exclusive permission to store, copy, deliver and display it as needed to operate the features you choose, including public discovery, search, playback and sharing within the service. This permission does not transfer ownership or allow us to sell your film. It ends when the relevant content is removed, except for the limited processing, backup, safety and legal retention described in the Privacy Policy.",
-        "Public viewing does not give other users ownership or permission to download, reproduce, redistribute or commercially exploit your work. Users must obtain the rights holder's permission unless the law independently permits the use. Do not present an unconfirmed credit as verified or claim another person's work as your own.",
+        "Public viewing does not give other users ownership or permission to download, reproduce, redistribute or commercially exploit your work. Users must obtain the rights holder's permission unless the law independently permits the use. Do not claim another person's work as your own.",
       ],
     },
     {
@@ -118,7 +118,7 @@ export const termsOfService: LegalPolicy = {
       id: "collaboration",
       title: "4. Messages, credits and collaboration",
       paragraphs: [
-        "You choose whom to contact and what to share. Arcenray does not guarantee the identity, qualifications, availability or conduct of another user, or independently certify every credit. A credit's status reflects the verification workflow shown in the product.",
+        "You choose whom to contact and what to share. Arcenray does not guarantee the identity, qualifications, availability or conduct of another user, and film credits are listed as supplied by the filmmaker rather than independently certified by Arcenray.",
         "You and your collaborators are responsible for your own agreements, permissions, payment arrangements and disputes. Arcenray is not a party to those agreements. The current service does not provide an in-app payment or escrow system.",
       ],
     },

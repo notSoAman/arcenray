@@ -63,7 +63,7 @@ export default async function FilmPage({
       loadProfiles(supabase, [film.owner_id]),
       supabase
         .from("film_credits")
-        .select("id,display_name,role,profile_id,verification_state")
+        .select("id,display_name,role,profile_id")
         .eq("film_id", film.id)
         .order("created_at", { ascending: true }),
       user
@@ -278,7 +278,6 @@ export default async function FilmPage({
               const p = c.profile_id
                 ? creditProfiles.get(c.profile_id)
                 : undefined;
-              const verified = c.verification_state === "accepted";
               const body = (
                 <>
                   <Avatar
@@ -290,25 +289,11 @@ export default async function FilmPage({
                     <span className={styles.creditName}>
                       {p?.full_name ?? c.display_name}
                     </span>
-                    <span className={styles.creditRole}>
-                      {c.role}
-                      {c.profile_id ? (
-                        <span
-                          className={styles.creditState}
-                          data-state={c.verification_state}
-                        >
-                          {verified
-                            ? " · Confirmed"
-                            : c.verification_state === "declined"
-                              ? " · Declined"
-                              : " · Unconfirmed"}
-                        </span>
-                      ) : null}
-                    </span>
+                    <span className={styles.creditRole}>{c.role}</span>
                   </span>
                 </>
               );
-              return p && (verified || c.profile_id === film.owner_id) ? (
+              return p ? (
                 <Link
                   key={c.id}
                   href={`/u/${p.handle}`}

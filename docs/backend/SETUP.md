@@ -13,7 +13,7 @@ See [current validation and pending setup](STATUS.md) before assuming a provider
 
 Migrations are ordered, versioned and matched to remote history. Do not blindly
 reset or db push this shared project. Local Supabase requires Docker running.
-No mobile app has been initialized; packages/shared is reusable from Expo later.
+The Expo Android app lives in `apps/mobile` and shares typed contracts from `packages/shared`.
 
 ## Secrets
 
@@ -106,7 +106,7 @@ Search embeddings use Supabase Edge Runtime built-in `gte-small` (384 dimensions
 server-side only, with mean pooling and normalization. No external AI API key is needed.
 English only; model input beyond 512 tokens is truncated. Structured metadata comes
 before free text to retain roles/genres/location. Supabase runtime usage still applies.
-Text edits and verified-credit changes invalidate old embeddings; call index-entity
+Text edits and film-credit changes invalidate old embeddings; call index-entity
 afterward. No automatic indexing queue yet; retry 409/503 without blocking saved
 content. Exact filters and full-text fallback remain available during inference outages.
 Do not mix model vectors. Migration 20261016185726 refuses to run if old embedding

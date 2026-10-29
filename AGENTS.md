@@ -129,7 +129,7 @@ All database changes must be created as **versioned migrations**. The live dashb
 
 - **`profiles`**: `id` as stable UUID linked through private trusted issuer/subject mappings, name, unique handle, bio, **`roles text[]`** (multiple creative roles), `location_city`, `skills_gear text[]`, `profile_pic` asset reference, `onboarding_completed`, **`embedding vector(384)`**, `taste_vector vector(384)`, full-text index, storage quota and reserved/used bytes as needed. Prefer a canonical roles taxonomy plus extensible labels.
 - **`films`**: creator ownership, title, synopsis, genres, mood tags, city/location when meaningful, source (`r2_native`, `vimeo_embed`, `youtube_embed`), provider ID / external URL or internal asset key, `poster`, **mandatory discovery hook**, hook duration **`<= 30 seconds`**, film duration, visibility/publication/processing state, `embedding vector(384)`, full-text index and timestamps. Do not require a native R2 video asset for external-linked films.
-- **`film_credits`**: film, credited creative (if registered), role/department, claim/invitation status, **verification state and verifier/audit record**. A user cannot grant themselves a verified credit by changing client-supplied flags.
+- **`film_credits`**: film, credited creative (if registered), and role/department. Film owners list credits directly; credits are filmmaker-supplied and the product does not offer recipient confirmation or verification states.
 - **`user_events`**: actor, event kind, film or target, meaningful dwell/watch data, timestamp, stable idempotency/deduplication identifier. Restrict and minimize tracking; no raw video/audio logging.
 - **`conversations`, `conversation_participants`, `messages`** (or an equivalently secure simple 1:1 design): participant membership, sender, message body, timestamps, optional attachment reference to a film/collaboration item, moderation/delete state where appropriate.
 - Supporting likes/bookmarks, reports, opportunity listings and applications should be introduced as **small normalized tables when their workflows are approved**, not embedded as unbounded JSON blobs or guessed into existence.
@@ -143,12 +143,12 @@ All database changes must be created as **versioned migrations**. The live dashb
 - Users may edit **their own** profile/media/film drafts; chat participants may read/write **their own** conversation messages. No one can arbitrarily join a conversation, impersonate a sender, or modify another user's storage usage/verification data.
 - Privileged writes (usage counters, verification, publishing pipeline, indexing) happen via trusted transactional functions or Edge Functions with explicit authorization.
 - For `SECURITY DEFINER` SQL RPCs: fix `search_path`, explicitly check `private.current_profile_id()`, validate access and parameters, and restrict grants. **Never accept a client-controlled `p_user_id` as authority over another user's taste/profile.**
-- Include negative security tests: unauthenticated access, cross-user edits, guessed conversation IDs, unauthorized credit verification and quota bypass.
+- Include negative security tests: unauthenticated access, cross-user edits, guessed conversation IDs, unauthorized credit writes and quota bypass.
 
 ### Stable service contracts (names are targets, not permission to break existing ones)
 
 - `presign-upload`: validates user/session, file type/size/intent, remaining quota and safe object path; returns short-lived presigned upload details. Verify completed upload **server-side** before declaring it published/charging final usage. Support large-file multipart/resumable upload if normal direct PUT cannot meet file-size/reliability needs. Prevent upload-intent races by reservation/transactional accounting.
-- `index-entity`: asynchronously computes a 384-dimensional embedding for a film or profile **after authorization and relevant edits**; supports retries, deduplication and reindexing after verified credits change.
+- `index-entity`: asynchronously computes a 384-dimensional embedding for a film or profile **after authorization and relevant edits**; supports retries, deduplication and reindexing after credit changes.
 - `update_user_taste_vector`: updates **only the authenticated user's** taste vector from a permitted event and an indexed film. Treat weights as tunable defaults, not immutable ML science.
 - `get_personalized_feed`: ranks publishable films for current user, filters blocked/unavailable/already-consumed content as appropriate, and has sensible cold-start/popularity/recency fallback.
 - `hybrid_search`: searches people/films across embeddings and full-text results with structured city/role/genre filters; initial scoring experiment **0.7 semantic / 0.3 text** after normalization. Never rely on vector match alone for exact filters.
@@ -291,7 +291,7 @@ For Supabase changes, use the official CLI and a **local/staging** instance to v
 - **Claude Code:** accepted design system, responsive onboarding, film creator, cinematic feed/player, people/film discovery and chat interfaces. Use Codex's API/DTOs; report missing data needs.
 - **Antigravity Flash:** only founder-approved easy tasks such as Storybook/demo fixtures (if Storybook is already present), isolated UI polish to supplied specs, integration test scaffolding, static screens with typed mocks, docs, accessibility smoke checks and reproducible bug fixes.
 
-**Phase 3 — Integration and quality (Codex merges):** verify real upload -> R2 -> DB -> indexing -> search/feed -> playback; onboarding -> taste seed; events -> feed update; credit verification -> profile index; two-person chat with RLS; external Vimeo/YouTube links; mobile consumption of shared contracts. Claude approves design consistency; Antigravity may handle narrow bug/QA tickets.
+**Phase 3 — Integration and quality (Codex merges):** verify real upload -> R2 -> DB -> indexing -> search/feed -> playback; onboarding -> taste seed; events -> feed update; film credit changes -> profile index; two-person chat with RLS; external Vimeo/YouTube links; mobile consumption of shared contracts. Claude approves design consistency; Antigravity may handle narrow bug/QA tickets.
 
 **Phase 4 — Controlled demo/pilot:** founder reviews costs, provider terms, safety/report flows, accessibility, logs/alerts, backups, recovery, and production rollout. Capture feedback without expanding into an unapproved commercial platform.
 

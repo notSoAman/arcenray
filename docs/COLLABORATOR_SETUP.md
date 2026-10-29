@@ -187,7 +187,7 @@ do not merge/deploy. List anything needing Codex as a specific contract request.
 ```text
 Read the latest Arcenray instructions and handoff. On a fresh, scoped feature
 branch implement approved film/people search with exact city/role/genre filters,
-creator profiles/verified credit states, and contextual one-to-one inbox/chat via
+creator profiles and filmmaker-supplied credits, and contextual one-to-one inbox/chat via
 the existing SDK and Supabase Realtime. Distinguish loading, empty, blocked,
 signed-out and error states. Use stable message IDs and clean up subscriptions.
 Do not implement unrestricted private Broadcast/typing/presence: that authorization

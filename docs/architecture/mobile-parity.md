@@ -38,22 +38,22 @@ are not changed by this implementation.
 
 ## Native flow coverage
 
-| Website flow | Native implementation |
-| --- | --- |
-| Guest home and personalized home | Public/RLS-backed feed, signed-in ranking, genre filter, more results, refresh/error/empty states |
-| Loop | Existing Loop feed/feedback RPCs, optional muted-on-intent hook, no fabricated previews |
-| Search | Shared hybrid/full-text behavior; people/films and exact city/role/genre filters |
-| Film/detail/watch | Public detail and credits, native R2 playback with native controls, compliant provider WebView embeds and explicit provider fallback |
-| Film actions | Authenticated likes/bookmarks/deduplicated taste events, reporting and native sharing |
-| Profiles | Multi-role/skills/city/bio/work/credits, follow/block/report and open one-to-one conversation |
-| Login/signup/onboarding | Clerk hosted flow; stable UUID bootstrap; multi-role form and exactly 3 of the shared 12 vibe references |
-| Profile editing | Shared validation and native compact WebP profile picture upload |
-| Publish | Own draft list/load/save; native MP4 selection; poster/optional hook; direct resumable multipart; processing status/retry; explicit publish; creator credit invitations |
-| Credits | Recipient-only accept/decline through existing RPCs; no client-controlled verified flags |
-| Chat | Membership check; existing summaries/messages; live inserts; history; stable idempotent client IDs and mark-read |
-| Settings/safety | Storage display, sign-out, reporting/blocking, official support, privacy/terms |
-| Account deletion | Explicit website handoff to the existing same-origin/recent-session confirmation route; no unsafe bearer bypass or native deletion shortcut |
-| Moderation operations | Existing website remains the operator interface |
+| Website flow                     | Native implementation                                                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Guest home and personalized home | Public/RLS-backed feed, signed-in ranking, genre filter, more results, refresh/error/empty states                                                                                     |
+| Loop                             | Existing Loop feed/feedback RPCs, optional muted-on-intent hook, no fabricated previews                                                                                               |
+| Search                           | Shared hybrid/full-text behavior; people/films and exact city/role/genre filters                                                                                                      |
+| Film/detail/watch                | Public detail and credits, native R2 playback with native controls, compliant provider WebView embeds and explicit provider fallback                                                  |
+| Film actions                     | Authenticated likes/bookmarks/deduplicated taste events, reporting and native sharing                                                                                                 |
+| Profiles                         | Multi-role/skills/city/bio/work/credits, follow/block/report and open one-to-one conversation                                                                                         |
+| Login/signup/onboarding          | Clerk hosted flow; stable UUID bootstrap; multi-role form and exactly 3 of the shared 12 vibe references                                                                              |
+| Profile editing                  | Shared validation and native compact WebP profile picture upload                                                                                                                      |
+| Publish                          | Own draft list/load/save; native MP4 selection; poster/optional hook; direct resumable multipart; processing status/retry; explicit publish; add registered creative credits directly |
+| Credits                          | Film owners list credits directly; public film and profile views show listed credits without confirmation labels                                                                      |
+| Chat                             | Membership check; existing summaries/messages; live inserts; history; stable idempotent client IDs and mark-read                                                                      |
+| Settings/safety                  | Storage display, sign-out, reporting/blocking, official support, privacy/terms                                                                                                        |
+| Account deletion                 | Explicit website handoff to the existing same-origin/recent-session confirmation route; no unsafe bearer bypass or native deletion shortcut                                           |
+| Moderation operations            | Existing website remains the operator interface                                                                                                                                       |
 
 Native screens use existing Void/Graphite/Bone tokens and the actual accepted logo export.
 They do not import Next.js server components, browser UI, server secrets or cookie auth.

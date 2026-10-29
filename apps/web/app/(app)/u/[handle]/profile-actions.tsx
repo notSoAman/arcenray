@@ -5,48 +5,6 @@ import { useState } from "react";
 import { browserApi } from "../../../../lib/client-api";
 import styles from "./profile.module.css";
 
-/** Accept or decline a pending credit. Only the credited person can attest. */
-export function CreditResponse({ creditId }: { creditId: string }) {
-  const router = useRouter();
-  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
-
-  async function respond(accept: boolean) {
-    setState("busy");
-    const { error } = await browserApi().credits.respond(creditId, accept);
-    if (error) {
-      setState("error");
-      return;
-    }
-    router.refresh();
-  }
-
-  return (
-    <span className={styles.creditActions}>
-      <button
-        type="button"
-        className="pill"
-        onClick={() => respond(true)}
-        disabled={state === "busy"}
-      >
-        Confirm
-      </button>
-      <button
-        type="button"
-        className="pill"
-        onClick={() => respond(false)}
-        disabled={state === "busy"}
-      >
-        Not me
-      </button>
-      {state === "error" ? (
-        <span className="field-error" role="alert">
-          Couldn&apos;t update. Try again.
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
 /** Block / unblock. Blocking hides and stops conversations between you. */
 export function BlockButton({
   profileId,

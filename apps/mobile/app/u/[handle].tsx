@@ -59,7 +59,7 @@ export default function Profile() {
         : Promise.resolve({ data: null }),
       api.supabase
         .from("film_credits")
-        .select("id,film_id,role,verification_state")
+        .select("id,film_id,role")
         .eq("profile_id", p.data.id)
         .limit(50),
     ]);
@@ -179,7 +179,7 @@ export default function Profile() {
           {d.credits.map((c) => (
             <Nav
               key={c.id}
-              title={`${c.role} · ${c.verification_state}`}
+              title={c.role}
               href={{ pathname: "/film/[id]", params: { id: c.film_id } }}
             />
           ))}

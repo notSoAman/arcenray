@@ -31,8 +31,7 @@ serve(async (req) => {
       await client
         .from("film_credits")
         .select("display_name,role")
-        .eq("film_id", f.id)
-        .eq("verification_state", "accepted"),
+        .eq("film_id", f.id),
     );
     content = [
       f.title,
@@ -55,8 +54,7 @@ serve(async (req) => {
       await client
         .from("film_credits")
         .select("display_name,role")
-        .eq("profile_id", p.id)
-        .eq("verification_state", "accepted"),
+        .eq("profile_id", p.id),
     );
     content = [
       p.full_name,

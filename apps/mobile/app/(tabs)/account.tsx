@@ -30,7 +30,6 @@ export default function Account() {
           href="/onboarding"
         />
         <Nav title="Publish and manage films" href="/publish" />
-        <Nav title="Credit invitations" href="/invitations" />
         <Nav title="Account settings & support" href="/settings" />
       </Screen>
     </Gate>
