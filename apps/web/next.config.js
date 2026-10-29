@@ -1,3 +1,7 @@
+import { PHASE_PRODUCTION_BUILD } from "next/constants.js";
+import process from "node:process";
+import { assertMediaBuildConfig } from "./lib/media/build-config.mjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async headers() {
@@ -19,4 +23,9 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default function config(phase) {
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    assertMediaBuildConfig(process.env.NEXT_PUBLIC_MEDIA_URL);
+  }
+  return nextConfig;
+}
