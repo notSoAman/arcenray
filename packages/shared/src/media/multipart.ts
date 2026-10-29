@@ -277,6 +277,21 @@ function hex(value: ArrayBuffer) {
   ).join("");
 }
 
+function retryDelay(ms: number, signal: AbortSignal) {
+  signal.throwIfAborted();
+  return new Promise<void>((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", abort, { once: true });
+  });
+}
+
 /** Read only one 16 MiB slice at a time; reselecting a file checks every byte, not its name/date. */
 export async function fingerprintFilm(
   blob: UploadSource,
@@ -572,23 +587,56 @@ export function createMultipartUploadTask(
             );
             inFlight.set(number, 0);
             emit({ stage: "uploading" });
-            await transport(
-              part.upload_url,
-              part.headers,
-              slice,
-              signal,
-              (bytes) => {
-                inFlight.set(number, Math.max(0, Math.min(slice.size, bytes)));
-                emit({
-                  bytesSent:
-                    acknowledged() +
-                    Array.from(inFlight.values()).reduce(
-                      (sum, value) => sum + value,
-                      0,
-                    ),
-                });
-              },
-            );
+            // A dropped connection should recover this part automatically. PUT
+            // to the same part number is idempotent; re-sign before each retry.
+            for (let attempt = 0; ; attempt++) {
+              signal.throwIfAborted();
+              if (attempt) {
+                part = signedParts(
+                  await data(
+                    api.sign({
+                      asset_id: current.asset_id,
+                      part_numbers: [number],
+                    }),
+                    "Could not reconnect. Try resuming your upload.",
+                  ),
+                  current,
+                  [number],
+                )[0]!;
+              }
+              try {
+                await transport(
+                  part.upload_url,
+                  part.headers,
+                  slice,
+                  signal,
+                  (bytes) => {
+                    inFlight.set(
+                      number,
+                      Math.max(0, Math.min(slice.size, bytes)),
+                    );
+                    emit({
+                      bytesSent:
+                        acknowledged() +
+                        Array.from(inFlight.values()).reduce(
+                          (sum, value) => sum + value,
+                          0,
+                        ),
+                    });
+                  },
+                );
+                break;
+              } catch (error) {
+                inFlight.set(number, 0);
+                if (
+                  signal.aborted ||
+                  attempt >= 2 ||
+                  (error as { retryable?: boolean })?.retryable === false
+                )
+                  throw error;
+                await retryDelay(500 * 2 ** attempt, signal);
+              }
+            }
             done.set(number, part.bytes);
             inFlight.delete(number);
             emit({

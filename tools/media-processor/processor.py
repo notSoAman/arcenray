@@ -17,6 +17,9 @@ import shutil
 import struct
 import subprocess
 import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor
+from typing import Callable
 from dataclasses import dataclass
 from fractions import Fraction
 from uuid import UUID
@@ -37,6 +40,8 @@ class Policy:
     bitrate: int = 4_500_000
     threads: int = 2
     timeout: int = 6 * 60 * 60
+    preset: str = "veryfast"
+    crf: int = 20
 
 
 def run(argv: list[str], *, timeout: int, output: Path | None = None,
@@ -162,7 +167,8 @@ def digest(path: Path) -> str:
     return sha.hexdigest()
 
 
-def process(source: Path, work: Path, policy: Policy = Policy()) -> tuple[Path, dict]:
+def process(source: Path, work: Path, policy: Policy = Policy(),
+            on_stage: Callable[[str], None] = lambda _: None) -> tuple[Path, dict]:
     source = source.resolve(strict=True)
     size = source.stat().st_size
     meta = probe(source, work)
@@ -177,6 +183,7 @@ def process(source: Path, work: Path, policy: Policy = Policy()) -> tuple[Path, 
     if mode == "preserve" and faststart and not fragmented and meta["streams"] == expected_streams:
         output = source  # Byte-for-byte preservation, no redundant temporary copy.
     else:
+        on_stage("encoding")
         if mode == "preserve":
             # Lossless remux for moov-at-end / fragmented input / extra data tracks.
             args = ["-c", "copy"]
@@ -190,7 +197,7 @@ def process(source: Path, work: Path, policy: Policy = Policy()) -> tuple[Path, 
                        "force_divisible_by=2,setsar=1")
             if meta["fps"] > 60:
                 filters += ",fps=60"
-            args = ["-vf", filters, "-c:v", "libx264", "-preset", "medium", "-crf", "22",
+            args = ["-vf", filters, "-c:v", "libx264", "-preset", policy.preset, "-crf", str(policy.crf),
                     "-pix_fmt", "yuv420p", "-threads", str(policy.threads),
                     "-c:a", "aac", "-b:a", "160k", "-ac", "2"]
         run(common + args + ["-map_metadata", "-1", "-map_chapters", "-1",
@@ -204,6 +211,7 @@ def process(source: Path, work: Path, policy: Policy = Policy()) -> tuple[Path, 
                           "-movflags", "+faststart", str(output)],
                 timeout=policy.timeout, max_file_bytes=2 * size + 64 * MIB)
             mode = "remux_no_size_saving"
+    on_stage("checking")
     result = probe(output, work)
     seekable, fragmented = mp4_layout(output)
     if (not compatible(result) or not seekable or fragmented or result["streams"] != expected_streams
@@ -248,6 +256,8 @@ def validate_job(data: dict) -> dict:
 
 
 def download(client, bucket: str, job: dict, target: Path) -> None:
+    if job["source_bytes"] > 64 * MIB:
+        return download_ranges(client, bucket, job, target)
     response = client.get_object(Bucket=bucket, Key=job["source_key"],
                                  IfMatch=job["source_etag"])
     body = response["Body"]
@@ -268,9 +278,54 @@ def download(client, bucket: str, job: dict, target: Path) -> None:
         body.close()
 
 
+def download_ranges(client, bucket: str, job: dict, target: Path) -> None:
+    """Four bounded streams, each pinned to the same immutable source ETag."""
+    size, part_size = job["source_bytes"], 64 * MIB
+    with target.open("xb") as dest:
+        dest.truncate(size)
+
+    def receive(start: int) -> None:
+        end = min(start + part_size, size) - 1
+        for attempt in range(3):
+            body = None
+            try:
+                response = client.get_object(Bucket=bucket, Key=job["source_key"],
+                    IfMatch=job["source_etag"], Range=f"bytes={start}-{end}")
+                body = response["Body"]
+                if (response["ETag"] != job["source_etag"]
+                        or response["ContentLength"] != end - start + 1
+                        or response.get("ContentRange") != f"bytes {start}-{end}/{size}"):
+                    raise ProcessingError("source_changed")
+                received = 0
+                with target.open("r+b") as dest:
+                    dest.seek(start)
+                    while chunk := body.read(MIB):
+                        received += len(chunk)
+                        if received > end - start + 1:
+                            raise ProcessingError("source_changed")
+                        dest.write(chunk)
+                if received != end - start + 1:
+                    raise OSError("incomplete range")
+                return
+            except ProcessingError:
+                raise
+            except Exception:
+                if attempt == 2:
+                    raise ProcessingError("source_incomplete") from None
+                time.sleep(2 ** attempt)
+            finally:
+                if body is not None:
+                    body.close()
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        # Consume every result before source validation; a sparse/partial download
+        # must never be handed to FFmpeg as a successful transfer.
+        list(pool.map(receive, range(0, size, part_size)))
+
+
 def upload(client, bucket: str, key: str, path: Path, receipt: dict) -> str:
-    # Explicit multipart lifecycle makes failures abortable; memory <=64MiB (or
-    # larger dynamic part at provider-scale sizes). Disk I/O never loads full film.
+    # Two in-flight parts, bounded to 128 MiB at ordinary film sizes. Waiting for
+    # both tasks before abort prevents uploads racing the abort operation.
     size = path.stat().st_size
     part_size = max(64 * MIB, math.ceil(size / 10_000 / MIB) * MIB)
     created = client.create_multipart_upload(Bucket=bucket, Key=key,
@@ -278,16 +333,18 @@ def upload(client, bucket: str, key: str, path: Path, receipt: dict) -> str:
                                          "policy": POLICY_VERSION})
     upload_id = created["UploadId"]
     try:
-        parts = []
-        with path.open("rb") as source:
-            while chunk := source.read(part_size):
-                number = len(parts) + 1
+        def send(number: int) -> dict:
+            with path.open("rb") as source:
+                source.seek((number - 1) * part_size)
+                chunk = source.read(part_size)
                 part = client.upload_part(Bucket=bucket, Key=key, UploadId=upload_id,
                                           PartNumber=number, Body=chunk,
                                           ContentMD5=base64.b64encode(
                                               hashlib.md5(chunk, usedforsecurity=False).digest()
                                           ).decode("ascii"))
-                parts.append({"PartNumber": number, "ETag": part["ETag"]})
+                return {"PartNumber": number, "ETag": part["ETag"]}
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            parts = list(pool.map(send, range(1, math.ceil(size / part_size) + 1)))
         client.complete_multipart_upload(Bucket=bucket, Key=key, UploadId=upload_id,
                                          MultipartUpload={"Parts": parts})
     except BaseException:
@@ -313,6 +370,17 @@ def main() -> None:
     if not args.output_dir.is_dir() or any(args.output_dir.iterdir()):
         parser.error("output-dir must exist and be empty")
     os.umask(0o077)
+    timings = {}
+    stage, since = "starting", time.monotonic()
+
+    def report_stage(next_stage: str) -> None:
+        nonlocal stage, since
+        now = time.monotonic()
+        timings[stage] = round(timings.get(stage, 0) + now - since, 3)
+        stage, since = next_stage, now
+        progress = args.output_dir / "progress.tmp"
+        progress.write_text(json.dumps({"stage": stage}))
+        progress.replace(args.output_dir / "progress.json")
     try:
         with tempfile.TemporaryDirectory(prefix="arcenray-process-",
                                          dir=os.environ.get("PROCESSOR_SCRATCH")) as raw:
@@ -340,13 +408,18 @@ def main() -> None:
                                   retries={"mode": "standard", "max_attempts": 5},
                                   request_checksum_calculation="when_required",
                                   response_checksum_validation="when_required"))
+                report_stage("downloading")
                 download(client, bucket, job, source)
-            output, receipt = process(source, work)
+            report_stage("checking")
+            output, receipt = process(source, work, on_stage=report_stage)
             if job:
+                report_stage("uploading")
                 etag = upload(client, bucket, job["output_key"], output, receipt)
                 receipt.update({**job, "output_etag": etag})
             else:
                 shutil.copyfile(output, args.output_dir / "film.mp4")
+            report_stage("ready")
+            receipt["timings"] = timings
             (args.output_dir / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
             print(json.dumps({"status": "processed_private", "mode": receipt["mode"]}))
     except (ProcessingError, OSError, ValueError, KeyError) as exc:

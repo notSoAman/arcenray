@@ -145,14 +145,21 @@ function harness(blob: Blob) {
 }
 
 test("an unfinished completion can reach finish after reload without retransmitting parts", async () => {
-  const blob = film(), h = harness(blob);
+  const blob = film(),
+    h = harness(blob);
   const original = h.api.status;
   h.api.status = async (assetId) => {
     const reply = await original(assetId);
-    return { ...reply, data: { ...(reply.data as object), status: "completing", parts: [] } };
+    return {
+      ...reply,
+      data: { ...(reply.data as object), status: "completing", parts: [] },
+    };
   };
   const task = createMultipartUploadTask(blob, h.api, {
-    draftId: draft, checkpoint: h.port, transport: h.transport, now: h.now,
+    draftId: draft,
+    checkpoint: h.port,
+    transport: h.transport,
+    now: h.now,
   });
   assert.deepEqual(await task.start(), verified);
   assert.equal(h.counts().finishes, 1);
@@ -227,7 +234,6 @@ test("failed transfer retries canonical missing parts with one reservation acros
   let fail = true;
   const transport: typeof h.transport = async (...args) => {
     if (Number(new URL(args[0]).searchParams.get("partNumber")) === 2 && fail) {
-      fail = false;
       throw new Error("offline");
     }
     await h.transport(...args);
@@ -240,6 +246,7 @@ test("failed transfer retries canonical missing parts with one reservation acros
   });
   await assert.rejects(first.start(), /offline/);
   assert.equal(h.checkpoint?.asset_id, asset);
+  fail = false;
   const reloaded = createMultipartUploadTask(blob, h.api, {
     draftId: draft,
     checkpoint: h.port,
@@ -254,7 +261,7 @@ test("failed transfer retries canonical missing parts with one reservation acros
   assert.equal(h.counts().creates, 1);
 });
 
-test("slow second part refreshes expired URL on the same asset", async () => {
+test("both signed parts begin together before a slow part can expire the other URL", async () => {
   const blob = film(chunk + 3),
     h = harness(blob);
   const transport: typeof h.transport = async (...args) => {
@@ -268,7 +275,7 @@ test("slow second part refreshes expired URL on the same asset", async () => {
     now: h.now,
   }).start();
   assert.equal(h.counts().creates, 1);
-  assert.equal(h.counts().signs, 2);
+  assert.equal(h.counts().signs, 1);
 });
 
 test("pause aborts transport, retains reservation, and explicit discard calls server abort", async () => {
@@ -303,6 +310,56 @@ test("pause aborts transport, retains reservation, and explicit discard calls se
   assert.equal(await task.discard(), "aborted");
   assert.equal(h.counts().aborts, 1);
   assert.equal(h.checkpoint, null);
+});
+
+test("a dropped part is re-signed and recovered automatically without a second reservation", async () => {
+  const blob = film(chunk + 5),
+    h = harness(blob);
+  let attempts = 0;
+  await createMultipartUploadTask(blob, h.api, {
+    draftId: draft,
+    checkpoint: h.port,
+    now: h.now,
+    transport: async (...args) => {
+      if (
+        new URL(args[0]).searchParams.get("partNumber") === "2" &&
+        attempts++ === 0
+      )
+        throw new Error("connection dropped");
+      await h.transport(...args);
+    },
+  }).start();
+  assert.equal(attempts, 2);
+  assert.equal(h.counts().creates, 1);
+  assert.equal(h.counts().signs, 2);
+  assert.equal(h.transfers.length, 2);
+});
+
+test("pausing during reconnect cancels retry and preserves the checkpoint", async () => {
+  const blob = film(),
+    h = harness(blob);
+  let failed!: () => void;
+  const failure = new Promise<void>((resolve) => {
+    failed = resolve;
+  });
+  let attempts = 0;
+  const task = createMultipartUploadTask(blob, h.api, {
+    draftId: draft,
+    checkpoint: h.port,
+    now: h.now,
+    transport: async () => {
+      attempts++;
+      failed();
+      throw new Error("connection dropped");
+    },
+  });
+  const result = task.start();
+  await failure;
+  task.pause();
+  await assert.rejects(result);
+  assert.equal(attempts, 1);
+  assert.equal(task.state.stage, "paused");
+  assert.equal(h.checkpoint?.asset_id, asset);
 });
 
 test("lost finish response recovers verified canonical receipt without another upload", async () => {
@@ -393,7 +450,6 @@ test("canonical resume retransfers a formerly successful part when storage no lo
   let fails = true;
   const transport: typeof h.transport = async (...args) => {
     if (new URL(args[0]).searchParams.get("partNumber") === "2" && fails) {
-      fails = false;
       throw new Error("connection lost");
     }
     await h.transport(...args);
@@ -406,6 +462,7 @@ test("canonical resume retransfers a formerly successful part when storage no lo
   });
   await assert.rejects(task.start());
   h.present.delete(1);
+  fails = false;
   await task.start();
   assert.deepEqual(
     h.transfers.map((t) => new URL(t.url).searchParams.get("partNumber")),

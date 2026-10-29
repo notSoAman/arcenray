@@ -7,10 +7,12 @@ import struct
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import Mock
+import threading
+from unittest.mock import Mock, patch
 
 from processor import (Policy, ProcessingError, compatible, decision, digest,
                        download, mp4_layout, process, upload, validate_job)
+import processor
 
 
 class PolicyTests(unittest.TestCase):
@@ -75,6 +77,50 @@ class PolicyTests(unittest.TestCase):
                 dest.write(struct.pack(">I4sQ", 1, b"mdat", length - 16))
                 dest.truncate(length)
             self.assertEqual(mp4_layout(source), (True, False))
+
+    def test_parallel_download_is_etag_bound_and_reassembles_correct_bytes(self):
+        with tempfile.TemporaryDirectory() as raw, patch.object(processor, "MIB", 1):
+            data = bytes(range(200))
+            barrier = threading.Barrier(4)
+            def get(**kw):
+                self.assertEqual(kw['IfMatch'], '"same-source"')
+                start, end = map(int, kw['Range'][6:].split('-'))
+                barrier.wait(timeout=5)
+                return {'Body': io.BytesIO(data[start:end+1]), 'ContentLength': end-start+1,
+                        'ContentRange': f'bytes {start}-{end}/200', 'ETag': '"same-source"'}
+            client = Mock()
+            client.get_object.side_effect = get
+            target = Path(raw)/'source.mp4'
+            download(client, 'private', {'source_key': 'owner/film', 'source_etag': '"same-source"', 'source_bytes':200}, target)
+            self.assertEqual(target.read_bytes(), data)
+
+    def test_parallel_download_rejects_changed_etag_and_truncated_range(self):
+        for changed in (True, False):
+            with tempfile.TemporaryDirectory() as raw, patch.object(processor, "MIB", 1), patch.object(processor.time, 'sleep'):
+                client = Mock()
+                def get(**kw):
+                    start, end = map(int, kw['Range'][6:].split('-'))
+                    return {'Body': io.BytesIO(b'bad'), 'ContentLength': end-start+1,
+                            'ContentRange': f'bytes {start}-{end}/65', 'ETag': '"changed"' if changed else '"source"'}
+                client.get_object.side_effect = get
+                with self.assertRaises(ProcessingError):
+                    download(client,'private',{'source_key':'owner/film','source_etag':'"source"','source_bytes':65},Path(raw)/'source.mp4')
+
+    def test_parallel_upload_completes_in_part_order_after_out_of_order_transfer(self):
+        with tempfile.TemporaryDirectory() as raw, patch.object(processor, 'MIB', 1):
+            source = Path(raw)/'film.mp4'
+            source.write_bytes(bytes(range(100)))
+            client = Mock()
+            client.create_multipart_upload.return_value = {'UploadId':'attempt'}
+            barrier = threading.Barrier(2)
+            def put(**kw):
+                barrier.wait(timeout=5)
+                return {'ETag': str(kw['PartNumber'])}
+            client.upload_part.side_effect = put
+            client.head_object.return_value={'ContentLength':100,'Metadata':{'sha256':'hash'},'ETag':'result'}
+            self.assertEqual(upload(client,'private','output',source,{'sha256':'hash'}),'result')
+            self.assertEqual(client.complete_multipart_upload.call_args.kwargs['MultipartUpload']['Parts'],
+                             [{'PartNumber':1,'ETag':'1'},{'PartNumber':2,'ETag':'2'}])
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg required")

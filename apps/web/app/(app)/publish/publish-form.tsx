@@ -9,6 +9,11 @@ import { browserApi } from "../../../lib/client-api";
 import { canReserveStorage } from "../../../lib/media/storage";
 import { inspectVideo, prepareImage } from "../../../lib/media/prepare";
 import { inspectMp4Tracks } from "@repo/shared/media-preflight";
+import {
+  processingLabel,
+  canRetryProcessing,
+  type ProcessingStatus,
+} from "../../../lib/media/processing-status";
 import { multipartCheckpoint } from "../../../lib/media/multipart-checkpoint";
 import {
   createMultipartUploadTask,
@@ -122,10 +127,6 @@ export function PublishForm({
   const [slots, setSlots] = useState<Partial<Record<Kind, Slot>>>({});
   const tasks = useRef<Partial<Record<Kind, Task>>>({});
   const active = useRef<{ cancel(): void } | null>(null);
-  const autoPublishStarted = useRef(false);
-  const publishRef = useRef<(automatically?: boolean) => Promise<void>>(
-    async () => {},
-  );
   const mainFile = useRef<File | null>(null);
   const mainTask = useRef<ReturnType<typeof createMultipartUploadTask> | null>(
     null,
@@ -151,10 +152,7 @@ export function PublishForm({
   );
   const [published, setPublished] = useState(initial?.status === "published");
   const [indexed, setIndexed] = useState(false);
-  const [processing, setProcessing] = useState<{
-    state: string;
-    error?: string;
-  } | null>(null);
+  const [processing, setProcessing] = useState<ProcessingStatus | null>(null);
   const [rights, setRights] = useState(false);
   const [autoPublish, setAutoPublish] = useState(false);
   const languageMenu = useRef<HTMLDetailsElement>(null);
@@ -267,11 +265,8 @@ export function PublishForm({
   useEffect(() => {
     if (!draftId) return;
     const rightsKey = `arcenray:publish-rights:${viewerId}:${draftId}`;
-    const autoKey = `arcenray:auto-publish:${viewerId}:${draftId}`;
     const savedRights = window.localStorage.getItem(rightsKey);
-    const savedAuto = window.localStorage.getItem(autoKey);
     if (savedRights !== null) setRights(savedRights === "1");
-    if (savedAuto !== null) setAutoPublish(savedAuto === "1");
   }, [draftId, viewerId]);
 
   useEffect(() => {
@@ -284,22 +279,12 @@ export function PublishForm({
     const refresh = async () => {
       const reply = await browserApi().media.processing.status(assetId);
       if (!active || reply.error) return;
-      const value = reply.data as { state?: string; error?: string } | null;
+      const value = reply.data as Partial<ProcessingStatus> | null;
       setProcessing(
-        value?.state ? { state: value.state, error: value.error } : null,
+        value?.state
+          ? { state: value.state, error: value.error, stage: value.stage }
+          : null,
       );
-      if (
-        value?.state === "complete" &&
-        autoPublish &&
-        rights &&
-        draftId &&
-        !busy &&
-        !published &&
-        !autoPublishStarted.current
-      ) {
-        autoPublishStarted.current = true;
-        void publishRef.current(true);
-      }
     };
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5000);
@@ -316,6 +301,60 @@ export function PublishForm({
     published,
     rights,
   ]);
+
+  useEffect(() => {
+    if (!draftId || published) return;
+    let active = true;
+    const refresh = async () => {
+      const reply = await browserApi().films.publication(draftId);
+      if (!active || reply.error) return;
+      const state = (reply.data as { state?: string } | null)?.state;
+      setAutoPublish(state === "pending" || state === "processing");
+      if (state === "complete") {
+        setPublished(true);
+        setNotice("Your film is published and available to watch.");
+      } else if (state === "failed") {
+        setError(
+          "We couldn’t publish your film. Check its preparation status below, then try publishing again.",
+        );
+      } else if (state === "cancelled") {
+        setNotice(
+          "Automatic publication is off. Review your saved details, then publish when you’re ready.",
+        );
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 5000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [draftId, published]);
+
+  async function cancelPublication() {
+    if (!draftId || operation.current) return;
+    operation.current = true;
+    setBusy(true);
+    try {
+      const reply = await browserApi().films.publishWhenReady(draftId, false);
+      if (reply.error)
+        throw new Error(
+          "Couldn’t turn off automatic publication. Please try again.",
+        );
+      if (reply.data === "complete") {
+        setPublished(true);
+        setNotice("Your film has already been published.");
+      } else {
+        setAutoPublish(false);
+        setNotice("Automatic publication is off. Your film remains a draft.");
+      }
+    } catch (err) {
+      setError(message(err));
+    } finally {
+      operation.current = false;
+      setBusy(false);
+    }
+  }
 
   async function choose(kind: Kind, file?: File) {
     if (!file || operation.current || busy || preparing) return;
@@ -536,8 +575,8 @@ export function PublishForm({
           ? "Draft saved privately. Reselect the original film below to resume its pending upload."
           : value.source === "r2_native" && value.film_asset_id
             ? autoPublish
-              ? "Your film is uploaded. This page will publish it automatically when preparation finishes. If you leave, reopen this draft to complete publication."
-              : "Your film is uploaded. Preparation is running; you can publish as soon as it’s ready."
+              ? "Your film is uploaded and will publish when ready. You can close this page."
+              : "Your film is uploaded. Choose Publish when ready and we’ll take care of the rest."
             : "Draft saved privately. All selected files are verified. Review your details, then publish.",
       );
     } catch (err) {
@@ -593,19 +632,23 @@ export function PublishForm({
         throw new Error(
           "Upload the selected optional preview clip or poster first, or leave it out.",
         );
-      if (
-        value.source === "r2_native" &&
-        value.film_asset_id &&
-        processing?.state !== "complete" &&
-        !automatically
-      ) {
-        throw new Error(
-          processing?.state === "failed"
-            ? "Automatic compression failed. Retry processing below before publishing."
-            : "Your film is still being prepared. You can publish it as soon as it’s ready.",
-        );
-      }
       const id = await persist(value);
+      if (
+        automatically ||
+        (value.source === "r2_native" && processing?.state !== "complete")
+      ) {
+        const queued = await browserApi().films.publishWhenReady(id, true);
+        if (queued.error)
+          throw new Error(
+            "Couldn’t schedule publication. Your draft is saved; please try again.",
+          );
+        if (queued.data === "complete") setPublished(true);
+        else setAutoPublish(true);
+        setNotice(
+          "Your film will publish automatically when it’s ready. You can close this page.",
+        );
+        return;
+      }
       const reply = await browserApi().films.publish(id);
       if (reply.error) {
         // A timed-out response can follow a committed publication. Read back before retrying.
@@ -629,7 +672,6 @@ export function PublishForm({
       setBusy(false);
     }
   }
-  publishRef.current = publish;
   async function discardMain() {
     if (
       operation.current ||
@@ -1063,47 +1105,6 @@ export function PublishForm({
                       <p aria-live="polite" className={styles.uploadStatus}>
                         {uploadLabel(slots[kind]!.state.stage)}
                       </p>
-                      {kind === "film" && processing && (
-                        <>
-                          <p
-                            className={
-                              processing.state === "failed"
-                                ? styles.error
-                                : styles.muted
-                            }
-                            role="status"
-                          >
-                            {processing.state === "complete"
-                              ? "Compression complete. Your film is ready to publish."
-                              : processing.state === "failed"
-                                ? "We couldn’t prepare this film. Try another export or try again."
-                                : processing.state === "processing"
-                                  ? "Your film is being prepared. This may take a little while."
-                                  : "Your film is in line to be prepared."}
-                          </p>
-                          {processing.state === "failed" &&
-                            form.film_asset_id && (
-                              <button
-                                type="button"
-                                className="btn btn-ghost"
-                                disabled={busy}
-                                onClick={async () => {
-                                  const reply =
-                                    await browserApi().media.processing.retry(
-                                      form.film_asset_id!,
-                                    );
-                                  if (reply.error || reply.data !== true)
-                                    setError(
-                                      "Could not retry compression. Refresh this draft and try again.",
-                                    );
-                                  else setProcessing({ state: "queued" });
-                                }}
-                              >
-                                Try again
-                              </button>
-                            )}
-                        </>
-                      )}
                       {kind === "film" &&
                         slots.film &&
                         "hashedBytes" in slots.film.state &&
@@ -1125,15 +1126,48 @@ export function PublishForm({
                     </>
                   ) : form[assetField[kind]] ? (
                     <p className={styles.success}>
-                      Verified asset saved with this draft. Choose a file only
-                      to replace it.
+                      Your file is saved. Choose another file to replace it.
                     </p>
                   ) : (
                     <small>
                       {kind === "poster"
-                        ? "JPEG, PNG or WebP. Prepared as WebP up to 800 × 1200 before upload."
+                        ? "Choose a JPEG, PNG or WebP image."
                         : "No file selected yet."}
                     </small>
+                  )}
+                  {kind === "film" && processing && (
+                    <>
+                      <p
+                        className={
+                          processing.state === "failed"
+                            ? styles.error
+                            : styles.muted
+                        }
+                        role="status"
+                      >
+                        {processingLabel(processing)}
+                      </p>
+                      {canRetryProcessing(processing) && form.film_asset_id && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          disabled={busy}
+                          onClick={async () => {
+                            const reply =
+                              await browserApi().media.processing.retry(
+                                form.film_asset_id!,
+                              );
+                            if (reply.error || reply.data !== true)
+                              setError(
+                                "Could not retry compression. Refresh this draft and try again.",
+                              );
+                            else setProcessing({ state: "queued" });
+                          }}
+                        >
+                          Try again
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
@@ -1189,8 +1223,7 @@ export function PublishForm({
                   else window.localStorage.removeItem(key);
                 }
                 if (!checked) {
-                  setAutoPublish(false);
-                  autoPublishStarted.current = false;
+                  if (autoPublish) void cancelPublication();
                   if (draftId)
                     window.localStorage.removeItem(
                       `arcenray:auto-publish:${viewerId}:${draftId}`,
@@ -1206,14 +1239,15 @@ export function PublishForm({
               <input
                 type="checkbox"
                 checked={autoPublish}
-                disabled={locked || !rights || !form.film_asset_id || published}
+                disabled={
+                  locked ||
+                  (!rights && !autoPublish) ||
+                  !form.film_asset_id ||
+                  published
+                }
                 onChange={(event) => {
-                  const checked = event.target.checked;
-                  setAutoPublish(checked);
-                  autoPublishStarted.current = false;
-                  const key = `arcenray:auto-publish:${viewerId}:${draftId}`;
-                  if (checked) window.localStorage.setItem(key, "1");
-                  else window.localStorage.removeItem(key);
+                  if (event.target.checked) void publish(true);
+                  else void cancelPublication();
                 }}
               />
               Publish automatically when your film is ready
@@ -1225,28 +1259,25 @@ export function PublishForm({
             disabled={
               locked ||
               !rights ||
+              autoPublish ||
               (form.source === "r2_native" &&
-                (!form.film_asset_id || processing?.state !== "complete")) ||
-              (autoPublish && processing?.state !== "complete")
+                (!form.film_asset_id || processing?.state === "failed"))
             }
             onClick={() => void publish()}
           >
-            {form.source === "r2_native" && !form.film_asset_id
-              ? "Upload film to publish"
-              : form.source === "r2_native" && processing?.state !== "complete"
-                ? autoPublish
-                  ? "Will publish when ready"
-                  : "Film is being prepared…"
-                : autoPublish
-                  ? processing?.state === "complete"
-                    ? "Publish now"
-                    : "Will publish when ready"
+            {autoPublish
+              ? "Will publish when ready"
+              : form.source === "r2_native" && !form.film_asset_id
+                ? "Upload film to publish"
+                : form.source === "r2_native" &&
+                    processing?.state !== "complete"
+                  ? "Publish when ready"
                   : "Publish film"}
           </button>
           {autoPublish ? (
             <p className={styles.muted}>
-              Keep this draft open while it prepares. If you leave, reopen the
-              draft to finish publishing.
+              You can close this page. Your film will publish when it’s ready.
+              Saving changes to this draft turns off automatic publication.
             </p>
           ) : null}
         </section>

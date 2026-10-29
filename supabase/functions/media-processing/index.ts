@@ -1,3 +1,4 @@
+import { publishNextFilm } from "../_shared/queued-publication.ts";
 import { z } from "zod";
 import {
   admin,
@@ -26,6 +27,9 @@ const bodySchema = z.discriminatedUnion("action", [
       action: z.literal("heartbeat"),
       job_id: z.uuid(),
       lease_token: z.uuid(),
+      stage: z
+        .enum(["downloading", "encoding", "checking", "uploading"])
+        .optional(),
     })
     .strict(),
   z
@@ -50,6 +54,11 @@ const bodySchema = z.discriminatedUnion("action", [
         "source_changed",
         "output_invalid",
         "cancelled",
+        "multiple_tracks",
+        "hdr_unsupported",
+        "unsupported_media",
+        "invalid_media",
+        "processing_timeout",
       ]),
     })
     .strict(),
@@ -79,6 +88,9 @@ serve(async (req) => {
     return { max_source_bytes: max, heartbeat_at: new Date().toISOString() };
   }
   if (body.action === "claim") {
+    // Reuses the existing worker poll; requests survive closed browsers/restarts.
+    // Publication failures have their own bounded retry and never block encoding.
+    await publishNextFilm().catch(() => {});
     const { data, error } = await db.rpc("backend_claim_media_processing_job", {
       p_lease_seconds: 300,
     });
@@ -88,11 +100,17 @@ serve(async (req) => {
   if (body.action === "heartbeat") {
     return {
       active: checked(
-        await db.rpc("backend_heartbeat_media_processing_job", {
-          p_job: body.job_id,
-          p_token: body.lease_token,
-          p_lease_seconds: 300,
-        }),
+        body.stage
+          ? await db.rpc("backend_heartbeat_media_processing_progress", {
+              p_job: body.job_id,
+              p_token: body.lease_token,
+              p_stage: body.stage,
+            })
+          : await db.rpc("backend_heartbeat_media_processing_job", {
+              p_job: body.job_id,
+              p_token: body.lease_token,
+              p_lease_seconds: 300,
+            }),
       ),
     };
   }
@@ -113,7 +131,26 @@ serve(async (req) => {
       p_job: body.job_id,
       p_token: body.lease_token,
     }),
-  ) as { output_key: string };
+  ) as {
+    output_key: string;
+    completed?: boolean;
+    output_etag?: string;
+    output_bytes?: number;
+    sha256?: string;
+  };
+  if (lease.completed) {
+    if (
+      lease.output_etag?.replace(/^"|"$/g, "") !==
+        body.output_etag.replace(/^"|"$/g, "") ||
+      lease.output_bytes !== body.output_bytes ||
+      lease.sha256 !== body.sha256
+    )
+      throw new HttpError(
+        409,
+        "Processing receipt does not match the completed film",
+      );
+    return { completed: true, bytes: lease.output_bytes };
+  }
   const head = await r2("HEAD", env("R2_UPLOAD_BUCKET_NAME"), lease.output_key);
   const bytes = Number(head.headers.get("content-length"));
   const etag = head.headers.get("etag") ?? "";
