@@ -548,6 +548,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      backend_claim_film_publication: { Args: never; Returns: Json }
       backend_claim_index_jobs: {
         Args: { p_limit?: number }
         Returns: {
@@ -632,6 +633,10 @@ export type Database = {
         Args: { p_job: string }
         Returns: boolean
       }
+      backend_finish_film_publication: {
+        Args: { p_film: string; p_token: string }
+        Returns: boolean
+      }
       backend_finish_index_job: {
         Args: {
           p_id: string
@@ -676,6 +681,10 @@ export type Database = {
           }
       backend_heartbeat_media_processing_job: {
         Args: { p_job: string; p_lease_seconds?: number; p_token: string }
+        Returns: boolean
+      }
+      backend_heartbeat_media_processing_progress: {
+        Args: { p_job: string; p_stage: string; p_token: string }
         Returns: boolean
       }
       backend_initialize_multipart: {
@@ -754,6 +763,10 @@ export type Database = {
         Args: { p_asset: string; p_owner: string; p_token: string }
         Returns: undefined
       }
+      backend_retry_film_publication: {
+        Args: { p_film: string; p_token: string }
+        Returns: undefined
+      }
       backend_set_embedding: {
         Args: {
           p_embedding: string
@@ -807,6 +820,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_film_publication: { Args: { p_film: string }; Returns: Json }
       get_loop_feed: {
         Args: { p_exclude_ids?: string[]; p_limit?: number }
         Returns: {
@@ -1014,6 +1028,10 @@ export type Database = {
       set_film_feedback: {
         Args: { p_film_id: string; p_preference: string }
         Returns: undefined
+      }
+      set_film_publication: {
+        Args: { p_enabled: boolean; p_film: string }
+        Returns: string
       }
       set_media_processor_capacity: {
         Args: { p_available: number }

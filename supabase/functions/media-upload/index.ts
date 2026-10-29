@@ -1,3 +1,4 @@
+import { asset, promote, type Asset } from "../_shared/media-promotion.ts";
 import { publicationAssetIds } from "../_shared/publication.ts";
 import { z } from "zod";
 import {
@@ -15,13 +16,7 @@ import {
   rateLimit,
   serve,
 } from "../_shared/http.ts";
-import {
-  copyPublic,
-  r2,
-  readMoov,
-  readRange,
-  signUpload,
-} from "../_shared/r2.ts";
+import { r2, readMoov, readRange, signUpload } from "../_shared/r2.ts";
 import {
   inspectMp4Moov,
   inspectWebP,
@@ -40,62 +35,6 @@ const basicBodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("publish"), film_id: z.uuid() }).strict(),
 ]);
 const bodySchema = z.union([basicBodySchema, multipartSchema]);
-type Asset = {
-  id: string;
-  owner_id: string;
-  kind: string;
-  object_key: string;
-  expected_bytes: number;
-  actual_bytes: number | null;
-  content_type: string;
-  status: string;
-  etag: string | null;
-  expires_at: string;
-  public_key: string | null;
-};
-async function asset(id: string, owner: string): Promise<Asset> {
-  return checked(
-    await admin().rpc("backend_asset", { p_id: id, p_owner: owner }),
-  ) as Asset;
-}
-async function promote(a: Asset) {
-  if (a.status === "ready") return a;
-  if (a.status !== "uploaded" || !a.etag) {
-    throw new HttpError(409, "Complete and verify media before publishing");
-  }
-  const token = checked(
-    await admin().rpc("backend_begin_promotion", {
-      p_id: a.id,
-      p_owner: a.owner_id,
-    }),
-  );
-  const destination = await copyPublic(
-    a.object_key,
-    a.id,
-    a.etag,
-    a.content_type,
-    a.actual_bytes ?? a.expected_bytes,
-  );
-  const result = checked(
-    await admin().rpc("backend_finish_promotion", {
-      p_id: a.id,
-      p_owner: a.owner_id,
-      p_token: token,
-      p_public_etag: destination.etag,
-      p_bytes: destination.bytes,
-      p_content_type: destination.contentType,
-    }),
-  ) as Asset;
-  // Delete the current duplicate opportunistically. Ordinary PUT URLs may still
-  // recreate it; SQL keeps source_deleted=false until their full safety hold passes.
-  try {
-    await r2("DELETE", env("R2_UPLOAD_BUCKET_NAME"), a.object_key);
-    await admin().rpc("backend_source_deleted", { p_id: a.id });
-  } catch {
-    /* Scheduled cleanup retries source deletion. */
-  }
-  return result;
-}
 async function verifyCompletedAsset(id: string, owner: string) {
   let a = await asset(id, owner);
   if (a.status === "ready" || a.status === "uploaded") {
@@ -160,7 +99,18 @@ async function verifyCompletedAsset(id: string, owner: string) {
 serve(async (req) => {
   const { client, user } = await auth(req);
   const b = bodySchema.parse(await jsonBody(req));
-  await rateLimit(user.id, "media", 120);
+  // A 25 GiB film needs ~200 two-part signatures. Signing/status calls must not
+  // exhaust the separate reservation/publication allowance halfway through it.
+  const transfer = [
+    "multipart_sign",
+    "multipart_status",
+    "multipart_list",
+  ].includes(b.action);
+  await rateLimit(
+    user.id,
+    transfer ? "media_transfer" : "media",
+    transfer ? 1024 : 120,
+  );
   // Fail before reserving quota if credentials have not been configured.
   for (const key of [
     "R2_ACCOUNT_ID",

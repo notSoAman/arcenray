@@ -1,8 +1,9 @@
-# Arcenray media processor — preparation only
+# Arcenray media processor
 
-This is an offline/private-R2 single-job runner, not a deployed service or a
-production upload replacement. The durable queue, lease supervisor and publication
-integration are specified in the [architecture plan](../../docs/architecture/r2-ffmpeg-processing.md).
+The private R2 processor and outbound-only queue supervisor run on the Oracle
+worker. The processing primitive cannot publish; the authenticated backend handles
+explicit publication requests. See the [architecture plan](../../docs/architecture/r2-ffmpeg-processing.md)
+and [recovery release](../../docs/operations/upload-recovery-2026-10-29.md).
 
 Requires Linux, Python3.12+, patched FFmpeg/ffprobe with libx264/AAC, and sufficient
 scratch disk. Local processing and tests use Python's standard library only:
@@ -22,5 +23,5 @@ python3 -m venv /tmp/arcenray-processor-venv
   -r tools/media-processor/requirements.lock
 ```
 
-Never commit media, job manifests, receipts or credentials. Do not run against live
-content until backend lifecycle integration and a scoped pilot are approved.
+Never commit media, job manifests, receipts or credentials. Live tests must use explicitly authorized, disposable fixtures and clean up their
+exact keys and accounts.

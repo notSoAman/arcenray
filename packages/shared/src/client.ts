@@ -77,6 +77,13 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
         supabase.functions.invoke("media-upload", {
           body: { action: "publish", film_id: uuidSchema.parse(id) },
         }),
+      publishWhenReady: (id: string, enabled: boolean) =>
+        supabase.rpc("set_film_publication", {
+          p_film: uuidSchema.parse(id),
+          p_enabled: enabled,
+        }),
+      publication: (id: string) =>
+        supabase.rpc("get_film_publication", { p_film: uuidSchema.parse(id) }),
       feed: (limit = 20, offset = 0, genre?: string) =>
         supabase.rpc("get_personalized_feed", {
           p_limit: Math.min(50, Math.max(1, limit)),

@@ -240,13 +240,56 @@ function signedParts(
 }
 async function data(reply: PromiseLike<Reply>, errorMessage: string) {
   const result = await reply;
-  if (result.error) throw new Error(errorMessage);
+  if (result.error) {
+    const error = result.error as {
+      message?: unknown;
+      context?: unknown;
+      status?: unknown;
+    };
+    let detail = typeof error.message === "string" ? error.message : "";
+    let status = typeof error.status === "number" ? error.status : 0;
+    if (error.context instanceof Response) {
+      status ||= error.context.status;
+      try {
+        const body = (await error.context.clone().json()) as {
+          error?: unknown;
+        };
+        if (typeof body.error === "string") detail = body.error;
+      } catch {
+        // Keep the calm fallback when the server response is not readable JSON.
+      }
+    }
+    if (/available processor capacity/i.test(detail))
+      throw new Error(
+        "There isn’t enough processing capacity for this film right now. Try again later or choose a smaller export.",
+      );
+    if (status === 429)
+      throw new Error(
+        "Too many upload attempts. Wait a little, then try again.",
+      );
+    throw new Error(errorMessage);
+  }
   return result.data;
 }
 function hex(value: ArrayBuffer) {
   return Array.from(new Uint8Array(value), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
+}
+
+function retryDelay(ms: number, signal: AbortSignal) {
+  signal.throwIfAborted();
+  return new Promise<void>((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", abort, { once: true });
+  });
 }
 
 /** Read only one 16 MiB slice at a time; reselecting a file checks every byte, not its name/date. */
@@ -506,11 +549,13 @@ export function createMultipartUploadTask(
             requested,
           );
           signal.throwIfAborted();
+          // Refresh signatures before starting the batch so both part PUTs can
+          // overlap without either waiting behind a slow transfer.
+          const parts: SignedPart[] = [];
           for (const number of requested) {
             let part = batch.find((part) => part.part_number === number)!;
-            // On a slow connection the second URL may expire before its turn. Refresh only that part.
             if (Date.parse(part.expires_at) <= now() + 5000) {
-              batch = signedParts(
+              const refreshed = signedParts(
                 await data(
                   api.sign({
                     asset_id: current.asset_id,
@@ -521,38 +566,95 @@ export function createMultipartUploadTask(
                 current,
                 [number],
               );
-              part = batch[0]!;
-              if (Date.parse(part.expires_at) <= now() + 5000)
-                throw new Error(
-                  "Storage signature expires too soon. Retry later.",
-                );
+              part = refreshed[0]!;
             }
-            signal.throwIfAborted();
-            emit({ stage: "uploading" });
-            const acknowledged = Array.from(done.values()).reduce(
-              (sum, bytes) => sum + bytes,
-              0,
-            );
+            if (Date.parse(part.expires_at) <= now() + 5000)
+              throw new Error(
+                "Storage signature expires too soon. Retry later.",
+              );
+            parts.push(part);
+          }
+
+          const inFlight = new Map<number, number>();
+          const acknowledged = () =>
+            Array.from(done.values()).reduce((sum, bytes) => sum + bytes, 0);
+          const sendPart = async (part: SignedPart) => {
+            const number = part.part_number;
             const slice = blob.slice(
               (number - 1) * current.part_size,
               Math.min(number * current.part_size, blob.size),
               "video/mp4",
             );
-            await transport(
-              part.upload_url,
-              part.headers,
-              slice,
-              signal,
-              (bytes) =>
-                emit({
-                  bytesSent:
-                    acknowledged + Math.max(0, Math.min(slice.size, bytes)),
-                }),
-            );
+            inFlight.set(number, 0);
+            emit({ stage: "uploading" });
+            // A dropped connection should recover this part automatically. PUT
+            // to the same part number is idempotent; re-sign before each retry.
+            for (let attempt = 0; ; attempt++) {
+              signal.throwIfAborted();
+              if (attempt) {
+                part = signedParts(
+                  await data(
+                    api.sign({
+                      asset_id: current.asset_id,
+                      part_numbers: [number],
+                    }),
+                    "Could not reconnect. Try resuming your upload.",
+                  ),
+                  current,
+                  [number],
+                )[0]!;
+              }
+              try {
+                await transport(
+                  part.upload_url,
+                  part.headers,
+                  slice,
+                  signal,
+                  (bytes) => {
+                    inFlight.set(
+                      number,
+                      Math.max(0, Math.min(slice.size, bytes)),
+                    );
+                    emit({
+                      bytesSent:
+                        acknowledged() +
+                        Array.from(inFlight.values()).reduce(
+                          (sum, value) => sum + value,
+                          0,
+                        ),
+                    });
+                  },
+                );
+                break;
+              } catch (error) {
+                inFlight.set(number, 0);
+                if (
+                  signal.aborted ||
+                  attempt >= 2 ||
+                  (error as { retryable?: boolean })?.retryable === false
+                )
+                  throw error;
+                await retryDelay(500 * 2 ** attempt, signal);
+              }
+            }
             done.set(number, part.bytes);
-            emit({ bytesSent: acknowledged + part.bytes });
+            inFlight.delete(number);
+            emit({
+              bytesSent:
+                acknowledged() +
+                Array.from(inFlight.values()).reduce(
+                  (sum, value) => sum + value,
+                  0,
+                ),
+            });
             signal.throwIfAborted();
-          }
+          };
+          const results = await Promise.allSettled(parts.map(sendPart));
+          const failed = results.find(
+            (result): result is PromiseRejectedResult =>
+              result.status === "rejected",
+          );
+          if (failed) throw failed.reason;
         }
       }
       current = await canonical(signal); // Never complete from client-local success flags or stale ETags.
