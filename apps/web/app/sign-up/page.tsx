@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: "Sign up",
   robots: { index: false, follow: false },
 };
+export const dynamic = "force-dynamic";
 
 export default function SignUpPage() {
   const configured = Boolean(
