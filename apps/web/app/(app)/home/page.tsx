@@ -10,7 +10,12 @@ import { getViewer } from "../../../lib/session";
 import { FeedMore } from "./feed-more";
 import styles from "./home.module.css";
 
-export const metadata: Metadata = { title: "Home" };
+export const metadata: Metadata = {
+  title: "Independent short films",
+  description:
+    "Watch short films from independent filmmakers and discover new creative work on Arcenray.",
+  alternates: { canonical: "/home" },
+};
 export const dynamic = "force-dynamic";
 
 const PICKS = 5;

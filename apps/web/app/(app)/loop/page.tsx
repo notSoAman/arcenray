@@ -5,7 +5,12 @@ import { getViewer } from "../../../lib/session";
 import { LoopFeed } from "./loop-feed";
 import styles from "./loop.module.css";
 
-export const metadata: Metadata = { title: "Loop" };
+export const metadata: Metadata = {
+  title: "Discover short films",
+  description:
+    "Explore independent short films, new voices, and fresh perspectives from filmmakers on Arcenray.",
+  alternates: { canonical: "/loop" },
+};
 export const dynamic = "force-dynamic";
 const PAGE_SIZE = 10;
 

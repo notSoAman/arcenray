@@ -1,14 +1,52 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { LogoTile } from "../components/brand";
 import { SetupNotice } from "../components/setup-notice";
 import { SiteHeader } from "../components/site-header";
 import { getViewer, isSupabaseConfigured } from "../lib/session";
 import styles from "./welcome.module.css";
 
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "Arcenray",
+    locale: "en_IN",
+    title: "Arcenray — discover independent short films & filmmakers",
+    description:
+      "Discover independent short films, meet the filmmakers and creative crew behind them, and find collaborators for your next project.",
+    url: "/",
+    images: [
+      {
+        url: "/brand/spectrum-hero.webp",
+        width: 1846,
+        height: 576,
+        alt: "Arcenray — find your people, make your art",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Arcenray — discover independent short films & filmmakers",
+    description:
+      "Discover independent short films, meet the filmmakers and creative crew behind them, and find collaborators for your next project.",
+    images: ["/brand/spectrum-hero.webp"],
+  },
+};
+
 export const dynamic = "force-dynamic";
 
+const siteIdentity = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Arcenray",
+  url: "https://arcenray.com/",
+};
+
 export default async function WelcomePage() {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const configured = isSupabaseConfigured();
   if (configured) {
     const { user, profile } = await getViewer();
@@ -17,6 +55,11 @@ export default async function WelcomePage() {
 
   return (
     <div className={styles.page}>
+      <script
+        type="application/ld+json"
+        nonce={nonce}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(siteIdentity) }}
+      />
       <SiteHeader />
       <main className={styles.main}>
         {!configured ? <SetupNotice /> : null}
@@ -30,8 +73,9 @@ export default async function WelcomePage() {
               The next great thing is still unknown.
             </h1>
             <p className={styles.heroLede}>
-              Watch short films by independent filmmakers, find the people
-              behind them, and start a conversation.
+              Arcenray brings together short films by independent filmmakers
+              and the creative people behind them. Watch their work and start a
+              conversation.
             </p>
             <div className={styles.heroActions}>
               <Link href="/home" className="btn btn-primary">

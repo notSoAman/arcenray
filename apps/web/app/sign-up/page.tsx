@@ -1,8 +1,15 @@
 import { SignUp } from "@clerk/nextjs";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Lockup, LogoTile } from "../../components/brand";
 import { SetupNotice } from "../../components/setup-notice";
 import styles from "../sign-in/sign-in.module.css";
+
+export const metadata: Metadata = {
+  title: "Sign up",
+  robots: { index: false, follow: false },
+};
+
 export default function SignUpPage() {
   const configured = Boolean(
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&

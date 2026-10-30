@@ -12,6 +12,7 @@ import {
 import {
   FILM_DETAIL_COLUMNS,
   loadProfiles,
+  mediaUrl,
   type FeedCreator,
 } from "../../../../lib/feed";
 import { personRole } from "../../../../lib/roles";
@@ -43,7 +44,36 @@ export async function generateMetadata({
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
   const loaded = await loadProfile((await params).handle);
-  return { title: loaded?.profile.full_name || "Profile" };
+  if (!loaded)
+    return { title: "Profile", robots: { index: false, follow: false } };
+
+  const { profile } = loaded;
+  const roles = profile.roles.map(personRole).filter(Boolean);
+  const description = (
+    profile.bio?.trim().replace(/\s+/g, " ") ||
+    `${profile.full_name} is a ${roles.join(", ") || "creative"} on Arcenray${profile.location_city ? ` in ${profile.location_city}` : ""}. Discover their films and creative work.`
+  ).slice(0, 300);
+  const canonical = `/u/${profile.handle}`;
+  const image = mediaUrl(profile.profile_pic_key);
+
+  return {
+    title: `${profile.full_name} — ${roles.slice(0, 2).join(" & ") || "filmmaker"}`,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "profile",
+      title: profile.full_name,
+      description,
+      url: canonical,
+      ...(image ? { images: [{ url: image, alt: profile.full_name }] } : {}),
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: profile.full_name,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
+  };
 }
 
 export default async function ProfilePage({
