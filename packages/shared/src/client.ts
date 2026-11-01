@@ -70,7 +70,7 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
           .from("films")
           .update(filmDraftSchema.parse(input))
           .eq("id", uuidSchema.parse(id))
-          .eq("status", "draft")
+          .in("status", ["draft", "published"])
           .select()
           .single(),
       publish: (id: string) =>

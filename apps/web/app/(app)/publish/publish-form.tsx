@@ -155,9 +155,12 @@ export function PublishForm({
   const [preparing, setPreparing] = useState<Kind | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState(
-    initial?.status === "published" ? "This film is already published." : "",
+    initial?.status === "published"
+      ? "Edit your film’s details below. Saved detail changes stay live."
+      : "",
   );
   const [published, setPublished] = useState(initial?.status === "published");
+  const savedPublished = useRef(initial?.status === "published");
   const [indexed, setIndexed] = useState(false);
   const [processing, setProcessing] = useState<ProcessingStatus | null>(null);
   const [rights, setRights] = useState(false);
@@ -503,8 +506,10 @@ export function PublishForm({
       : await browserApi().films.createDraft(value);
     if (reply.error || !reply.data)
       throw new Error(
-        "Could not save the draft. Your form and uploaded files are retained here; retry saving.",
+        "Could not save your changes. Your details and selected files are retained here; try again.",
       );
+    savedPublished.current = reply.data.status === "published";
+    setPublished(savedPublished.current);
     savedId.current = reply.data.id;
     setDraftId(reply.data.id);
     window.history.replaceState(null, "", `/publish?draft=${reply.data.id}`);
@@ -520,7 +525,28 @@ export function PublishForm({
     setUploading(true);
     try {
       let value = input();
+      const replaceFilm =
+        value.source === "r2_native" &&
+        mainFile.current &&
+        mainTask.current?.state.stage !== "complete";
+      // Detach only the replacement slot before reserving its new upload.
+      if (replaceFilm && savedPublished.current)
+        value = { ...value, film_asset_id: null };
       const id = await persist(value); // Save metadata first, before any upload reservation.
+      const hasUploads =
+        replaceFilm ||
+        Object.values(tasks.current).some(
+          (task) => task && task.state.stage !== "complete",
+        );
+      if (!hasUploads) {
+        setNotice(
+          savedPublished.current
+            ? "Your changes are saved. Your film is still live."
+            : "Your details are saved. Existing uploads are kept.",
+        );
+        if (savedPublished.current) await index(id);
+        return;
+      }
       let resumable: MultipartDescriptor | undefined;
       let mainFreshBytes = 0;
       if (
@@ -565,7 +591,7 @@ export function PublishForm({
         throw new Error(
           "These files exceed your available storage. Choose smaller exports or wait for abandoned reservations to clear.",
         );
-      if (value.source === "r2_native" && mainFile.current) {
+      if (replaceFilm && mainFile.current) {
         if (!mainTask.current)
           mainTask.current = createMultipartUploadTask(
             mainFile.current,
@@ -603,7 +629,7 @@ export function PublishForm({
             "Upload paused. Retry Save draft & upload in this tab to reuse your reservation.",
           );
         const task = tasks.current[kind];
-        if (!task) continue;
+        if (!task || task.state.stage === "complete") continue;
         active.current = task;
         const receipt = await task.start();
         value = { ...value, [assetField[kind]]: receipt.asset_id };
@@ -788,8 +814,7 @@ export function PublishForm({
       setBusy(false);
     }
   }
-  const locked =
-    busy || preparing !== null || published || resumeLoading || autoPublish;
+  const locked = busy || preparing !== null || resumeLoading || autoPublish;
   return (
     <div className={styles.layout}>
       <section className={styles.editor} aria-label="Film editor">
@@ -1228,7 +1253,7 @@ export function PublishForm({
           {preparing && <p role="status">Checking {preparing}…</p>}
           <div className={styles.actions}>
             <button className="btn btn-ghost" type="submit" disabled={locked}>
-              Save draft & upload
+              {published ? "Save changes" : "Save details & upload"}
             </button>
             {busy && uploading && !published && (
               <button
@@ -1244,8 +1269,9 @@ export function PublishForm({
             )}
           </div>
           <p className={styles.muted}>
-            You can leave this draft and come back if your upload is
-            interrupted.
+            {published
+              ? "Detail edits stay live. Replacing a file saves the film as a private draft until you publish again. Only changed files are uploaded and prepared."
+              : "You can leave this draft and return later. Saved files are kept; only changed files are uploaded and prepared."}
           </p>
         </form>
         {draftId ? (
@@ -1262,91 +1288,96 @@ export function PublishForm({
             Save your draft to add your collaborators’ film credits.
           </p>
         )}
-        <section className={styles.publish}>
-          <h2>3 / Ready for your audience?</h2>
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={rights}
-              disabled={locked}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                setRights(checked);
-                const key = `arcenray:publish-rights:${viewerId}:${draftId}`;
-                if (draftId) {
-                  if (checked) window.localStorage.setItem(key, "1");
-                  else window.localStorage.removeItem(key);
-                }
-                if (!checked) {
-                  if (autoPublish) void cancelPublication();
-                  if (draftId)
-                    window.localStorage.removeItem(
-                      `arcenray:auto-publish:${viewerId}:${draftId}`,
-                    );
-                }
-              }}
-            />
-            I have permission to publish this film and any optional poster or
-            preview clip.
-          </label>
-          {form.source === "r2_native" && draftId ? (
+        {!published && (
+          <section className={styles.publish}>
+            <h2>3 / Ready for your audience?</h2>
             <label className={styles.check}>
               <input
                 type="checkbox"
-                checked={leaveWhenPublishing}
-                disabled={
-                  locked || autoPublish || !form.film_asset_id || published
-                }
-                onChange={(event) => {
-                  setLeaveWhenPublishing(event.target.checked);
+                checked={rights}
+                disabled={locked}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setRights(checked);
+                  const key = `arcenray:publish-rights:${viewerId}:${draftId}`;
+                  if (draftId) {
+                    if (checked) window.localStorage.setItem(key, "1");
+                    else window.localStorage.removeItem(key);
+                  }
+                  if (!checked) {
+                    if (autoPublish) void cancelPublication();
+                    if (draftId)
+                      window.localStorage.removeItem(
+                        `arcenray:auto-publish:${viewerId}:${draftId}`,
+                      );
+                  }
                 }}
               />
-              Publish when ready and take me home
+              I have permission to publish this film and any optional poster or
+              preview clip.
             </label>
-          ) : null}
-          <button
-            type="button"
-            className="btn btn-accent"
-            disabled={
-              locked ||
-              !rights ||
-              autoPublish ||
-              (form.source === "r2_native" &&
-                (!form.film_asset_id || processing?.state === "failed"))
-            }
-            onClick={() => void publish(leaveWhenPublishing)}
-          >
-            {autoPublish
-              ? "Preparing your film…"
-              : form.source === "r2_native" && !form.film_asset_id
-                ? "Upload film to publish"
-                : form.source === "r2_native" &&
-                    processing?.state !== "complete"
-                  ? "Publish when ready"
-                  : "Publish film"}
-          </button>
-          {autoPublish ? (
-            <>
-              <p className={styles.muted} role="status">
-                We’ll open your film when it’s ready. You can also go home;
-                publication will continue.
-              </p>
-              <div className={styles.actions}>
-                <Link className="btn btn-ghost" href="/home?publication=queued">
-                  Go home
-                </Link>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={busy}
-                  onClick={() => void cancelPublication()}
-                >
-                  Cancel publication
-                </button>
-              </div>
-            </>
-          ) : null}
-        </section>
+            {form.source === "r2_native" && draftId ? (
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={leaveWhenPublishing}
+                  disabled={
+                    locked || autoPublish || !form.film_asset_id || published
+                  }
+                  onChange={(event) => {
+                    setLeaveWhenPublishing(event.target.checked);
+                  }}
+                />
+                Publish when ready and take me home
+              </label>
+            ) : null}
+            <button
+              type="button"
+              className="btn btn-accent"
+              disabled={
+                locked ||
+                !rights ||
+                autoPublish ||
+                (form.source === "r2_native" &&
+                  (!form.film_asset_id || processing?.state === "failed"))
+              }
+              onClick={() => void publish(leaveWhenPublishing)}
+            >
+              {autoPublish
+                ? "Preparing your film…"
+                : form.source === "r2_native" && !form.film_asset_id
+                  ? "Upload film to publish"
+                  : form.source === "r2_native" &&
+                      processing?.state !== "complete"
+                    ? "Publish when ready"
+                    : "Publish film"}
+            </button>
+            {autoPublish ? (
+              <>
+                <p className={styles.muted} role="status">
+                  We’ll open your film when it’s ready. You can also go home;
+                  publication will continue.
+                </p>
+                <div className={styles.actions}>
+                  <Link
+                    className="btn btn-ghost"
+                    href="/home?publication=queued"
+                  >
+                    Go home
+                  </Link>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy}
+                    onClick={() => void cancelPublication()}
+                  >
+                    Cancel publication
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </section>
+        )}
         {notice && (
           <p role="status" className={styles.success}>
             {notice}
@@ -1449,8 +1480,8 @@ export function PublishForm({
           <p className={styles.muted}>Your saved drafts will appear here.</p>
         )}
         <p className={styles.muted}>
-          Publish only work you can share. Credits are listed as supplied by
-          the filmmaker and are not independently verified by Arcenray.
+          Publish only work you can share. Credits are listed as supplied by the
+          filmmaker and are not independently verified by Arcenray.
         </p>
       </aside>
     </div>
