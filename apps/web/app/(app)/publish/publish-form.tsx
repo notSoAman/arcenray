@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { filmDraftSchema, type Database, type FilmDraft } from "@repo/shared";
 import { DeleteFilm } from "../../../components/delete-film";
@@ -15,6 +16,11 @@ import {
   type ProcessingStatus,
 } from "../../../lib/media/processing-status";
 import { multipartCheckpoint } from "../../../lib/media/multipart-checkpoint";
+import {
+  processingAsset,
+  recoveryNeeded,
+  publicationDestination,
+} from "../../../lib/media/publish-flow";
 import {
   createMultipartUploadTask,
   parseMultipartDescriptor,
@@ -98,6 +104,7 @@ export function PublishForm({
   handle: string;
   viewerId: string;
 }) {
+  const router = useRouter();
   const [form, setForm] = useState<FilmDraft>(() =>
     initial
       ? {
@@ -155,6 +162,24 @@ export function PublishForm({
   const [processing, setProcessing] = useState<ProcessingStatus | null>(null);
   const [rights, setRights] = useState(false);
   const [autoPublish, setAutoPublish] = useState(false);
+  const [leaveWhenPublishing, setLeaveWhenPublishing] = useState(false);
+  const publicationRevision = useRef(0);
+  const processingId =
+    form.source === "r2_native"
+      ? processingAsset(form.film_asset_id, slots.film?.state)
+      : null;
+  const needsRecovery = recoveryNeeded(
+    slots.film?.state.stage,
+    pendingUploads.length > 0 || Boolean(mainTask.current?.state.assetId),
+  );
+  const navigateAfterPublication = (
+    id: string,
+    state: string,
+    leave = false,
+  ) => {
+    const destination = publicationDestination(id, state, leave);
+    if (destination) router.replace(destination);
+  };
   const languageMenu = useRef<HTMLDetailsElement>(null);
   const patch = (value: Partial<FilmDraft>) =>
     setForm((current) => ({ ...current, ...value }));
@@ -165,13 +190,13 @@ export function PublishForm({
     };
   }, []);
   useEffect(() => {
-    if (!busy) return;
+    if (!uploading) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [busy]);
+  }, [uploading]);
 
   async function loadPending(id: string) {
     const reply = await browserApi().media.multipart.list(id);
@@ -270,70 +295,84 @@ export function PublishForm({
   }, [draftId, viewerId]);
 
   useEffect(() => {
-    const assetId = form.source === "r2_native" ? form.film_asset_id : null;
-    if (!assetId) {
-      setProcessing(null);
+    setProcessing(null);
+    if (!processingId || published) {
       return;
     }
     let active = true;
+    let timer: number;
     const refresh = async () => {
-      const reply = await browserApi().media.processing.status(assetId);
-      if (!active || reply.error) return;
-      const value = reply.data as Partial<ProcessingStatus> | null;
-      setProcessing(
-        value?.state
-          ? { state: value.state, error: value.error, stage: value.stage }
-          : null,
-      );
-    };
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 5000);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, [
-    autoPublish,
-    busy,
-    draftId,
-    form.film_asset_id,
-    form.source,
-    published,
-    rights,
-  ]);
-
-  useEffect(() => {
-    if (!draftId || published) return;
-    let active = true;
-    const refresh = async () => {
-      const reply = await browserApi().films.publication(draftId);
-      if (!active || reply.error) return;
-      const state = (reply.data as { state?: string } | null)?.state;
-      setAutoPublish(state === "pending" || state === "processing");
-      if (state === "complete") {
-        setPublished(true);
-        setNotice("Your film is published and available to watch.");
-      } else if (state === "failed") {
-        setError(
-          "We couldn’t publish your film. Check its preparation status below, then try publishing again.",
-        );
-      } else if (state === "cancelled") {
-        setNotice(
-          "Automatic publication is off. Review your saved details, then publish when you’re ready.",
-        );
+      try {
+        const reply = await browserApi().media.processing.status(processingId);
+        if (!active || reply.error) return;
+        const value = reply.data as Partial<ProcessingStatus> | null;
+        if (value?.state)
+          setProcessing({
+            state: value.state,
+            error: value.error,
+            stage: value.stage,
+          });
+      } catch {
+        // A status request failing is not evidence that the film failed.
+      } finally {
+        if (active) timer = window.setTimeout(() => void refresh(), 5000);
       }
     };
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 5000);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
-  }, [draftId, published]);
+  }, [processingId, published]);
+
+  useEffect(() => {
+    if (!draftId || published || (slots.film && !processingId)) return;
+    let active = true;
+    let timer: number;
+    const refresh = async () => {
+      const revision = publicationRevision.current;
+      try {
+        if (operation.current) return;
+        const reply = await browserApi().films.publication(draftId);
+        if (
+          !active ||
+          reply.error ||
+          operation.current ||
+          revision !== publicationRevision.current
+        )
+          return;
+        const state = (reply.data as { state?: string } | null)?.state;
+        setAutoPublish(state === "pending" || state === "processing");
+        if (state === "complete") {
+          setPublished(true);
+          setNotice("Your film is published and available to watch.");
+          router.replace(`/films/${draftId}`);
+        } else if (state === "failed") {
+          setError(
+            "We couldn’t publish your film. Check its preparation status below, then try publishing again.",
+          );
+        } else if (state === "cancelled") {
+          setNotice(
+            "Automatic publication is off. Review your saved details, then publish when you’re ready.",
+          );
+        }
+      } catch {
+        // Keep the last confirmed state during a brief connection problem.
+      } finally {
+        if (active) timer = window.setTimeout(() => void refresh(), 5000);
+      }
+    };
+    void refresh();
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [draftId, published, router, processingId, Boolean(slots.film)]);
 
   async function cancelPublication() {
     if (!draftId || operation.current) return;
     operation.current = true;
+    publicationRevision.current++;
     setBusy(true);
     try {
       const reply = await browserApi().films.publishWhenReady(draftId, false);
@@ -458,6 +497,7 @@ export function PublishForm({
     });
   }
   async function persist(value: FilmDraft): Promise<string> {
+    publicationRevision.current++;
     const reply = savedId.current
       ? await browserApi().films.updateDraft(savedId.current, value)
       : await browserApi().films.createDraft(value);
@@ -599,6 +639,7 @@ export function PublishForm({
   async function publish(automatically = false) {
     if (busy || preparing || operation.current) return;
     operation.current = true;
+    publicationRevision.current++;
     setBusy(true);
     setError("");
     setNotice("");
@@ -633,20 +674,27 @@ export function PublishForm({
           "Upload the selected optional preview clip or poster first, or leave it out.",
         );
       const id = await persist(value);
-      if (
-        automatically ||
-        (value.source === "r2_native" && processing?.state !== "complete")
-      ) {
+      if (value.source === "r2_native" && processing?.state !== "complete") {
         const queued = await browserApi().films.publishWhenReady(id, true);
-        if (queued.error)
+        // A lost response may still have saved the request. Read it before alarming the creator.
+        const state = queued.error
+          ? ((await browserApi().films.publication(id)).data as {
+              state?: string;
+            } | null)
+          : { state: queued.data as string };
+        if (
+          !state?.state ||
+          !["pending", "processing", "complete"].includes(state.state)
+        )
           throw new Error(
-            "Couldn’t schedule publication. Your draft is saved; please try again.",
+            "We couldn’t confirm publication yet. Your upload is saved; try Publish again.",
           );
-        if (queued.data === "complete") setPublished(true);
+        if (state.state === "complete") setPublished(true);
         else setAutoPublish(true);
         setNotice(
-          "Your film will publish automatically when it’s ready. You can close this page.",
+          "Getting your film ready. We’ll open its page as soon as it’s available to watch.",
         );
+        navigateAfterPublication(id, state.state, automatically);
         return;
       }
       const reply = await browserApi().films.publish(id);
@@ -664,7 +712,8 @@ export function PublishForm({
       );
       window.localStorage.removeItem(`arcenray:auto-publish:${viewerId}:${id}`);
       setNotice("Your film is published and available to watch.");
-      await index(id);
+      // Existing server indexing jobs run independently of navigation.
+      navigateAfterPublication(id, "complete");
     } catch (err) {
       setError(message(err));
     } finally {
@@ -739,157 +788,161 @@ export function PublishForm({
       setBusy(false);
     }
   }
-  const locked = busy || preparing !== null || published || resumeLoading;
+  const locked =
+    busy || preparing !== null || published || resumeLoading || autoPublish;
   return (
     <div className={styles.layout}>
       <section className={styles.editor} aria-label="Film editor">
-        {!published && draftId && (
-          <section
-            className={styles.resumePanel}
-            aria-label="Saved film uploads"
-          >
-            <h2>Resumable film upload</h2>
-            {resumeLoading ? (
-              <p role="status">Checking saved uploads…</p>
-            ) : resumeError ? (
-              <div>
-                <p role="alert" className={styles.error}>
-                  {resumeError}
-                </p>
-                <p>
-                  If a local recovery hint is unreadable, forget it and reload
-                  the server’s saved uploads. This does not discard remote parts
-                  or release storage.
-                </p>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={busy || resumeLoading}
-                  onClick={() => {
-                    if (operation.current) return;
-                    operation.current = true;
-                    setBusy(true);
-                    void (async () => {
-                      await multipartCheckpoint(viewerId, draftId).clear();
-                      mainTask.current?.pause();
-                      mainTask.current = null;
-                      mainFile.current = null;
-                      setSlots((previous) => {
-                        const next = { ...previous };
-                        delete next.film;
-                        return next;
-                      });
-                      setFileVersion((version) => version + 1);
-                      await loadPending(draftId);
-                    })()
-                      .catch((err) => setResumeError(message(err)))
-                      .finally(() => {
-                        operation.current = false;
-                        setBusy(false);
-                      });
-                  }}
-                >
-                  Forget local recovery hint & reload
-                </button>
-              </div>
-            ) : pendingUploads.length ? (
-              <>
-                <label>
-                  Saved upload
-                  <select
-                    value={resumeId ?? ""}
-                    disabled={busy}
-                    onChange={(event) => {
-                      setResumeId(event.target.value || null);
-                      mainTask.current?.pause();
-                      mainTask.current = null;
-                      mainFile.current = null;
-                      setSlots((previous) => {
-                        const next = { ...previous };
-                        delete next.film;
-                        return next;
-                      });
-                      setFileVersion((version) => version + 1);
+        {!published &&
+          !uploading &&
+          draftId &&
+          (resumeLoading || resumeError || needsRecovery) && (
+            <section
+              className={styles.resumePanel}
+              aria-label="Saved film uploads"
+            >
+              <h2>Continue your upload</h2>
+              {resumeLoading ? (
+                <p role="status">Checking saved uploads…</p>
+              ) : resumeError ? (
+                <div>
+                  <p role="alert" className={styles.error}>
+                    {resumeError}
+                  </p>
+                  <p>
+                    If a local recovery hint is unreadable, forget it and reload
+                    the server’s saved uploads. This does not discard remote
+                    parts or release storage.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy || resumeLoading}
+                    onClick={() => {
+                      if (operation.current) return;
+                      operation.current = true;
+                      setBusy(true);
+                      void (async () => {
+                        await multipartCheckpoint(viewerId, draftId).clear();
+                        mainTask.current?.pause();
+                        mainTask.current = null;
+                        mainFile.current = null;
+                        setSlots((previous) => {
+                          const next = { ...previous };
+                          delete next.film;
+                          return next;
+                        });
+                        setFileVersion((version) => version + 1);
+                        await loadPending(draftId);
+                      })()
+                        .catch((err) => setResumeError(message(err)))
+                        .finally(() => {
+                          operation.current = false;
+                          setBusy(false);
+                        });
                     }}
                   >
-                    <option value="">Choose an upload</option>
-                    {pendingUploads.map((item) => (
-                      <option value={item.asset_id} key={item.asset_id}>
-                        {size(item.bytes)} · {item.status} ·{" "}
-                        {item.asset_id.slice(0, 8)}
-                      </option>
+                    Forget local recovery hint & reload
+                  </button>
+                </div>
+              ) : pendingUploads.length ? (
+                <>
+                  <label>
+                    Saved upload
+                    <select
+                      value={resumeId ?? ""}
+                      disabled={busy}
+                      onChange={(event) => {
+                        setResumeId(event.target.value || null);
+                        mainTask.current?.pause();
+                        mainTask.current = null;
+                        mainFile.current = null;
+                        setSlots((previous) => {
+                          const next = { ...previous };
+                          delete next.film;
+                          return next;
+                        });
+                        setFileVersion((version) => version + 1);
+                      }}
+                    >
+                      <option value="">Choose an upload</option>
+                      {pendingUploads.map((item) => (
+                        <option value={item.asset_id} key={item.asset_id}>
+                          {size(item.bytes)} · {item.status} ·{" "}
+                          {item.asset_id.slice(0, 8)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {pendingUploads
+                    .filter((item) => item.asset_id === resumeId)
+                    .map((item) => (
+                      <div key={item.asset_id}>
+                        <p>
+                          {size(item.bytes)} · {item.status}. Resume before{" "}
+                          {new Date(item.resume_expires_at).toLocaleString()}.
+                        </p>
+                        <p>
+                          Choose the same film file below and save to continue
+                          the upload.
+                        </p>
+                      </div>
                     ))}
-                  </select>
-                </label>
-                {pendingUploads
-                  .filter((item) => item.asset_id === resumeId)
-                  .map((item) => (
-                    <div key={item.asset_id}>
-                      <p>
-                        {size(item.bytes)} · {item.status}. Resume before{" "}
-                        {new Date(item.resume_expires_at).toLocaleString()}.
-                      </p>
-                      <p>
-                        Choose the same film file below and save to continue the
-                        upload.
-                      </p>
-                    </div>
-                  ))}
-              </>
-            ) : (
-              <p>
-                {mainTask.current?.state.assetId &&
-                mainTask.current.state.stage !== "complete"
-                  ? "A film upload is reserved in this tab. Resume it below or explicitly discard it."
-                  : "No pending upload was found for this draft."}
-              </p>
-            )}
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={busy || resumeLoading}
-              onClick={() => {
-                setResumeLoading(true);
-                void loadPending(draftId)
-                  .catch((err) => setResumeError(message(err)))
-                  .finally(() => setResumeLoading(false));
-              }}
-            >
-              Refresh saved uploads
-            </button>
-            {(pendingUploads.length > 0 ||
-              (mainTask.current?.state.assetId &&
-                mainTask.current.state.stage !== "complete")) && (
-              <div className={styles.discard}>
+                </>
+              ) : (
                 <p>
-                  Discard permanently abandons these uploaded film parts. Your
-                  draft metadata stays saved. Quota may remain reserved while
-                  server cleanup finishes.
+                  {mainTask.current?.state.assetId &&
+                  mainTask.current.state.stage !== "complete"
+                    ? "A film upload is reserved in this tab. Resume it below or explicitly discard it."
+                    : "No pending upload was found for this draft."}
                 </p>
-                <label>
-                  Type DISCARD UPLOAD to confirm
-                  <input
-                    value={discardConfirmation}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setDiscardConfirmation(event.target.value)
-                    }
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={busy || discardConfirmation !== "DISCARD UPLOAD"}
-                  onClick={() => void discardMain()}
-                >
-                  Discard saved upload
-                </button>
-              </div>
-            )}
-          </section>
-        )}
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={busy || resumeLoading}
+                onClick={() => {
+                  setResumeLoading(true);
+                  void loadPending(draftId)
+                    .catch((err) => setResumeError(message(err)))
+                    .finally(() => setResumeLoading(false));
+                }}
+              >
+                Refresh saved uploads
+              </button>
+              {(pendingUploads.length > 0 ||
+                (mainTask.current?.state.assetId &&
+                  mainTask.current.state.stage !== "complete")) && (
+                <div className={styles.discard}>
+                  <p>
+                    Discard permanently abandons these uploaded film parts. Your
+                    draft metadata stays saved. Quota may remain reserved while
+                    server cleanup finishes.
+                  </p>
+                  <label>
+                    Type DISCARD UPLOAD to confirm
+                    <input
+                      value={discardConfirmation}
+                      disabled={busy}
+                      onChange={(event) =>
+                        setDiscardConfirmation(event.target.value)
+                      }
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy || discardConfirmation !== "DISCARD UPLOAD"}
+                    onClick={() => void discardMain()}
+                  >
+                    Discard saved upload
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -1080,8 +1133,8 @@ export function PublishForm({
                 <div key={kind} className={styles.asset}>
                   <label>
                     {kind === "film"
-                      ? pendingUploads.length || mainTask.current?.state.assetId
-                        ? "Reselect original Main film MP4 to resume"
+                      ? needsRecovery && !mainFile.current
+                        ? "Choose the original film to continue"
                         : "Main film MP4"
                       : kind === "hook"
                         ? "Discovery hook MP4 (optional)"
@@ -1135,7 +1188,7 @@ export function PublishForm({
                         : "No file selected yet."}
                     </small>
                   )}
-                  {kind === "film" && processing && (
+                  {kind === "film" && processingId && processing && (
                     <>
                       <p
                         className={
@@ -1159,7 +1212,7 @@ export function PublishForm({
                               );
                             if (reply.error || reply.data !== true)
                               setError(
-                                "Could not retry compression. Refresh this draft and try again.",
+                                "Couldn’t restart preparation. Your upload is saved; try again shortly.",
                               );
                             else setProcessing({ state: "queued" });
                           }}
@@ -1200,7 +1253,9 @@ export function PublishForm({
             key={draftId}
             filmId={draftId}
             viewerId={viewerId}
-            editable={!busy && preparing === null && !resumeLoading}
+            editable={
+              !busy && preparing === null && !resumeLoading && !autoPublish
+            }
           />
         ) : (
           <p className={styles.muted}>
@@ -1238,19 +1293,15 @@ export function PublishForm({
             <label className={styles.check}>
               <input
                 type="checkbox"
-                checked={autoPublish}
+                checked={leaveWhenPublishing}
                 disabled={
-                  locked ||
-                  (!rights && !autoPublish) ||
-                  !form.film_asset_id ||
-                  published
+                  locked || autoPublish || !form.film_asset_id || published
                 }
                 onChange={(event) => {
-                  if (event.target.checked) void publish(true);
-                  else void cancelPublication();
+                  setLeaveWhenPublishing(event.target.checked);
                 }}
               />
-              Publish automatically when your film is ready
+              Publish when ready and take me home
             </label>
           ) : null}
           <button
@@ -1263,10 +1314,10 @@ export function PublishForm({
               (form.source === "r2_native" &&
                 (!form.film_asset_id || processing?.state === "failed"))
             }
-            onClick={() => void publish()}
+            onClick={() => void publish(leaveWhenPublishing)}
           >
             {autoPublish
-              ? "Will publish when ready"
+              ? "Preparing your film…"
               : form.source === "r2_native" && !form.film_asset_id
                 ? "Upload film to publish"
                 : form.source === "r2_native" &&
@@ -1275,10 +1326,25 @@ export function PublishForm({
                   : "Publish film"}
           </button>
           {autoPublish ? (
-            <p className={styles.muted}>
-              You can close this page. Your film will publish when it’s ready.
-              Saving changes to this draft turns off automatic publication.
-            </p>
+            <>
+              <p className={styles.muted} role="status">
+                We’ll open your film when it’s ready. You can also go home;
+                publication will continue.
+              </p>
+              <div className={styles.actions}>
+                <Link className="btn btn-ghost" href="/home?publication=queued">
+                  Go home
+                </Link>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={busy}
+                  onClick={() => void cancelPublication()}
+                >
+                  Cancel publication
+                </button>
+              </div>
+            </>
           ) : null}
         </section>
         {notice && (

@@ -40,7 +40,10 @@ Deno.test(
                 output_bytes: 100,
                 sha256: "a".repeat(64),
               }
-            : true;
+            : name === "backend_claim_film_publication" ||
+                name === "backend_claim_media_processing_job"
+              ? null
+              : true;
         return new Response(JSON.stringify(result), {
           headers: { "content-type": "application/json" },
         });
@@ -75,7 +78,15 @@ Deno.test(
         if (response.status !== 200 || !(await response.json()).completed)
           throw Error("Completion replay failed");
       }
-      if (calls.some((name) => name !== "backend_processing_output"))
+      if (
+        calls.some(
+          (name) =>
+            ![
+              "backend_processing_output",
+              "backend_claim_film_publication",
+            ].includes(name),
+        )
+      )
         throw Error("Replay repeated a write");
       if ((await send({ ...complete, sha256: "b".repeat(64) })).status !== 409)
         throw Error("Changed receipt accepted");
@@ -85,10 +96,16 @@ Deno.test(
         lease_token: token,
         stage: "encoding",
       });
-      if (calls.at(-1) !== "backend_heartbeat_media_processing_progress")
+      if (
+        calls.at(-2) !== "backend_heartbeat_media_processing_progress" ||
+        calls.at(-1) !== "backend_claim_film_publication"
+      )
         throw Error("Stage not reported");
       await send({ action: "heartbeat", job_id: job, lease_token: token });
-      if (calls.at(-1) !== "backend_heartbeat_media_processing_job")
+      if (
+        calls.at(-2) !== "backend_heartbeat_media_processing_job" ||
+        calls.at(-1) !== "backend_claim_film_publication"
+      )
         throw Error("Legacy worker broken");
       if (
         (

@@ -179,11 +179,12 @@ test("native resume rejects a content URI whose bytes changed while paused", asy
     },
   );
   await assert.rejects(task.start(), /offline/);
+  const beforeChangedFile = statusCalls;
   bytes[1] = 9;
   await assert.rejects(task.start(), /does not match/);
   assert.equal(
     statusCalls,
-    1,
+    beforeChangedFile,
     "changed bytes must be rejected before signing or status reconciliation",
   );
 });
