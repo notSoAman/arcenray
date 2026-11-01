@@ -347,6 +347,17 @@ export function PublishForm({
         const state = (reply.data as { state?: string } | null)?.state;
         setAutoPublish(state === "pending" || state === "processing");
         if (state === "complete") {
+          // A previous publication request can outlive a later edit. Confirm the
+          // current film before navigating, then recheck edits made in flight.
+          const film = await browserApi().films.get(draftId);
+          if (
+            !active ||
+            film.error ||
+            film.data?.status !== "published" ||
+            operation.current ||
+            revision !== publicationRevision.current
+          )
+            return;
           setPublished(true);
           setNotice("Your film is published and available to watch.");
           router.replace(`/films/${draftId}`);

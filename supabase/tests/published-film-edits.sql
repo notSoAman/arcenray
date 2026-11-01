@@ -9,6 +9,7 @@ insert into private.media_assets(id,owner_id,kind,object_key,expected_bytes,cont
 insert into public.films(id,owner_id,title,status,published_at,film_asset_id,poster_asset_id,film_key,poster_key,duration_seconds) values
 ('34000000-0000-4000-8000-000000000001','14000000-0000-4000-8000-000000000001','Original','published',now(),
 '24000000-0000-4000-8000-000000000001','24000000-0000-4000-8000-000000000002','assets/film','assets/poster',60);
+insert into private.film_publication_requests(film_id,owner_id,snapshot,state) select id,owner_id,private.publication_snapshot(f),'complete' from public.films f where id='34000000-0000-4000-8000-000000000001';
 select set_config('request.jwt.claims','{"iss":"https://ropbxsnjtejfomnpdllf.supabase.co/auth/v1","sub":"14000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
 set local role authenticated;
 update public.films set title='Updated',synopsis='New details',language='Hindi' where id='34000000-0000-4000-8000-000000000001';
@@ -20,6 +21,7 @@ select pg_temp.assert_true((select title='Updated' from public.films where id='3
 select set_config('request.jwt.claims','{"iss":"https://ropbxsnjtejfomnpdllf.supabase.co/auth/v1","sub":"14000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
 update public.films set poster_asset_id=null where id='34000000-0000-4000-8000-000000000001';
 select pg_temp.assert_true((select status='draft' and film_asset_id='24000000-0000-4000-8000-000000000001' and poster_asset_id is null and film_key is null from public.films where id='34000000-0000-4000-8000-000000000001'),'poster replacement retains original film asset and requires publication');
+select pg_temp.assert_true((public.get_film_publication('34000000-0000-4000-8000-000000000001')->>'state') is distinct from 'complete','an old completed request must not redirect an edited draft');
 reset role;
 select pg_temp.assert_true(not exists(select 1 from private.media_processing_jobs where draft_id='34000000-0000-4000-8000-000000000001'),'metadata/poster edits never enqueue a film encode');
 update public.films set status='published',film_key='assets/film',poster_asset_id='24000000-0000-4000-8000-000000000002' where id='34000000-0000-4000-8000-000000000001';
