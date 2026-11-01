@@ -497,7 +497,7 @@ function Publisher() {
       ) : (
         <Panel>
           <Copy>
-            {input.title} is published. Credits can still be invited below.
+            {input.title} is published. You can update its credits below.
           </Copy>
           <Nav
             title="View published film"
@@ -531,7 +531,10 @@ function Publisher() {
               }
             />
           ) : null}
-          <Title>Credit your collaborators</Title>
+          <Title>Film credits</Title>
+          <Muted>
+            Credits are listed on the film and the registered creative’s profile immediately.
+          </Muted>
           <Field
             label="Find a registered creative"
             value={creditQuery}
@@ -559,18 +562,22 @@ function Publisher() {
           {collaborators.map((p) => (
             <Button
               key={p.id}
-              title={`Invite ${p.full_name} (@${p.handle})`}
+              title={`Add ${p.full_name} (@${p.handle}) to the credits`}
               disabled={a.busy || !creditRole.trim()}
               onPress={() =>
                 a.run(async () => {
-                  const x = await api!.credits.invite(
-                    draftId,
-                    p.id,
-                    creditRole,
-                  );
+                  const x = await api!.supabase.from("film_credits").insert({
+                    film_id: draftId,
+                    profile_id: p.id,
+                    display_name: p.full_name.trim() || p.handle,
+                    role: creditRole.trim(),
+                  });
                   if (x.error) throw x.error;
                   setStage(
-                    "Credit invitation sent. Only the recipient can confirm it.",
+                    "Credit added to the film and the creative’s profile.",
+                  );
+                  setCollaborators((current) =>
+                    current.filter((person) => person.id !== p.id),
                   );
                 })
               }

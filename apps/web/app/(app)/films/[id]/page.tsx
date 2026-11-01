@@ -16,6 +16,7 @@ import {
   FILM_DETAIL_COLUMNS,
   formatDuration,
   loadProfiles,
+  mediaUrl,
   withCreators,
   type FilmRow,
 } from "../../../../lib/feed";
@@ -44,7 +45,50 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const loaded = await loadFilm((await params).id);
-  return { title: loaded?.film.title ?? "Film" };
+  if (!loaded)
+    return { title: "Film", robots: { index: false, follow: false } };
+
+  const { film } = loaded;
+  const description = (
+    film.synopsis ||
+    `${film.genres.join(", ") || "Independent"} short film on Arcenray.`
+  )
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+  const canonical = `/films/${film.id}`;
+  const poster = mediaUrl(film.poster_key);
+
+  return {
+    title: `${film.title} — independent short film`,
+    description,
+    alternates: film.status === "published" ? { canonical } : undefined,
+    robots:
+      film.status === "published"
+        ? { index: true, follow: true }
+        : { index: false, follow: false },
+    openGraph:
+      film.status === "published"
+        ? {
+            type: "video.movie",
+            title: film.title,
+            description,
+            url: canonical,
+            ...(poster
+              ? { images: [{ url: poster, alt: `${film.title} poster` }] }
+              : {}),
+          }
+        : undefined,
+    twitter:
+      film.status === "published"
+        ? {
+            card: poster ? "summary_large_image" : "summary",
+            title: film.title,
+            description,
+            ...(poster ? { images: [poster] } : {}),
+          }
+        : undefined,
+  };
 }
 
 export default async function FilmPage({
@@ -63,7 +107,7 @@ export default async function FilmPage({
       loadProfiles(supabase, [film.owner_id]),
       supabase
         .from("film_credits")
-        .select("id,display_name,role,profile_id,verification_state")
+        .select("id,display_name,role,profile_id")
         .eq("film_id", film.id)
         .order("created_at", { ascending: true }),
       user
@@ -278,7 +322,6 @@ export default async function FilmPage({
               const p = c.profile_id
                 ? creditProfiles.get(c.profile_id)
                 : undefined;
-              const verified = c.verification_state === "accepted";
               const body = (
                 <>
                   <Avatar
@@ -290,25 +333,11 @@ export default async function FilmPage({
                     <span className={styles.creditName}>
                       {p?.full_name ?? c.display_name}
                     </span>
-                    <span className={styles.creditRole}>
-                      {c.role}
-                      {c.profile_id ? (
-                        <span
-                          className={styles.creditState}
-                          data-state={c.verification_state}
-                        >
-                          {verified
-                            ? " · Confirmed"
-                            : c.verification_state === "declined"
-                              ? " · Declined"
-                              : " · Unconfirmed"}
-                        </span>
-                      ) : null}
-                    </span>
+                    <span className={styles.creditRole}>{c.role}</span>
                   </span>
                 </>
               );
-              return p && (verified || c.profile_id === film.owner_id) ? (
+              return p ? (
                 <Link
                   key={c.id}
                   href={`/u/${p.handle}`}

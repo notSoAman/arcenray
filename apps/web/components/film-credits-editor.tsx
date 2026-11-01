@@ -9,7 +9,6 @@ type Credit = {
   display_name: string;
   role: string;
   profile_id: string | null;
-  verification_state: string;
 };
 
 type Person = {
@@ -32,7 +31,9 @@ export function FilmCreditsEditor({
   const [credits, setCredits] = useState<Credit[]>([]);
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
-  const [mode, setMode] = useState<"invite" | "manual" | "self">("invite");
+  const [mode, setMode] = useState<"registered" | "manual" | "self">(
+    "registered",
+  );
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<Person[]>([]);
   const [selected, setSelected] = useState<Person | null>(null);
@@ -45,7 +46,7 @@ export function FilmCreditsEditor({
   const load = useCallback(async () => {
     const { data, error } = await browserApi()
       .supabase.from("film_credits")
-      .select("id,display_name,role,profile_id,verification_state")
+      .select("id,display_name,role,profile_id")
       .eq("film_id", filmId)
       .order("created_at");
     if (error) throw error;
@@ -72,7 +73,7 @@ export function FilmCreditsEditor({
   useEffect(() => {
     let active = true;
     const search = query.trim().replace(/^@/, "");
-    if (mode !== "invite" || selected || search.length < 2) return;
+    if (mode !== "registered" || selected || search.length < 2) return;
     const timer = setTimeout(() => {
       void (async () => {
         try {
@@ -101,7 +102,7 @@ export function FilmCreditsEditor({
     const creditRole = role.trim();
     if (
       !creditRole ||
-      (mode === "invite" ? !selected : mode === "manual" && !displayName)
+      (mode === "registered" ? !selected : mode === "manual" && !displayName)
     ) {
       setError("Choose a collaborator or enter a name, and add their role.");
       return;
@@ -111,7 +112,7 @@ export function FilmCreditsEditor({
     setError("");
     try {
       const profileId =
-        mode === "invite"
+        mode === "registered"
           ? selected!.profile_id
           : mode === "self"
             ? viewerId
@@ -140,21 +141,19 @@ export function FilmCreditsEditor({
           throw new Error("Couldn’t load your profile. Try again.");
         selfName = result.data.full_name;
       }
-      const { error } =
-        mode === "invite"
-          ? await browserApi().credits.invite(
-              filmId,
-              selected!.profile_id,
-              creditRole,
-            )
-          : await browserApi()
-              .supabase.from("film_credits")
-              .insert({
-                film_id: filmId,
-                profile_id: profileId,
-                display_name: mode === "self" ? selfName : displayName,
-                role: creditRole,
-              });
+      const { error } = await browserApi()
+        .supabase.from("film_credits")
+        .insert({
+          film_id: filmId,
+          profile_id: profileId,
+          display_name:
+            mode === "registered"
+              ? selected!.full_name.trim() || selected!.handle
+              : mode === "self"
+                ? selfName
+                : displayName,
+          role: creditRole,
+        });
       if (error)
         throw new Error(
           "Couldn’t add this credit. Check the details and try again.",
@@ -187,7 +186,6 @@ export function FilmCreditsEditor({
         .delete()
         .eq("id", id)
         .eq("film_id", filmId)
-        .eq("verification_state", "pending")
         .select("id");
       if (error || !data?.length)
         throw new Error("Couldn’t remove this credit. Reload and try again.");
@@ -222,17 +220,15 @@ export function FilmCreditsEditor({
                 <strong>{credit.display_name}</strong>
                 <span>{credit.role}</span>
               </div>
-              {editable && credit.verification_state === "pending" ? (
+              {editable ? (
                 <button
                   type="button"
                   className="btn btn-ghost"
                   disabled={busy}
                   onClick={() => void remove(credit.id)}
-                  aria-label={`${credit.profile_id && credit.profile_id !== viewerId ? "Cancel invitation for" : "Remove"} ${credit.display_name}, ${credit.role}`}
+                  aria-label={`Remove ${credit.display_name}, ${credit.role}`}
                 >
-                  {credit.profile_id && credit.profile_id !== viewerId
-                    ? "Cancel invitation"
-                    : "Remove"}
+                  Remove
                 </button>
               ) : null}
             </li>
@@ -246,7 +242,7 @@ export function FilmCreditsEditor({
           <div className={styles.actions} aria-label="Credit type">
             {(
               [
-                ["invite", "Invite a creative"],
+                ["registered", "Add a registered creative"],
                 ["manual", "Add someone without an account"],
                 ["self", "Credit myself"],
               ] as const
@@ -271,7 +267,7 @@ export function FilmCreditsEditor({
               </button>
             ))}
           </div>
-          {mode === "invite" ? (
+          {mode === "registered" ? (
             <div>
               <label>
                 Find a creative by name or handle
@@ -295,11 +291,12 @@ export function FilmCreditsEditor({
                 />
               </label>
               <p id="credit-search-hint" className={styles.muted}>
-                Type at least two characters, then choose a person.
+                Type at least two characters, then choose a person. Credits are
+                added to the film and their profile immediately.
               </p>
               {selected ? (
                 <p className={styles.selected}>
-                  Invitation for <strong>{selected.full_name}</strong> @
+                  Credit <strong>{selected.full_name}</strong> @
                   {selected.handle}
                 </p>
               ) : null}
@@ -377,7 +374,7 @@ export function FilmCreditsEditor({
               busy ||
               loading ||
               !role.trim() ||
-              (mode === "invite"
+              (mode === "registered"
                 ? !selected
                 : mode === "manual" && !name.trim())
             }
@@ -385,9 +382,7 @@ export function FilmCreditsEditor({
           >
             {busy
               ? "Saving…"
-              : mode === "invite"
-                ? "Send credit invitation"
-                : "Add credit"}
+              : "Add credit"}
           </button>
         </div>
       ) : null}

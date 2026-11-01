@@ -1449,9 +1449,8 @@ export function PublishForm({
           <p className={styles.muted}>Your saved drafts will appear here.</p>
         )}
         <p className={styles.muted}>
-          Publish only work you can share. Credit attribution and verification
-          are separate from publication; this editor does not grant verified
-          credits.
+          Publish only work you can share. Credits are listed as supplied by
+          the filmmaker and are not independently verified by Arcenray.
         </p>
       </aside>
     </div>

@@ -46,7 +46,6 @@ function Settings() {
       ) : null}
       <Notice message={storage.error} retry={storage.reload} />
       <Nav title="Edit creative profile" href="/onboarding" />
-      <Nav title="Credit invitations" href="/invitations" />
       <Button
         title="Contact support"
         secondary

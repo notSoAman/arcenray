@@ -164,18 +164,6 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
           p_query: query.trim().slice(0, 80),
           p_limit: 8,
         }),
-      invite: (filmId: string, profileId: string, role: string) =>
-        supabase.rpc("invite_film_credit", {
-          p_film_id: uuidSchema.parse(filmId),
-          p_profile_id: uuidSchema.parse(profileId),
-          p_role: role.trim(),
-        }),
-      invitations: () => supabase.rpc("get_my_credit_invitations"),
-      respond: (id: string, accept: boolean) =>
-        supabase.rpc("respond_to_credit", {
-          p_credit_id: uuidSchema.parse(id),
-          p_accept: accept,
-        }),
     },
     events: {
       record(input: Parameters<typeof eventSchema.parse>[0]) {

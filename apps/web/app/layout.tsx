@@ -20,12 +20,13 @@ const courierPrime = Courier_Prime({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://arcenray.com"),
   title: {
-    default: "arcenray. — find your people, make your art",
+    default: "Arcenray — discover independent short films & filmmakers",
     template: "%s · arcenray.",
   },
   description:
-    "Watch short films by independent filmmakers, find the people behind them, and start a conversation.",
+    "Discover independent short films, meet the filmmakers and creative crew behind them, and find collaborators for your next project.",
 };
 
 export const viewport: Viewport = {

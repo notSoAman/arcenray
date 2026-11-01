@@ -129,9 +129,9 @@ sender impersonation and reading other conversations are denied. Blocking either
 party hides/stops that conversation. Typing/presence private channel authorization
 is not implemented; don't send private payloads through unrestricted Broadcast.
 
-Creators insert pending film_credits. Only the named registered collaborator can
-accept/decline via `api.credits.respond`; creator self-verification is forbidden.
-Show pending/accepted/declined distinctly. Creator may remove a credit.
+Film owners add or remove `film_credits` directly. Registered creatives are linked
+to their profiles immediately; there is no recipient confirmation workflow or
+verified status. Credits are filmmaker-supplied attribution.
 
 Insert `content_reports` with reporter_id, reason and exactly one of film_id,
 profile_id,message_id. User sees only their reports; admin moderation is a founder
