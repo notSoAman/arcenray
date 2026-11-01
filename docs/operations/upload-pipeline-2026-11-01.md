@@ -82,3 +82,12 @@ Next standalone/Webpack, OpenNext build and Wrangler dry run passed. The normal
 Next build alone lacks the standalone directory required by OpenNext; the release
 was rebuilt with OpenNext's `NEXT_PRIVATE_STANDALONE=true` setting. No generated
 server files or missing manifests were fabricated. Security advisor: no findings.
+
+
+Final verification: live Home, Loop, sign-up, robots and sitemap returned 200;
+Publish redirected signed-out visitors to sign-in. The updated publish bundle and
+production security smoke passed. All three disposable films, source/output/public
+objects, profiles and Clerk users were removed; exact orphan embeddings were
+removed. The processing and publication queues are empty and the worker heartbeat
+is fresh. GitHub's connector denied PR creation with HTTP 403; the verified source
+was pushed using the existing SSH repository access.
