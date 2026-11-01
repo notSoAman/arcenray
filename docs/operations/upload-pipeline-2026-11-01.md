@@ -56,3 +56,29 @@ CRF 20/veryfast with complete output validation and compatible-source preservati
 
 Production also includes newer credits, playback configuration, SEO and sign-up
 fixes on `codex/seo-brand-repair`; reconcile those before web deployment.
+
+
+## Production result
+
+Applied migration: `20261101143010_serialize_media_processing_claims` (local name
+matches the recorded deployment identity). `media-processing` v4 is active. The
+unchanged Oracle worker consumed three concurrent disposable multipart uploads,
+encoded them serially, and published all three after their Clerk sessions were
+revoked. Transfers took 21.84, 22.03 and 23.75 seconds. Publication and successful
+HTTP 206/CORS playback were confirmed at 51.50, 66.42 and 83.32 seconds from test
+setup, including account creation. Each source was a four-second 4K/50fps generated
+MP4 padded with a valid 70 MiB free box to exercise multipart transfer. These
+short-fixture timings do not predict processing time for full-length films.
+
+The first test setup hit slow DNS resolution on this workstation. Retrying with a
+five-minute cache of the independently verified public DNS answer succeeded;
+TLS and all authorization remained enabled. No system DNS configuration changed.
+This is not evidence that the same resolver issue affects other users.
+
+Web Worker `f2320c3e-a6cf-42c3-b390-d17ec57b1989` is deployed with existing variables
+preserved. Rollback web version: `52e63695-485c-4af9-9db6-8cf52855c5de`. Production
+and staging share this Worker. Repository tests/types/lint, 62 Edge tests,
+Next standalone/Webpack, OpenNext build and Wrangler dry run passed. The normal
+Next build alone lacks the standalone directory required by OpenNext; the release
+was rebuilt with OpenNext's `NEXT_PRIVATE_STANDALONE=true` setting. No generated
+server files or missing manifests were fabricated. Security advisor: no findings.
