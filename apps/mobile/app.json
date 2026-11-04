@@ -30,7 +30,7 @@
         "expo-image-picker",
         {
           "cameraPermission": false,
-          "microphonePermission": false
+          "microphonePermission": "Allow Arcenray to record voice notes you choose to send."
         }
       ],
       [

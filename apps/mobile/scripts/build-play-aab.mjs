@@ -40,6 +40,20 @@ run(
   mobileRoot,
 );
 
+// Do not ship a recorder whose microphone permission was blocked by another plugin.
+const manifest = readFileSync(
+  join(mobileRoot, "android/app/src/main/AndroidManifest.xml"),
+  "utf8",
+);
+const microphone = manifest.match(
+  /<uses-permission\b[^>]*android:name="android.permission.RECORD_AUDIO"[^>]*>/,
+)?.[0];
+if (!microphone || microphone.includes('tools:node="remove"')) {
+  throw new Error(
+    "Android microphone permission is blocked; regenerate the native project before release.",
+  );
+}
+
 // Expo regenerates android/ from app.json. Keep signing credentials outside Git and
 // replace only the generated release signing stanza after each prebuild.
 const gradleFile = join(mobileRoot, "android/app/build.gradle");
