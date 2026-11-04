@@ -20,3 +20,9 @@ Release limits:
 - Web deployment status is recorded below only after deployment verification.
 - Google Play public production is gated by incomplete store setup and the console's required closed test (12 testers for 14 days; zero opted in at inspection). A local signed bundle is not a public Play release.
 - Source was recovered from saved tool commands after the original `/tmp` checkout was cleared. The release checkout now lives persistently under the project and all local checks were rerun.
+
+Production web deployed November 4: Cloudflare Worker `c377e645-dc9f-434a-98ba-489156f44c08`. Live browser confirmed bounded Loop height (793px document in a 793px viewport), next-film snapping, and readable logo icon. Live security smoke passed headers, unique SSR nonces, guest home, deletion-request boundaries and unsigned-webhook denial.
+
+Live search exposed overly broad semantic suggestions for a known person. Follow-up migration `20261104033535_search_identity_precision` suppresses semantic-only suggestions when an identity match exists and raises the fallback similarity floor to 0.65. The expanded rollback SQL suite passed before applying. Browser verification then returned exactly Nakul for `nakul`, and the semantic phrase `surviving conflict and loss` found `Is This The End?` with the War filter. Filter-only browsing and title/name SQL cases passed.
+
+Disposable live-chat Clerk accounts were removed after the test. Their exact test conversation and profiles were removed November 4, and the scheduled private-attachment cleanup subsequently removed all three fixture attachment records.
