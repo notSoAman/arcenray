@@ -354,6 +354,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          attachment_id: string | null
           body: string
           client_id: string
           conversation_id: string
@@ -363,6 +364,7 @@ export type Database = {
           sender_id: string
         }
         Insert: {
+          attachment_id?: string | null
           body: string
           client_id?: string
           conversation_id: string
@@ -372,6 +374,7 @@ export type Database = {
           sender_id: string
         }
         Update: {
+          attachment_id?: string | null
           body?: string
           client_id?: string
           conversation_id?: string
@@ -537,6 +540,10 @@ export type Database = {
       backend_begin_promotion: {
         Args: { p_id: string; p_owner: string }
         Returns: string
+      }
+      backend_chat_attachment: {
+        Args: { p_action: string; p_actor: string; p_data: Json }
+        Returns: Json
       }
       backend_claim_expired_assets: {
         Args: never
@@ -805,6 +812,7 @@ export type Database = {
       get_chat_summaries: {
         Args: never
         Returns: {
+          attachment_id: string | null
           body: string
           client_id: string
           conversation_id: string
@@ -875,19 +883,6 @@ export type Database = {
         }
       }
       get_my_asset: { Args: { p_asset_id: string }; Returns: Json }
-      get_my_credit_invitations: {
-        Args: never
-        Returns: {
-          credit_id: string
-          film_id: string
-          film_status: string
-          film_title: string
-          invited_at: string
-          owner_handle: string
-          owner_name: string
-          role: string
-        }[]
-      }
       get_my_film_feedback: {
         Args: never
         Returns: {
@@ -946,10 +941,6 @@ export type Database = {
           summary: string
           title: string
         }[]
-      }
-      invite_film_credit: {
-        Args: { p_film_id: string; p_profile_id: string; p_role: string }
-        Returns: string
       }
       is_moderator: { Args: never; Returns: boolean }
       moderate_film: {
@@ -1010,10 +1001,6 @@ export type Database = {
       reserve_upload: {
         Args: { p_bytes: number; p_content_type: string; p_kind: string }
         Returns: Json
-      }
-      respond_to_credit: {
-        Args: { p_accept: boolean; p_credit_id: string }
-        Returns: undefined
       }
       retry_media_processing: { Args: { p_asset: string }; Returns: boolean }
       search_credit_collaborators: {

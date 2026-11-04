@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { HookPreview } from "../../../components/hook-preview";
+import { LoopPreview } from "./loop-preview";
 import { IconPlay } from "../../../components/icons";
 import { Avatar, Poster } from "../../../components/media";
 import { browserApi } from "../../../lib/client-api";
@@ -35,7 +35,9 @@ export function LoopFeed({
     initialFailed ? "We couldn’t load Loop. Try again." : "",
   );
   const [loading, setLoading] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(
+    initialFilms[0]?.id ?? null,
+  );
   const [preferences, setPreferences] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       initialPreferences.map((p) => [p.film_id, p.preference]),
@@ -52,6 +54,8 @@ export function LoopFeed({
   const feedbackBusy = useRef(new Set<string>());
   const cards = useRef(new Map<string, HTMLElement>());
   const sentinel = useRef<HTMLDivElement>(null);
+  const feed = useRef<HTMLDivElement>(null);
+  const [muted, setMuted] = useState(true);
 
   const loadMore = useCallback(async () => {
     if (busy.current || !hasMore) return;
@@ -100,7 +104,7 @@ export function LoopFeed({
       ([entry]) => {
         if (entry?.isIntersecting) void loadMore();
       },
-      { rootMargin: "320px" },
+      { root: feed.current, rootMargin: "100% 0px" },
     );
     observer.observe(target);
     return () => observer.disconnect();
@@ -127,12 +131,28 @@ export function LoopFeed({
       },
       {
         threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
-        rootMargin: "-72px 0px 0px 0px",
+        root: feed.current,
       },
     );
     for (const card of cards.current.values()) observer.observe(card);
     return () => observer.disconnect();
   }, [films]);
+
+  const activeIndex = Math.max(
+    0,
+    films.findIndex((film) => film.id === activeId),
+  );
+  function move(direction: number) {
+    const film = films[activeIndex + direction];
+    if (film)
+      cards.current.get(film.id)?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+        block: "nearest",
+      });
+    else if (direction > 0 && hasMore && !loading) void loadMore();
+  }
 
   async function savePreference(film: FeedFilm, preference: Preference) {
     if (!viewerId) {
@@ -171,7 +191,29 @@ export function LoopFeed({
       <p className={styles.notice} role="status" aria-live="polite">
         {notice}
       </p>
-      <div className={styles.feed} aria-label="Short film previews">
+      <div
+        className={styles.feed}
+        ref={feed}
+        tabIndex={0}
+        aria-label="Short film previews. Use up and down arrows to browse."
+        onKeyDown={(event) => {
+          if (
+            event.target !== event.currentTarget &&
+            (event.target as HTMLElement).closest(
+              "button,a,input,textarea,select",
+            )
+          )
+            return;
+          if (
+            ["ArrowDown", "PageDown", "ArrowUp", "PageUp"].includes(event.key)
+          ) {
+            event.preventDefault();
+            move(
+              event.key === "ArrowDown" || event.key === "PageDown" ? 1 : -1,
+            );
+          }
+        }}
+      >
         {films.map((film) => (
           <article
             className={styles.card}
@@ -184,21 +226,20 @@ export function LoopFeed({
             }}
           >
             <div className={styles.preview}>
-              {film.hook_key ? (
-                <HookPreview
+              {film.hook_key && activeId === film.id ? (
+                <LoopPreview
                   filmId={film.id}
                   hookKey={film.hook_key}
                   posterKey={film.poster_key}
                   title={film.title}
-                  sizes="(max-width: 800px) 100vw, 800px"
-                  active={activeId === film.id}
-                  controlled={true}
+                  muted={muted}
+                  onMute={() => setMuted((value) => !value)}
                 />
               ) : (
                 <Poster
                   posterKey={film.poster_key}
                   title={film.title}
-                  sizes="(max-width: 800px) 100vw, 800px"
+                  sizes="(max-width: 600px) 100vw, 440px"
                 />
               )}
               <span className={`kicker glass ${styles.previewLabel}`}>
@@ -273,43 +314,63 @@ export function LoopFeed({
             </div>
           </article>
         ))}
-      </div>
-      {films.length === 0 && !loading && !error && !hasMore ? (
-        <div className="state-panel">
-          <h2>
-            {seenCount
-              ? "You’re all caught up"
-              : "The first films are on their way"}
-          </h2>
-          <p>
-            {seenCount
-              ? "Your preferences are saved. Come back for new films."
-              : "Published films will appear here."}
-          </p>
-          <Link
-            href={viewerId ? "/publish" : "/sign-in?next=%2Fpublish"}
-            className="btn btn-primary"
-          >
-            Share a film
-          </Link>
+        {films.length === 0 && !loading && !error && !hasMore ? (
+          <div className="state-panel">
+            <h2>
+              {seenCount
+                ? "You’re all caught up"
+                : "The first films are on their way"}
+            </h2>
+            <p>
+              {seenCount
+                ? "Your preferences are saved. Come back for new films."
+                : "Published films will appear here."}
+            </p>
+            <Link
+              href={viewerId ? "/publish" : "/sign-in?next=%2Fpublish"}
+              className="btn btn-primary"
+            >
+              Share a film
+            </Link>
+          </div>
+        ) : null}
+        <div ref={sentinel} className={styles.pagination}>
+          {error ? <p role="alert">{error}</p> : null}
+          {loading ? (
+            <p role="status">Loading more films…</p>
+          ) : hasMore ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => void loadMore()}
+            >
+              {error ? "Try again" : "Load more films"}
+            </button>
+          ) : films.length ? (
+            <p>You’re all caught up. Come back for new films.</p>
+          ) : null}
         </div>
-      ) : null}
-      <div ref={sentinel} className={styles.pagination}>
-        {error ? <p role="alert">{error}</p> : null}
-        {loading ? (
-          <p role="status">Loading more films…</p>
-        ) : hasMore ? (
+      </div>
+      {films.length > 1 && (
+        <nav className={styles.navigation} aria-label="Browse Loop">
           <button
             type="button"
-            className="btn btn-ghost"
-            onClick={() => void loadMore()}
+            aria-label="Previous film"
+            disabled={activeIndex === 0}
+            onClick={() => move(-1)}
           >
-            {error ? "Try again" : "Load more films"}
+            ↑
           </button>
-        ) : films.length ? (
-          <p>You’re all caught up. Come back for new films.</p>
-        ) : null}
-      </div>
+          <button
+            type="button"
+            aria-label="Next film"
+            disabled={activeIndex === films.length - 1 && !hasMore}
+            onClick={() => move(1)}
+          >
+            ↓
+          </button>
+        </nav>
+      )}
     </>
   );
 }

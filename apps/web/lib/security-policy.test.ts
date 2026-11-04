@@ -18,6 +18,7 @@ test("service policy permits data/realtime/direct media upload and legal player 
   assert.deepEqual(policy["media-src"], [
     "'self'",
     "blob:",
+    "https://*.r2.cloudflarestorage.com",
     "https://cdn.arcenray.com",
   ]);
   assert.ok(policy["frame-src"].includes("https://www.youtube-nocookie.com"));

@@ -38,7 +38,8 @@
     "react-native-screens": "4.30.0",
     "react-native-svg": "15.16.0",
     "react-native-url-polyfill": "3.0.0",
-    "react-native-webview": "14.0.1"
+    "react-native-webview": "14.0.1",
+    "expo-audio": "58.0.11"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",

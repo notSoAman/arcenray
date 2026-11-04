@@ -434,3 +434,7 @@ import_map = "./functions/deno.json"
 [functions.index-pending]
 verify_jwt = true
 import_map = "./functions/deno.json"
+
+[functions.chat-media]
+verify_jwt = false
+import_map = "./functions/deno.json"

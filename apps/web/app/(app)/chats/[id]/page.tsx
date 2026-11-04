@@ -32,7 +32,7 @@ export default async function ChatPage({
     loadProfiles(supabase, otherId ? [otherId] : []),
     supabase
       .from("messages")
-      .select("id,client_id,sender_id,body,created_at,film_id")
+      .select("id,client_id,sender_id,body,created_at,film_id,attachment_id")
       .eq("conversation_id", id)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })

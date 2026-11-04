@@ -105,7 +105,7 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
       error: unknown;
     }> {
       const parsed = searchSchema.parse(input);
-      if (await viewerId())
+      if (parsed.query && (await viewerId()))
         return supabase.functions.invoke("search", { body: parsed });
       const { data, error } = await supabase.rpc("hybrid_search", {
         p_query: parsed.query,
@@ -139,6 +139,32 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
       preferences: () => supabase.rpc("get_my_film_feedback"),
     },
     chat: {
+      attachment: {
+        create: (input: {
+          conversation_id: string;
+          name: string;
+          content_type: string;
+          bytes: number;
+        }) =>
+          supabase.functions.invoke<{
+            asset_id: string;
+            upload_url: string;
+            headers: Record<string, string>;
+          }>("chat-media", { body: { action: "create", ...input } }),
+        complete: (assetId: string) =>
+          supabase.functions.invoke<{ asset_id: string }>("chat-media", {
+            body: { action: "complete", asset_id: uuidSchema.parse(assetId) },
+          }),
+        download: (assetId: string) =>
+          supabase.functions.invoke<{
+            url: string;
+            name: string;
+            content_type: string;
+            bytes: number;
+          }>("chat-media", {
+            body: { action: "download", asset_id: uuidSchema.parse(assetId) },
+          }),
+      },
       open: (otherUser: string) =>
         supabase.rpc("open_conversation", {
           p_other_user: uuidSchema.parse(otherUser),
@@ -151,11 +177,25 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
           .order("created_at", { ascending: false })
           .limit(50),
       async send(input: Parameters<typeof messageSchema.parse>[0]) {
-        return supabase
+        const parsed = messageSchema.parse(input);
+        const sender = await userId();
+        const reply = await supabase
           .from("messages")
-          .insert({ ...messageSchema.parse(input), sender_id: await userId() })
+          .insert({ ...parsed, sender_id: sender })
           .select()
           .single();
+        // A lost acknowledgement is safe to retry with the same client ID.
+        if (reply.error?.code === "23505" && parsed.client_id) {
+          const existing = await supabase
+            .from("messages")
+            .select("*")
+            .eq("sender_id", sender)
+            .eq("client_id", parsed.client_id)
+            .eq("conversation_id", parsed.conversation_id)
+            .single();
+          if (existing.data) return existing;
+        }
+        return reply;
       },
     },
     credits: {

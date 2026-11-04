@@ -24,12 +24,8 @@ export default async function LoopPage() {
   const films =
     page.error || !page.data ? [] : await withCreators(supabase, page.data);
   return (
-    <main className={`app-main ${styles.main}`}>
-      <header className={styles.heading}>
-        <span className="kicker page-kicker">Find your next film</span>
-        <h1 className="page-title">Loop</h1>
-        <p>Small glimpses. New perspectives. A world of independent film.</p>
-      </header>
+    <main className={styles.main}>
+      <h1 className={styles.heading}>Loop — discover short films</h1>
       <LoopFeed
         initialFilms={films}
         initialFailed={Boolean(page.error) || !page.data}
