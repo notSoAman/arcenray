@@ -3,6 +3,7 @@ import { AppState, View, Linking } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEvent, useEventListener } from "expo";
+import Constants from "expo-constants";
 import * as Crypto from "expo-crypto";
 import { WebView } from "react-native-webview";
 import { config, publicMediaUrl } from "./config";
@@ -112,6 +113,7 @@ export function FilmPlayer({
   );
   const embed = externalFilmUrl(film, true);
   const external = externalFilmUrl(film);
+  const appId = Constants.expoConfig?.android?.package;
   if (hook || film.source === "r2_native")
     return native ? (
       <NativeVideo key={native} uri={native} film={film} hook={hook} />
@@ -128,7 +130,12 @@ export function FilmPlayer({
         <Muted>Playback paused while this screen is away.</Muted>
       ) : embed && !failed ? (
         <WebView
-          source={{ uri: embed }}
+          source={{
+            uri: embed,
+            ...(film.source === "youtube_embed" && appId
+              ? { headers: { Referer: `https://${appId}` } }
+              : {}),
+          }}
           style={{ width: "100%", height: 240, backgroundColor: "#000" }}
           allowsFullscreenVideo
           mediaPlaybackRequiresUserAction

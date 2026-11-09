@@ -15,8 +15,31 @@ flow. Next.js server components and browser UI are not imported.
 The explicitly approved Expo CLI connection is logged in as `notsoaman`. This app uses
 the existing [@notsoamans-team/arcenray project](https://expo.dev/accounts/notsoamans-team/projects/arcenray),
 ID `68a21561-8def-4dff-b6b8-e686e7c3a2c4`. `app.json` declares that owner/project;
-`eas.json` contains internal development and preview APK profiles. No new project,
-cloud build, OTA update, store submission, paid plan or signing credential was created.
+`eas.json` contains internal development, preview APK and production AAB profiles.
+
+## Play release preparation — 2 November 2026
+
+`app.config.ts` retains `com.arcenray.mobile.dev` and `arcenray-dev://` for local
+development. The EAS `production` profile selects `com.arcenray.mobile`,
+`arcenray://`, version code 1 and an Android App Bundle. Expo SDK 58 targets
+Android API 36. The Expo dependencies were aligned to the SDK's expected patch
+versions; run `expo install --check` before building.
+
+The four `EXPO_PUBLIC_*` values are configured in the EAS production environment
+and match the existing web production public configuration. A production EAS build
+was started on 2 November 2026; check its result before using an AAB. Register
+`com.arcenray.mobile` and the Play upload/app-signing certificate fingerprints and
+hosted callback in the existing Clerk instance; the development registration does
+not cover the store package. The launcher and Play icon, plus feature graphic, use
+the accepted logo export on the approved Void background; screenshots must come
+from the release app. Do not use an Expo placeholder icon.
+
+The release gate is an authenticated sign-in/callback and account persistence check,
+then real feed, playback, publish/upload, chat, account controls and policy-page
+checks on a signed ARM build. Validate the AAB's package, version code, target SDK,
+permissions and signing certificate before uploading. The Play Console requires
+store listing, app-content/data-safety declarations and a release track; production
+access may also require a closed test depending on the developer account.
 
 Use Node 24 and the root's pinned pnpm:
 
