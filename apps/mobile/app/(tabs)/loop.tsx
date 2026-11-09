@@ -325,7 +325,7 @@ export default function Loop() {
                 <Text style={s.meta}>
                   {film.genres.slice(0, 2).join(" · ")}
                 </Text>
-                <Link href={`/films/${film.id}`}>
+                <Link href={`/film/${film.id}`}>
                   <Text style={s.title} numberOfLines={2}>
                     {film.title}
                   </Text>
@@ -333,7 +333,7 @@ export default function Loop() {
                 <Text style={s.synopsis} numberOfLines={2}>
                   {film.synopsis}
                 </Text>
-                <Link href={`/films/${film.id}`} asChild>
+                <Link href={`/film/${film.id}`} asChild>
                   <Pressable accessibilityRole="link" style={s.watch}>
                     <Text style={s.watchText}>▶ Watch film</Text>
                   </Pressable>
