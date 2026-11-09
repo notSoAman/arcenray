@@ -50,3 +50,7 @@ yarn-error.log*
 
 # Private operator recovery snapshots (never commit)
 .private-backups/
+
+# Local Codex/OpenCode artifacts
+.release-discovery/
+.playwright-mcp/
