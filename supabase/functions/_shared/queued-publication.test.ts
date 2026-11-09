@@ -73,3 +73,73 @@ Deno.test(
     }
   },
 );
+
+Deno.test(
+  "publication drain is detached from heartbeats and bounded under backlog",
+  async () => {
+    const { wakePublications } = await import("./queued-publication.ts");
+    const oldFetch = globalThis.fetch,
+      oldGet = Deno.env.get;
+    const runtime = globalThis as typeof globalThis & {
+      EdgeRuntime?: { waitUntil(p: Promise<unknown>): void };
+    };
+    const oldRuntime = runtime.EdgeRuntime;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const background: Promise<unknown>[] = [];
+    let claimed = 0,
+      completed = 0;
+    try {
+      Deno.env.get = (name) =>
+        ({
+          SUPABASE_URL: "https://fixture.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "fixture",
+        })[name];
+      runtime.EdgeRuntime = {
+        waitUntil(p) {
+          background.push(p);
+        },
+      };
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        await gate;
+        const name = new URL(String(input)).pathname.split("/").at(-1);
+        let result: unknown = null;
+        if (name === "backend_claim_film_publication") {
+          claimed++;
+          result = {
+            film: {
+              id: "film",
+              owner_id: "owner",
+              source: "youtube_embed",
+              film_asset_id: null,
+              hook_asset_id: null,
+              poster_asset_id: null,
+            },
+            token: "lease",
+          };
+        } else if (name === "backend_finish_film_publication") {
+          completed++;
+          result = true;
+        }
+        return new Response(JSON.stringify(result), {
+          headers: { "content-type": "application/json" },
+        });
+      }) as typeof fetch;
+      await wakePublications(); // Must return even while publication's I/O is blocked.
+      if (background.length !== 1 || completed !== 0)
+        throw Error("Heartbeat blocked by publication");
+      release();
+      await Promise.all(background);
+      if (claimed !== 3 || Number(completed) !== 3)
+        throw Error("Publication backlog was not drained within its bound");
+    } finally {
+      release();
+      await Promise.all(background);
+      globalThis.fetch = oldFetch;
+      Deno.env.get = oldGet;
+      runtime.EdgeRuntime = oldRuntime;
+    }
+  },
+);

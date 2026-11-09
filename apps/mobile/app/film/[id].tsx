@@ -40,7 +40,7 @@ export default function FilmScreen() {
         .maybeSingle(),
       api.supabase
         .from("film_credits")
-        .select("id,display_name,role,verification_state,profile_id")
+        .select("id,display_name,role,profile_id")
         .eq("film_id", key),
       me
         ? api.supabase
@@ -168,12 +168,7 @@ export default function FilmScreen() {
             d.credits.map((c) => (
               <Panel key={c.id}>
                 <Copy>{c.display_name}</Copy>
-                <Muted>
-                  {c.role} ·{" "}
-                  {c.verification_state === "verified"
-                    ? "Verified credit"
-                    : "Unverified credit"}
-                </Muted>
+                <Muted>{c.role}</Muted>
               </Panel>
             ))
           ) : (

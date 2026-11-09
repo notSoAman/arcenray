@@ -40,9 +40,6 @@ export default async function SettingsPage() {
       <p>Manage your Arcenray profile and account.</p>
       <ProfileSettings initial={profile} />
       <div className={styles.actions}>
-        <Link className="btn btn-ghost" href="/invitations">
-          Credit invitations
-        </Link>
         <SignOutButton className="btn btn-ghost" />
         <Link className="btn btn-ghost" href="/home">
           Back to films

@@ -76,7 +76,7 @@ export const filmDraftSchema = z
   });
 export const searchSchema = z
   .object({
-    query: z.string().trim().min(1).max(500),
+    query: z.string().trim().max(500),
     kind: z.enum(["all", "film", "profile"]).default("all"),
     city: z.string().max(100).optional(),
     role: z.string().max(80).optional(),
@@ -111,6 +111,7 @@ export const messageSchema = z
     conversation_id: uuidSchema,
     body: z.string().trim().min(1).max(5000),
     client_id: uuidSchema.optional(),
+    attachment_id: uuidSchema.nullable().optional(),
     film_id: uuidSchema.nullable().optional(),
   })
   .strict();

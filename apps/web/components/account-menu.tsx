@@ -51,9 +51,6 @@ export function AccountMenu() {
           <Link href="/settings" onClick={() => setOpen(false)}>
             Profile & settings
           </Link>
-          <Link href="/invitations" onClick={() => setOpen(false)}>
-            Credit invitations
-          </Link>
         </nav>
       ) : null}
     </div>

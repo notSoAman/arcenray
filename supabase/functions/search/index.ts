@@ -5,7 +5,7 @@ serve(async (req) => {
   const { client, user } = await auth(req);
   const b = z
     .object({
-      query: z.string().trim().min(1).max(500),
+      query: z.string().trim().max(500),
       kind: z.enum(["all", "film", "profile"]).default("all"),
       city: z.string().max(100).optional(),
       role: z.string().max(80).optional(),
@@ -17,7 +17,7 @@ serve(async (req) => {
   await rateLimit(user.id, "search", 60);
   let vector: number[] | undefined;
   try {
-    vector = await embed(b.query);
+    if (b.query) vector = await embed(b.query);
   } catch {
     /* Full-text is a deliberate provider-outage fallback. */
   }

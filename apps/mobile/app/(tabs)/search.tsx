@@ -28,28 +28,59 @@ export default function Search() {
       <Field
         label="Search films and people"
         value={query}
+        editable={!a.busy}
+        autoCapitalize="none"
         onChangeText={setQuery}
       />
-      <Field label="City (exact)" value={city} onChangeText={setCity} />
       <Field
-        label="Creative role (exact)"
-        value={role}
-        onChangeText={setRole}
+        label="City"
+        value={city}
+        editable={!a.busy}
+        onChangeText={setCity}
       />
-      <Field label="Genre (exact)" value={genre} onChangeText={setGenre} />
+      <Field
+        label="Creative role (e.g. editor)"
+        value={role}
+        editable={!a.busy}
+        onChangeText={(value) => {
+          setRole(value);
+          if (value.trim()) {
+            setKind("profile");
+            setGenre("");
+          }
+        }}
+      />
+      <Field
+        label="Genre (e.g. Drama)"
+        value={genre}
+        editable={!a.busy}
+        onChangeText={(value) => {
+          setGenre(value);
+          if (value.trim()) {
+            setKind("film");
+            setRole("");
+          }
+        }}
+      />
       {(["all", "film", "profile"] as const).map((k) => (
         <Button
           key={k}
           secondary={kind !== k}
           title={k === "all" ? "All" : k === "film" ? "Films" : "People"}
-          onPress={() => setKind(k)}
+          disabled={a.busy}
+          onPress={() => {
+            setKind(k);
+            if (k !== "profile") setRole("");
+            if (k !== "film") setGenre("");
+          }}
         />
       ))}
       <Button
         title={a.busy ? "Searching…" : "Search"}
-        disabled={!api || !query.trim() || a.busy}
+        disabled={!api || a.busy}
         onPress={() =>
           a.run(async () => {
+            setResults(null);
             const r = await api!.search({
               query: query.trim(),
               kind,
@@ -57,8 +88,11 @@ export default function Search() {
               role: role.trim() || undefined,
               genre: genre.trim() || undefined,
             });
-            if (r.error) throw r.error;
-            setResults(r.data?.results ?? []);
+            if (r.error || !r.data)
+              throw (
+                r.error || new Error("Search is unavailable. Please try again.")
+              );
+            setResults(r.data.results);
           })
         }
       />

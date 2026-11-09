@@ -1,0 +1,28 @@
+.notice {
+  position: fixed;
+  z-index: 100;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 14px 16px 14px 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--graphite);
+  color: var(--text);
+  box-shadow: 0 8px 32px #0006;
+  font-size: 14px;
+}
+.notice button {
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 24px;
+}

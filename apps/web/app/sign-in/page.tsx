@@ -8,7 +8,10 @@ import { getViewer, isSupabaseConfigured } from "../../lib/session";
 import { SignInForm } from "./sign-in-form";
 import styles from "./sign-in.module.css";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = {
+  title: "Sign in",
+  robots: { index: false, follow: false },
+};
 export const dynamic = "force-dynamic";
 
 export default async function SignInPage({

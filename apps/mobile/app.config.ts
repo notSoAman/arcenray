@@ -14,7 +14,7 @@ export default {
         backgroundColor: "#0E0F0E",
       },
       package: production ? "com.arcenray.mobile" : app.expo.android.package,
-      versionCode: 1,
+      versionCode: 2,
     },
   },
 };

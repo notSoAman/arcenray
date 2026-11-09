@@ -1,4 +1,4 @@
-import { publishNextFilm } from "../_shared/queued-publication.ts";
+import { wakePublications } from "../_shared/queued-publication.ts";
 import { z } from "zod";
 import {
   admin,
@@ -88,31 +88,29 @@ serve(async (req) => {
     return { max_source_bytes: max, heartbeat_at: new Date().toISOString() };
   }
   if (body.action === "claim") {
-    // Reuses the existing worker poll; requests survive closed browsers/restarts.
-    // Publication failures have their own bounded retry and never block encoding.
-    await publishNextFilm().catch(() => {});
     const { data, error } = await db.rpc("backend_claim_media_processing_job", {
       p_lease_seconds: 300,
     });
     if (error) throw new HttpError(503, "Processing queue unavailable");
+    await wakePublications();
     return { job: data };
   }
   if (body.action === "heartbeat") {
-    return {
-      active: checked(
-        body.stage
-          ? await db.rpc("backend_heartbeat_media_processing_progress", {
-              p_job: body.job_id,
-              p_token: body.lease_token,
-              p_stage: body.stage,
-            })
-          : await db.rpc("backend_heartbeat_media_processing_job", {
-              p_job: body.job_id,
-              p_token: body.lease_token,
-              p_lease_seconds: 300,
-            }),
-      ),
-    };
+    const active = checked(
+      body.stage
+        ? await db.rpc("backend_heartbeat_media_processing_progress", {
+            p_job: body.job_id,
+            p_token: body.lease_token,
+            p_stage: body.stage,
+          })
+        : await db.rpc("backend_heartbeat_media_processing_job", {
+            p_job: body.job_id,
+            p_token: body.lease_token,
+            p_lease_seconds: 300,
+          }),
+    );
+    if (active) await wakePublications();
+    return { active };
   }
   if (body.action === "fail") {
     return {
@@ -149,6 +147,7 @@ serve(async (req) => {
         409,
         "Processing receipt does not match the completed film",
       );
+    await wakePublications();
     return { completed: true, bytes: lease.output_bytes };
   }
   const head = await r2("HEAD", env("R2_UPLOAD_BUCKET_NAME"), lease.output_key);
@@ -189,6 +188,7 @@ serve(async (req) => {
       409,
       "Processing lease expired; output remains private",
     );
+  await wakePublications();
   return {
     completed: true,
     bytes,

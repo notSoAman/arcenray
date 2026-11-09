@@ -267,7 +267,9 @@ async function data(reply: PromiseLike<Reply>, errorMessage: string) {
       throw new Error(
         "Too many upload attempts. Wait a little, then try again.",
       );
-    throw new Error(errorMessage);
+    const failure = new Error(errorMessage) as Error & { retryable: boolean };
+    failure.retryable = status === 0 || status === 408 || status >= 500;
+    throw failure;
   }
   return result.data;
 }
@@ -420,6 +422,26 @@ export function createMultipartUploadTask(
       fingerprint: stored.fingerprint,
     };
   }
+  async function request(
+    operation: () => PromiseLike<Reply>,
+    message: string,
+    signal: AbortSignal,
+  ) {
+    for (let attempt = 0; ; attempt++) {
+      signal.throwIfAborted();
+      try {
+        return await data(operation(), message);
+      } catch (error) {
+        if (
+          signal.aborted ||
+          attempt >= 2 ||
+          (error as { retryable?: boolean })?.retryable === false
+        )
+          throw error;
+        await retryDelay(500 * 2 ** attempt, signal);
+      }
+    }
+  }
   async function initialize(signal: AbortSignal) {
     if (!fingerprint) {
       emit({ stage: "hashing" });
@@ -458,9 +480,10 @@ export function createMultipartUploadTask(
     if (!descriptor && checkpoint.asset_id) {
       matches(
         readStatus(
-          await data(
-            api.status(checkpoint.asset_id),
-            "Could not recover your saved upload. Retry without creating another reservation.",
+          await request(
+            () => api.status(checkpoint!.asset_id!),
+            "Couldn’t check your saved upload. Your progress is saved; try again.",
+            signal,
           ),
         ),
       );
@@ -469,15 +492,17 @@ export function createMultipartUploadTask(
       emit({ stage: "reserving" });
       reservationAttempted = true;
       const created = parseMultipartDescriptor(
-        await data(
-          api.create({
-            draft_id: options.draftId,
-            request_id: checkpoint.request_id,
-            bytes: blob.size,
-            content_type: "video/mp4",
-            fingerprint,
-          }),
-          "Could not start the upload. Retry to recover the same reservation.",
+        await request(
+          () =>
+            api.create({
+              draft_id: options.draftId,
+              request_id: checkpoint!.request_id,
+              bytes: blob.size,
+              content_type: "video/mp4",
+              fingerprint: fingerprint!,
+            }),
+          "Couldn’t start your upload yet. Try again to continue the same upload.",
+          signal,
         ),
       );
       matches(created);
@@ -489,9 +514,10 @@ export function createMultipartUploadTask(
     signal.throwIfAborted();
     if (!descriptor) throw new Error("Upload reservation missing");
     const value = readStatus(
-      await data(
-        api.status(descriptor.asset_id),
-        "Could not check uploaded parts. Retry to recover your progress.",
+      await request(
+        () => api.status(descriptor!.asset_id),
+        "Couldn’t check your upload yet. Your progress is saved; try again.",
+        signal,
       ),
     );
     matches(value);
@@ -537,125 +563,93 @@ export function createMultipartUploadTask(
           { length: current.part_count },
           (_, index) => index + 1,
         ).filter((number) => !done.has(number));
-        for (let offset = 0; offset < missing.length; offset += 2) {
-          signal.throwIfAborted();
-          const requested = missing.slice(offset, offset + 2);
-          let batch = signedParts(
-            await data(
-              api.sign({ asset_id: current.asset_id, part_numbers: requested }),
-              "Could not sign upload parts. Retry with this same reservation.",
-            ),
-            current,
-            requested,
-          );
-          signal.throwIfAborted();
-          // Refresh signatures before starting the batch so both part PUTs can
-          // overlap without either waiting behind a slow transfer.
-          const parts: SignedPart[] = [];
-          for (const number of requested) {
-            let part = batch.find((part) => part.part_number === number)!;
-            if (Date.parse(part.expires_at) <= now() + 5000) {
-              const refreshed = signedParts(
-                await data(
-                  api.sign({
-                    asset_id: current.asset_id,
-                    part_numbers: [number],
-                  }),
-                  "Could not refresh the upload signature. Retry this same upload.",
-                ),
-                current,
-                [number],
-              );
-              part = refreshed[0]!;
-            }
-            if (Date.parse(part.expires_at) <= now() + 5000)
-              throw new Error(
-                "Storage signature expires too soon. Retry later.",
-              );
-            parts.push(part);
-          }
-
-          const inFlight = new Map<number, number>();
-          const acknowledged = () =>
-            Array.from(done.values()).reduce((sum, bytes) => sum + bytes, 0);
-          const sendPart = async (part: SignedPart) => {
-            const number = part.part_number;
-            const slice = blob.slice(
-              (number - 1) * current.part_size,
-              Math.min(number * current.part_size, blob.size),
-              "video/mp4",
-            );
-            inFlight.set(number, 0);
-            emit({ stage: "uploading" });
-            // A dropped connection should recover this part automatically. PUT
-            // to the same part number is idempotent; re-sign before each retry.
-            for (let attempt = 0; ; attempt++) {
+        // Two rolling lanes: a slow part does not leave the other lane idle.
+        // Sign pairs once, retaining the existing control-plane rate budget.
+        const signatures = new Map<number, Promise<SignedPart[]>>();
+        const inFlight = new Map<number, number>();
+        let next = 0,
+          failed = false;
+        const progress = () =>
+          emit({
+            bytesSent:
+              [...done.values()].reduce((sum, bytes) => sum + bytes, 0) +
+              [...inFlight.values()].reduce((sum, bytes) => sum + bytes, 0),
+          });
+        const sign = (numbers: number[]) =>
+          request(
+            () =>
+              api.sign({ asset_id: current.asset_id, part_numbers: numbers }),
+            "Couldn’t reconnect to your upload. Your progress is saved; try again.",
+            signal,
+          ).then((value) => signedParts(value, current, numbers));
+        const lane = async () => {
+          try {
+            while (!failed && next < missing.length) {
               signal.throwIfAborted();
-              if (attempt) {
-                part = signedParts(
-                  await data(
-                    api.sign({
-                      asset_id: current.asset_id,
-                      part_numbers: [number],
-                    }),
-                    "Could not reconnect. Try resuming your upload.",
-                  ),
-                  current,
-                  [number],
-                )[0]!;
-              }
-              try {
-                await transport(
-                  part.upload_url,
-                  part.headers,
-                  slice,
-                  signal,
-                  (bytes) => {
-                    inFlight.set(
-                      number,
-                      Math.max(0, Math.min(slice.size, bytes)),
-                    );
-                    emit({
-                      bytesSent:
-                        acknowledged() +
-                        Array.from(inFlight.values()).reduce(
-                          (sum, value) => sum + value,
-                          0,
-                        ),
-                    });
-                  },
-                );
-                break;
-              } catch (error) {
+              const index = next++,
+                number = missing[index]!;
+              const pair = Math.floor(index / 2) * 2;
+              if (!signatures.has(pair))
+                signatures.set(pair, sign(missing.slice(pair, pair + 2)));
+              let part = (await signatures.get(pair)!).find(
+                (p) => p.part_number === number,
+              )!;
+              const slice = blob.slice(
+                (number - 1) * current.part_size,
+                Math.min(number * current.part_size, blob.size),
+                "video/mp4",
+              );
+              emit({ stage: "uploading" });
+              for (let attempt = 0; ; attempt++) {
+                signal.throwIfAborted();
+                if (attempt || Date.parse(part.expires_at) <= now() + 5000)
+                  part = (await sign([number]))[0]!;
+                if (Date.parse(part.expires_at) <= now() + 5000)
+                  throw new Error(
+                    "Couldn’t connect to storage. Try again shortly.",
+                  );
                 inFlight.set(number, 0);
-                if (
-                  signal.aborted ||
-                  attempt >= 2 ||
-                  (error as { retryable?: boolean })?.retryable === false
-                )
-                  throw error;
-                await retryDelay(500 * 2 ** attempt, signal);
+                try {
+                  await transport(
+                    part.upload_url,
+                    part.headers,
+                    slice,
+                    signal,
+                    (bytes) => {
+                      inFlight.set(
+                        number,
+                        Math.max(0, Math.min(slice.size, bytes)),
+                      );
+                      progress();
+                    },
+                  );
+                  break;
+                } catch (error) {
+                  inFlight.set(number, 0);
+                  if (
+                    signal.aborted ||
+                    attempt >= 2 ||
+                    (error as { retryable?: boolean })?.retryable === false
+                  )
+                    throw error;
+                  await retryDelay(500 * 2 ** attempt, signal);
+                }
               }
+              done.set(number, part.bytes);
+              inFlight.delete(number);
+              progress();
             }
-            done.set(number, part.bytes);
-            inFlight.delete(number);
-            emit({
-              bytesSent:
-                acknowledged() +
-                Array.from(inFlight.values()).reduce(
-                  (sum, value) => sum + value,
-                  0,
-                ),
-            });
-            signal.throwIfAborted();
-          };
-          const results = await Promise.allSettled(parts.map(sendPart));
-          const failed = results.find(
-            (result): result is PromiseRejectedResult =>
-              result.status === "rejected",
-          );
-          if (failed) throw failed.reason;
-        }
+          } catch (error) {
+            failed = true;
+            throw error;
+          }
+        };
+        const results = await Promise.allSettled([lane(), lane()]);
+        const failure = results.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        );
+        if (failure) throw failure.reason;
       }
       current = await canonical(signal); // Never complete from client-local success flags or stale ETags.
       if (current.receipt) return accepted(current.receipt);
@@ -669,9 +663,10 @@ export function createMultipartUploadTask(
       emit({ stage: "verifying" });
       let finished: unknown;
       try {
-        finished = await data(
-          api.finish(current.asset_id),
+        finished = await request(
+          () => api.finish(current.asset_id),
           "Upload completion could not be confirmed.",
+          signal,
         );
       } catch {
         const recovered = await canonical(signal);

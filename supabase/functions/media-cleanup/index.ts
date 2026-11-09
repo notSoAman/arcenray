@@ -1,3 +1,4 @@
+import { cleanupChatAttachments } from "../_shared/chat-cleanup.ts";
 import { z } from "zod";
 import {
   serve,
@@ -148,7 +149,12 @@ serve(async (req) => {
     if (outcomes.some((result) => result.status === "rejected"))
       throw new HttpError(503, "Source cleanup will retry");
   }
+  const chatAttachmentsRemoved =
+    Date.now() + 6000 < deadline
+      ? await cleanupChatAttachments(deadline).catch(() => 0)
+      : 0;
   return {
+    chat_attachments_removed: chatAttachmentsRemoved,
     enqueued,
     ...jobs,
     ...accounts,

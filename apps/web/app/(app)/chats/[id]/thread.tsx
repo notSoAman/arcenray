@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { ChatAttachment, AttachmentPicker, type ReadyAttachment } from "../../../../components/chat/attachment";
 import {
   useEffect,
   useLayoutEffect,
@@ -24,6 +24,7 @@ export type ThreadMessage = {
   body: string;
   created_at: string;
   film_id: string | null;
+  attachment_id?: string | null;
 };
 export type ThreadFilm = {
   id: string;
@@ -67,7 +68,9 @@ export function Thread({
   films: Record<string, ThreadFilm>;
   loadFailed: boolean;
 }) {
-  const router = useRouter();
+  const [attachment, setAttachment] = useState<ReadyAttachment|null>(null);
+  const [fileBusy,setFileBusy] = useState(false);
+  const nearBottom = useRef(true);
   const [messages, setMessages] = useState<Local[]>(initialMessages);
   const [filmMap, setFilmMap] = useState(films);
   const [hasOlder, setHasOlder] = useState(initialHasOlder || loadFailed);
@@ -102,7 +105,7 @@ export function Thread({
       const db = browserApi().supabase;
       let query = db
         .from("messages")
-        .select("id,client_id,sender_id,body,created_at,film_id")
+        .select("id,client_id,sender_id,body,created_at,film_id,attachment_id")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
@@ -157,6 +160,29 @@ export function Thread({
   // Live delivery: RLS restricts events to participants. Clean up on unmount.
   useEffect(() => {
     const supabase = browserApi().supabase;
+    let active = true, syncing = false;
+    let after = initialMessages.at(-1);
+    const catchUp = async () => {
+      if (!active || syncing || document.hidden) return;
+      syncing = true;
+      try {
+        for (let page=0; page<20 && active; page++) {
+          let query=supabase.from("messages").select("*").eq("conversation_id",conversationId)
+            .order("created_at").order("id").limit(100);
+          if(after) query=query.or(`created_at.gt.${after.created_at},and(created_at.eq.${after.created_at},id.gt.${after.id})`);
+          const reply=await query;
+          if(reply.error || !active) return;
+          const rows=reply.data??[];
+          setMessages(list=>rows.reduce((result,row)=>merge(result,row),list));
+          if(rows.length)after=rows.at(-1);
+          if(rows.length<100)return;
+        }
+      } finally { syncing=false; }
+    };
+    const wake=()=>void catchUp();
+    document.addEventListener("visibilitychange",wake);
+    window.addEventListener("online",wake);
+    const timer=window.setInterval(wake,15000);
     const channel = supabase
       .channel(`messages:${conversationId}`)
       .on(
@@ -171,6 +197,7 @@ export function Thread({
           setMessages((list) => merge(list, row as ThreadMessage)),
       )
       .subscribe((status) => {
+        if(status === "SUBSCRIBED")void catchUp();
         setLive(
           status === "SUBSCRIBED"
             ? "live"
@@ -180,6 +207,8 @@ export function Thread({
         );
       });
     return () => {
+      active=false;window.clearInterval(timer);
+      document.removeEventListener("visibilitychange",wake);window.removeEventListener("online",wake);
       void supabase.removeChannel(channel);
     };
   }, [conversationId]);
@@ -187,17 +216,21 @@ export function Thread({
   // Keep the newest message in view and mark the thread read.
   const lastId = messages[messages.length - 1]?.id;
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
+    if(nearBottom.current)scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
+    if(document.hidden)return;
+    const latest=messages.filter(m=>!m.status).at(-1);
+    if(!latest)return;
     void (async () => {
       await browserApi()
         .supabase.from("conversation_participants")
-        .update({ last_read_at: new Date().toISOString() })
+        .update({ last_read_at: latest.created_at })
         .eq("conversation_id", conversationId)
         .eq("user_id", me);
     })();
   }, [lastId, conversationId, me]);
 
-  async function send(body: string, clientId = newId()) {
+  async function send(body: string, clientId = newId(), attachmentId: string|null = null) {
+    nearBottom.current=true;
     const optimistic: Local = {
       id: clientId,
       client_id: clientId,
@@ -205,6 +238,7 @@ export function Thread({
       body,
       created_at: new Date().toISOString(),
       film_id: null,
+      attachment_id: attachmentId,
       status: "sending",
     };
     setMessages((list) =>
@@ -213,10 +247,12 @@ export function Thread({
         optimistic,
       ),
     );
+    try {
     const { data, error } = await browserApi().chat.send({
       conversation_id: conversationId,
       body,
       client_id: clientId,
+      attachment_id:attachmentId,
     });
     if (error || !data) {
       setMessages((list) =>
@@ -229,19 +265,23 @@ export function Thread({
       return;
     }
     setMessages((list) => merge(list, data as ThreadMessage));
-    router.refresh();
+    } catch {
+      setMessages(list=>list.map(m=>m.sender_id===me&&m.client_id===clientId?{...m,status:"failed"}:m));
+    }
   }
 
   function submit(e?: FormEvent) {
     e?.preventDefault();
-    const body = draft.trim();
+    if(fileBusy)return;
+    const body = draft.trim() || attachment?.name || "";
     if (!body) return;
     setDraft("");
-    void send(body.slice(0, 5000));
+    const id=attachment?.id??null;setAttachment(null);
+    void send(body.slice(0, 5000),newId(),id);
   }
 
   function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       submit();
     }
@@ -275,7 +315,7 @@ export function Thread({
         ) : null}
       </header>
 
-      <div ref={scroller} className={styles.messages} aria-live="polite">
+      <div ref={scroller} className={styles.messages} aria-live="polite" onScroll={()=>{const el=scroller.current;if(el)nearBottom.current=el.scrollHeight-el.scrollTop-el.clientHeight<100}}>
         {hasOlder || historyError ? (
           <button
             type="button"
@@ -319,6 +359,7 @@ export function Thread({
               >
                 {m.body}
               </div>
+              {m.attachment_id ? <ChatAttachment id={m.attachment_id}/> : null}
               {film ? (
                 <Link href={`/films/${film.id}`} className={styles.filmCard}>
                   <span className={styles.filmArt}>
@@ -352,7 +393,7 @@ export function Thread({
                   Not sent ·{" "}
                   <button
                     type="button"
-                    onClick={() => void send(m.body, m.client_id)}
+                    onClick={() => void send(m.body, m.client_id, m.attachment_id??null)}
                   >
                     Retry
                   </button>
@@ -363,6 +404,11 @@ export function Thread({
         })}
       </div>
 
+      <div className="chat-tools">
+        <AttachmentPicker conversationId={conversationId} onReady={setAttachment} onBusy={setFileBusy} disabled={fileBusy}/>
+        {attachment?<span>{attachment.name} <button type="button" onClick={()=>setAttachment(null)}>Remove</button></span>:null}
+        <div aria-label="Emojis">{["😀","❤️","👏","🎬","🔥","🙏"].map(emoji=><button className="pill" type="button" key={emoji} aria-label={`Add ${emoji}`} onClick={()=>setDraft(text=>text+emoji)}>{emoji}</button>)}</div>
+      </div>
       <form className={styles.composer} onSubmit={submit}>
         <label htmlFor="chat-draft" className="visually-hidden">
           Message {first}
@@ -381,7 +427,7 @@ export function Thread({
           type="submit"
           className={styles.send}
           data-ready={draft.trim() ? "true" : undefined}
-          disabled={!draft.trim()}
+          disabled={fileBusy||(!draft.trim()&&!attachment)}
         >
           Send
         </button>

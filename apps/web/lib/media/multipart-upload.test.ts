@@ -429,8 +429,8 @@ test("lost create reply retries the same persisted idempotency UUID", async () =
     transport: h.transport,
     now: h.now,
   });
-  await assert.rejects(task.start(), /same reservation/);
-  await task.start();
+  assert.deepEqual(await task.start(), verified);
+  assert.equal(requests.length, 2);
   assert.equal(new Set(requests).size, 1);
 });
 
@@ -567,4 +567,67 @@ test("browser checkpoints are scoped per profile/draft and persist no URLs or cr
     if (previous) Object.defineProperty(globalThis, "localStorage", previous);
     else Reflect.deleteProperty(globalThis, "localStorage");
   }
+});
+
+test("brief API outages recover without falsely reporting a failed transfer", async () => {
+  for (const operation of ["status", "sign", "finish"] as const) {
+    const blob = film(),
+      h = harness(blob);
+    const original = h.api[operation] as (...args: any[]) => Promise<any>;
+    let attempts = 0;
+    (h.api[operation] as any) = async (...args: any[]) => {
+      if (++attempts === 1) return { data: null, error: { status: 503 } };
+      return original(...args);
+    };
+    const stages: string[] = [];
+    const task = createMultipartUploadTask(blob, h.api, {
+      draftId: draft,
+      checkpoint: h.port,
+      transport: h.transport,
+      now: h.now,
+      onChange: (state) => stages.push(state.stage),
+    });
+    assert.deepEqual(await task.start(), verified, operation);
+    assert.equal(stages.includes("error"), false, operation);
+    assert.equal(h.transfers.length, 1, operation);
+    assert.equal(h.counts().creates, 1, operation);
+  }
+});
+
+test("a free transfer lane starts the next part without waiting for its slower neighbor", async () => {
+  const blob = film(chunk * 2 + 1),
+    h = harness(blob);
+  let releaseFirst!: () => void;
+  const first = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const started: number[] = [];
+  let active = 0,
+    maximum = 0;
+  const task = createMultipartUploadTask(blob, h.api, {
+    draftId: draft,
+    checkpoint: h.port,
+    now: h.now,
+    transport: async (...args) => {
+      const number = Number(new URL(args[0]).searchParams.get("partNumber"));
+      started.push(number);
+      maximum = Math.max(maximum, ++active);
+      if (number === 1) await first;
+      if (number === 3) releaseFirst();
+      await h.transport(...args);
+      active--;
+    },
+  });
+  const timeout = setTimeout(releaseFirst, 3000);
+  const run = task.start();
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  try {
+    assert.ok(started.includes(3), "third part must not wait for first part");
+  } finally {
+    releaseFirst();
+    clearTimeout(timeout);
+    await run;
+  }
+  assert.equal(maximum, 2);
+  assert.deepEqual([...h.present.keys()].sort(), [1, 2, 3]);
 });

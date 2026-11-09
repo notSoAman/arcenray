@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { PublicationNotice } from "../../components/publication-notice";
 import { AppNav } from "../../components/app-nav";
 import { getViewer, isSupabaseConfigured } from "../../lib/session";
 
@@ -27,6 +29,9 @@ export default async function AppLayout({
         }
       />
       {children}
+      <Suspense fallback={null}>
+        <PublicationNotice />
+      </Suspense>
     </div>
   );
 }

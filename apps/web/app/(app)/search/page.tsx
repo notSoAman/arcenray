@@ -6,7 +6,7 @@ import { IconSearch } from "../../../components/icons";
 import { Avatar } from "../../../components/media";
 import {
   FILM_COLUMNS,
-  loadProfiles,
+  PROFILE_CARD_COLUMNS,
   withCreators,
   type FeedCreator,
   type FeedFilm,
@@ -19,21 +19,13 @@ import {
 } from "../../../lib/roles";
 import { getViewer } from "../../../lib/session";
 import { LocationInput } from "../../../components/location-input";
+import { FILM_GENRES } from "../publish/film-options";
 import styles from "./search.module.css";
 
 export const metadata: Metadata = { title: "Search" };
 export const dynamic = "force-dynamic";
 
-const GENRES = [
-  "Drama",
-  "Documentary",
-  "Animation",
-  "Experimental",
-  "Thriller",
-  "Comedy",
-  "Romance",
-  "Horror",
-];
+const GENRES = FILM_GENRES;
 const PROMPTS = [
   "quiet night-time dramas",
   "editors who cut documentaries",
@@ -84,9 +76,12 @@ export default async function SearchPage({
   let mode: string | null = null;
   let failed = false;
 
-  if (params.q) {
+  const hasSearch = Boolean(
+    params.q || params.city || params.role || params.genre || params.kind,
+  );
+  if (hasSearch) {
     const { data, error } = await createArcenrayClient(supabase).search({
-      query: params.q,
+      query: params.q ?? "",
       kind: kind as "all" | "film" | "profile",
       ...(params.city ? { city: params.city } : {}),
       ...(params.role ? { role: params.role } : {}),
@@ -103,7 +98,7 @@ export default async function SearchPage({
       const personIds = data.results
         .filter((r) => r.kind === "profile")
         .map((r) => r.id);
-      const [filmRows, profileMap] = await Promise.all([
+      const [filmRows, profileRows] = await Promise.all([
         filmIds.length
           ? supabase
               .from("films")
@@ -111,8 +106,21 @@ export default async function SearchPage({
               .eq("status", "published")
               .in("id", filmIds)
           : Promise.resolve({ data: [] as never[] }),
-        loadProfiles(supabase, personIds),
+        personIds.length
+          ? supabase
+              .from("profiles")
+              .select(PROFILE_CARD_COLUMNS)
+              .in("id", personIds)
+          : Promise.resolve({ data: [] as FeedCreator[] }),
       ]);
+      if (
+        ("error" in filmRows && filmRows.error) ||
+        ("error" in profileRows && profileRows.error)
+      )
+        failed = true;
+      const profileMap = new Map(
+        (profileRows.data ?? []).map((p) => [p.id, p]),
+      );
       const hydrated = await withCreators(supabase, filmRows.data ?? []);
       const byId = new Map(hydrated.map((f) => [f.id, f]));
       films = filmIds
@@ -146,7 +154,7 @@ export default async function SearchPage({
             name="q"
             type="search"
             defaultValue={params.q ?? ""}
-            placeholder="Describe a mood, a place or a kind of person"
+            placeholder="Search names, titles, or describe what you’re looking for"
             autoComplete="off"
             maxLength={500}
             className={styles.input}
@@ -271,19 +279,16 @@ export default async function SearchPage({
           <div role="tablist" aria-label="Search in" className={styles.scopes}>
             {Object.entries(KINDS).map(([key, label]) => {
               const on = kind === key;
-              const disabled =
-                (params.role && key !== "profile") ||
-                (params.genre && key !== "film");
-              return disabled ? (
-                <span key={key} className={styles.scope} aria-disabled="true">
-                  {label}
-                </span>
-              ) : (
+              return (
                 <Link
                   key={key}
                   role="tab"
                   aria-selected={on}
-                  href={href(params, { kind: key === "all" ? undefined : key })}
+                  href={href(params, {
+                    kind: key === "all" ? undefined : key,
+                    role: key === "profile" ? params.role : undefined,
+                    genre: key === "film" ? params.genre : undefined,
+                  })}
                   className={styles.scope}
                 >
                   {label}
@@ -292,7 +297,7 @@ export default async function SearchPage({
             })}
           </div>
 
-          {!params.q ? (
+          {!hasSearch ? (
             <div className={styles.intro}>
               <h2>Search by feeling, not just by name.</h2>
               <p>
@@ -327,11 +332,16 @@ export default async function SearchPage({
             <>
               <div className={styles.summary}>
                 <span>
-                  {total} result{total === 1 ? "" : "s"} for “{params.q}”
+                  {total} result{total === 1 ? "" : "s"}
+                  {params.q ? ` for “${params.q}”` : " matching your filters"}
                   {params.city ? ` in ${params.city}` : ""}
                 </span>
                 <span className="kicker">
-                  {mode === "hybrid" ? "Meaning + words" : "Words only"}
+                  {params.q
+                    ? mode === "hybrid"
+                      ? "Meaning + words"
+                      : "Names + words"
+                    : "Browse"}
                 </span>
               </div>
               {films.length > 0 ? (
