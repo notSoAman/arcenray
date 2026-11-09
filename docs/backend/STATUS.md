@@ -4,8 +4,9 @@
 
 - Supabase project `ropbxsnjtejfomnpdllf`: schema, RLS, column grants and API/RPCs.
 - Realtime publication: messages and conversation_participants.
-- Eight ordered migrations applied, including cleanup authentication and the approved
-  switch to Supabase built-in gte-small (384 dimensions).
+- **35 ordered migrations applied** (as of 2026-11-09 consolidation), including cleanup authentication,
+  the approved switch to Supabase built-in gte-small (384 dimensions), chat attachments, search
+  relevance, and the listed-credits model (no recipient confirmation).
 - Three Clerk-aware user Edge Functions plus the separately protected media-cleanup.
 - Credentials from the Git-ignored root `.env.test` synced to server-side secrets.
 - R2 `arcenray-media` and private `arcenray-uploads`; supplied S3 key verified on both.
