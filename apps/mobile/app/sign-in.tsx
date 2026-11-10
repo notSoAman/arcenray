@@ -12,6 +12,7 @@ import { router } from "expo-router";
 import { useClerk, useSignIn, useSignUp } from "@clerk/expo";
 import { useSSO } from "@clerk/expo/experimental";
 import { useHostedAuth } from "@clerk/expo/hosted-auth";
+import Constants from "expo-constants";
 import { LinearGradient } from "expo-linear-gradient";
 import { LogoTile, Lockup } from "../src/brand";
 import { Spectrum } from "../src/visuals";
@@ -26,6 +27,15 @@ import { colors, fonts, radius } from "../src/theme";
  */
 
 type Mode = "sign-in" | "sign-up";
+
+/**
+ * Clerk authorizes `clerk://<package>.callback` for the registered native app.
+ * The SDK default (`<scheme>://sso-callback`) is not on that allowlist, so pass
+ * the registered callback explicitly.
+ */
+const packageName =
+  Constants.expoConfig?.android?.package ?? "com.arcenray.mobile";
+const ssoRedirectUrl = `clerk://${packageName}.callback`;
 
 function errorText(error: { longMessage?: string; message?: string } | null) {
   return error?.longMessage ?? error?.message ?? "That didn't finish. Try again.";
@@ -140,7 +150,18 @@ function SignInForm() {
         setError(errorText(pwError));
         return;
       }
-      if (signIn.status === "complete") await finish();
+      if (signIn.status === "complete") {
+        await finish();
+      } else if (
+        signIn.status === "needs_client_trust" ||
+        signIn.status === "needs_second_factor"
+      ) {
+        setError(
+          "This device needs an extra check. Use “Trouble signing in? Use the browser” below to finish securely.",
+        );
+      } else {
+        setError("Sign-in needs another step. Try the browser sign-in below.");
+      }
     } finally {
       setBusy(false);
     }
@@ -176,7 +197,7 @@ function SignInForm() {
     setBusy(true);
     setError(null);
     try {
-      const { createdSessionId } = await startSSOFlow({ strategy: "oauth_google" });
+      const { createdSessionId } = await startSSOFlow({ strategy: "oauth_google", redirectUrl: ssoRedirectUrl });
       if (createdSessionId) router.replace("/home");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Google sign-in didn't finish.");
@@ -362,7 +383,7 @@ function SignUpForm() {
     setBusy(true);
     setError(null);
     try {
-      const { createdSessionId } = await startSSOFlow({ strategy: "oauth_google" });
+      const { createdSessionId } = await startSSOFlow({ strategy: "oauth_google", redirectUrl: ssoRedirectUrl });
       if (createdSessionId) router.replace("/onboarding");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Google sign-up didn't finish.");

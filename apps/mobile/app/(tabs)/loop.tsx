@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Text,
   View,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from "react-native";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useEvent, useEventListener } from "expo";
@@ -148,7 +150,6 @@ export default function Loop() {
   const more = useRef(true);
   const generation = useRef(0);
   const list = useRef<FlatList<Film>>(null);
-  const [viewabilityConfig] = useState({ itemVisiblePercentThreshold: 60 });
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
@@ -220,20 +221,10 @@ export default function Loop() {
       generation.current = version + 1;
     };
   }, [load]);
-  const viewable = useCallback(
-    ({
-      viewableItems,
-    }: {
-      viewableItems: Array<{ index?: number; isViewable: boolean }>;
-    }) => {
-      const visible = viewableItems.find(
-        (item) => item.isViewable && item.index !== null,
-      );
-      if (visible?.index !== null && visible?.index !== undefined)
-        setActiveIndex(visible.index);
-    },
-    [],
-  );
+  function onMomentumEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const next = Math.round(e.nativeEvent.contentOffset.y / height);
+    if (next >= 0 && next < films.length) setActiveIndex(next);
+  }
   function move(offset: number) {
     const index = activeIndex + offset;
     if (index >= 0 && index < films.length)
@@ -270,16 +261,17 @@ export default function Loop() {
         ref={list}
         data={films}
         keyExtractor={(film) => film.id}
-        pagingEnabled
+        snapToInterval={height}
+        snapToAlignment="start"
         decelerationRate="fast"
+        disableIntervalMomentum
         showsVerticalScrollIndicator={false}
         getItemLayout={(_, index) => ({
           length: height,
           offset: height * index,
           index,
         })}
-        viewabilityConfig={viewabilityConfig}
-        onViewableItemsChanged={viewable}
+        onMomentumScrollEnd={onMomentumEnd}
         onEndReached={() => {
           if (!error) void load();
         }}
@@ -428,20 +420,6 @@ export default function Loop() {
           </View>
         }
       />
-      {films.length > 1 && (
-        <View style={s.arrows}>
-          <Action
-            label="↑"
-            disabled={activeIndex === 0}
-            onPress={() => move(-1)}
-          />
-          <Action
-            label="↓"
-            disabled={activeIndex === films.length - 1 && !hasMore}
-            onPress={() => move(1)}
-          />
-        </View>
-      )}
       {notice ? (
         <Pressable
           onPress={() => setNotice("")}
@@ -550,7 +528,6 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
   watchText: { color: colors.void, fontFamily: fonts.bold, fontSize: 13 },
-  arrows: { position: "absolute", right: 10, top: "40%", gap: 10, zIndex: 2 },
   notice: {
     position: "absolute",
     top: 60,
