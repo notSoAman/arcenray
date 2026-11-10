@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { View } from "react-native";
-import { FILM_GENRES } from "@repo/shared";
 import { useSession } from "../../src/session";
 import { filmPage, type Film } from "../../src/data";
 import { FeaturedFilm, PosterCard } from "../../src/cards";
@@ -9,11 +8,11 @@ import {
   Screen,
   Kicker,
   PageTitle,
+  SectionTitle,
   Muted,
   Notice,
   Busy,
   Button,
-  Chips,
   StatePanel,
   Nav,
   useResource,
@@ -23,15 +22,14 @@ import { colors } from "../../src/theme";
 
 export default function Home() {
   const { api, me } = useSession();
-  const [activeGenre, setActiveGenre] = useState("");
   const [more, setMore] = useState<Film[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const a = useAction();
 
   const load = useCallback(async () => {
     if (!api) return [];
-    return filmPage(api, 0, activeGenre || undefined);
-  }, [api, activeGenre]);
+    return filmPage(api, 0);
+  }, [api]);
   const r = useResource(load);
 
   const rows = [...(r.data ?? []), ...more];
@@ -46,26 +44,12 @@ export default function Home() {
           {firstName ? `For ${firstName}` : "Independent cinema"}
         </Kicker>
         <PageTitle>Short films for you</PageTitle>
+        <Muted>
+          {me
+            ? "Share your work with the community."
+            : "Discover independent films. Browse as a guest."}
+        </Muted>
       </View>
-
-      <Muted>
-        {me
-          ? "Share your work with the community."
-          : "Discover independent films. Browse as a guest."}
-      </Muted>
-      <Nav title="Publish your film" href="/publish" />
-
-      <Chips
-        label="Genre"
-        options={FILM_GENRES}
-        selected={activeGenre ? [activeGenre] : []}
-        disabled={a.busy}
-        onToggle={(value) => {
-          setMore([]);
-          setHasMore(true);
-          setActiveGenre(activeGenre === value ? "" : value);
-        }}
-      />
 
       {!api ? (
         <StatePanel
@@ -91,6 +75,7 @@ export default function Home() {
 
       {rest.length > 0 ? (
         <View style={{ gap: 16 }}>
+          <SectionTitle>More to watch</SectionTitle>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {rest.map((f) => (
               <View key={f.id} style={{ width: "48%", flexGrow: 1, minWidth: 140 }}>
@@ -101,6 +86,7 @@ export default function Home() {
         </View>
       ) : null}
 
+      <Nav title="Publish your film" href="/publish" />
       <Notice message={a.error} />
 
       {rows.length >= 20 && hasMore ? (
@@ -110,11 +96,7 @@ export default function Home() {
           onPress={() =>
             a.run(async () => {
               if (!api) return;
-              const next = await filmPage(
-                api,
-                rows.length,
-                activeGenre || undefined,
-              );
+              const next = await filmPage(api, rows.length);
               setHasMore(next.length === 20);
               setMore((old) => [
                 ...old,
