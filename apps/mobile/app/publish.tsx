@@ -22,7 +22,8 @@ import {
 } from "../src/media";
 import {
   Screen,
-  Title,
+  PageTitle,
+  SectionTitle,
   Copy,
   Muted,
   Field,
@@ -242,7 +243,7 @@ function Publisher() {
   }
   return (
     <Screen>
-      <Title>Put your work out there.</Title>
+      <PageTitle>Put your work out there.</PageTitle>
       <Muted>
         Native MP4 upload or an external Vimeo/YouTube link. A poster is
         required; a discovery hook is optional.
@@ -316,7 +317,7 @@ function Publisher() {
                 ? "Use external film link instead"
                 : "Use native MP4 upload instead"
             }
-            secondary
+            variant="ghost"
             disabled={a.busy || !!input.film_asset_id || !!state}
             onPress={() => {
               set(
@@ -382,7 +383,7 @@ function Publisher() {
           )}
           <Button
             title={poster ? "Poster selected" : "Choose poster"}
-            secondary
+            variant="ghost"
             disabled={a.busy}
             onPress={() =>
               a.run(async () => {
@@ -401,7 +402,7 @@ function Publisher() {
                 ? "Discovery hook selected"
                 : "Choose optional discovery hook"
             }
-            secondary
+            variant="ghost"
             disabled={a.busy}
             onPress={() =>
               a.run(async () => {
@@ -441,12 +442,12 @@ function Publisher() {
               <Notice message={state.error ?? null} />
               <Button
                 title="Pause upload"
-                secondary
+                variant="ghost"
                 onPress={() => task.current?.pause()}
               />
               <Button
                 title="Discard pending upload"
-                secondary
+                variant="ghost"
                 disabled={a.busy}
                 onPress={() =>
                   Alert.alert(
@@ -478,7 +479,7 @@ function Publisher() {
             <>
               <Button
                 title="Refresh processing status"
-                secondary
+                variant="ghost"
                 disabled={a.busy}
                 onPress={() => a.run(() => checkProcessing())}
               />
@@ -543,7 +544,7 @@ function Publisher() {
               }
             />
           ) : null}
-          <Title>Film credits</Title>
+          <SectionTitle>Film credits</SectionTitle>
           <Muted>
             Credits are listed on the film and the registered creative’s profile immediately.
           </Muted>
@@ -560,7 +561,7 @@ function Publisher() {
           <Button
             title="Find collaborators"
             disabled={a.busy || creditQuery.trim().length < 2}
-            secondary
+            variant="ghost"
             onPress={() =>
               a.run(async () => {
                 const x = await api!.credits.search(creditQuery);
@@ -607,7 +608,7 @@ function Publisher() {
           />
           <Button
             title="Remove my film"
-            secondary
+            variant="ghost"
             disabled={a.busy || deletionConfirmation !== "DELETE FILM"}
             onPress={() =>
               Alert.alert("Remove this film?", input.title, [

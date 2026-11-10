@@ -521,7 +521,7 @@ function Thread() {
             <Button
               title={olderBusy ? "Loading…" : "Load older messages"}
               disabled={olderBusy}
-              secondary
+              variant="ghost"
               onPress={() => void loadOlder()}
             />
           ) : undefined
@@ -558,7 +558,7 @@ function Thread() {
             {row.delivery === "failed" ? (
               <Button
                 title="Not sent · Retry"
-                secondary
+                variant="ghost"
                 onPress={() =>
                   void send(row.body, row.attachment_id, row.client_id)
                 }
@@ -582,7 +582,7 @@ function Thread() {
             </Muted>
             <Button
               title={fileBusy ? "Cancel upload" : "Remove file"}
-              secondary
+              variant="ghost"
               onPress={() =>
                 fileBusy ? upload.current?.abort() : setSelected(null)
               }

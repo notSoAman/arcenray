@@ -13,20 +13,23 @@ import { Link, useFocusEffect } from "expo-router";
 import { useEvent, useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as Crypto from "expo-crypto";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSession } from "../../src/session";
 import { config, publicMediaUrl } from "../../src/config";
 import type { Film } from "../../src/data";
-import { colors } from "../../src/theme";
+import { colors, fonts } from "../../src/theme";
 import { Busy } from "../../src/ui";
 
 function Action({
   label,
   onPress,
   disabled = false,
+  primary = false,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  primary?: boolean;
 }) {
   return (
     <Pressable
@@ -35,9 +38,9 @@ function Action({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={[s.action, disabled && { opacity: 0.4 }]}
+      style={[s.action, primary && s.actionPrimary, disabled && { opacity: 0.4 }]}
     >
-      <Text style={s.actionText}>{label}</Text>
+      <Text style={[s.actionText, primary && s.actionTextPrimary]}>{label}</Text>
     </Pressable>
   );
 }
@@ -318,9 +321,17 @@ export default function Loop() {
                   autoplay={!reduced}
                 />
               )}
-              <Text style={s.label}>
-                {hook ? "FILM PREVIEW" : "FILM POSTER"}
-              </Text>
+              <View style={s.label}>
+                <Text style={s.labelText}>
+                  {hook ? "Film preview" : "Film poster"}
+                </Text>
+              </View>
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.88)"]}
+                locations={[0, 0.45]}
+                pointerEvents="none"
+                style={s.detailsScrim}
+              />
               <View style={s.details}>
                 <Text style={s.meta}>
                   {film.genres.slice(0, 2).join(" · ")}
@@ -346,6 +357,7 @@ export default function Loop() {
                           ? "✓ More like this"
                           : "More like this"
                       }
+                      primary={preferences[film.id] === "more"}
                       disabled={feedbackBusy}
                       onPress={() => void feedback(film, "more")}
                     />
@@ -367,7 +379,10 @@ export default function Loop() {
         ListEmptyComponent={
           !loading && !error ? (
             <View style={s.empty}>
-              <Text style={s.title}>The first films are on their way.</Text>
+              <Text style={s.emptyTitle}>The first films are on their way.</Text>
+              <Text style={s.synopsis}>
+                Published films will appear here.
+              </Text>
             </View>
           ) : undefined
         }
@@ -393,12 +408,12 @@ export default function Loop() {
       {films.length > 1 && (
         <View style={s.arrows}>
           <Action
-            label="↑ Previous"
+            label="↑"
             disabled={activeIndex === 0}
             onPress={() => move(-1)}
           />
           <Action
-            label="↓ Next"
+            label="↓"
             disabled={activeIndex === films.length - 1 && !hasMore}
             onPress={() => move(1)}
           />
@@ -411,7 +426,7 @@ export default function Loop() {
           accessibilityRole="button"
           accessibilityLabel={`${notice} Dismiss`}
         >
-          <Text accessibilityLiveRegion="polite" style={s.actionText}>
+          <Text accessibilityLiveRegion="polite" style={s.noticeText}>
             {notice}
           </Text>
         </Pressable>
@@ -421,9 +436,9 @@ export default function Loop() {
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#080808" },
+  screen: { flex: 1, backgroundColor: colors.void },
   slide: {
-    backgroundColor: "#080808",
+    backgroundColor: colors.void,
     justifyContent: "center",
     overflow: "hidden",
   },
@@ -439,20 +454,37 @@ const s = StyleSheet.create({
   play: {
     fontSize: 38,
     color: colors.bone,
-    backgroundColor: "#0008",
+    backgroundColor: "rgba(0,0,0,0.45)",
     padding: 16,
-    borderRadius: 40,
+    borderRadius: 30,
+    overflow: "hidden",
   },
-  sound: { position: "absolute", top: 12, right: 12 },
+  sound: { position: "absolute", top: 12, right: 12, zIndex: 2 },
   label: {
     position: "absolute",
-    top: 24,
+    top: 14,
     left: 14,
+    zIndex: 2,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "rgba(26,26,27,0.8)",
+    borderWidth: 1,
+    borderColor: "rgba(243,239,233,0.12)",
+  },
+  labelText: {
     color: colors.bone,
+    fontFamily: fonts.monoBold,
     fontSize: 10,
-    letterSpacing: 2,
-    backgroundColor: "#0008",
-    padding: 6,
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+  },
+  detailsScrim: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 220,
   },
   details: {
     position: "absolute",
@@ -460,48 +492,57 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 18,
-    gap: 9,
-    backgroundColor: "#080808bf",
+    paddingTop: 60,
+    gap: 8,
   },
-  title: { color: colors.bone, fontSize: 25, fontWeight: "700" },
-  meta: { color: colors.muted, fontSize: 11 },
-  synopsis: { color: colors.bone, fontSize: 13, lineHeight: 19 },
+  title: { color: colors.text, fontFamily: fonts.extraBold, fontSize: 24, lineHeight: 28 },
+  meta: { color: colors.bone, fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase" },
+  synopsis: { color: colors.bone, fontFamily: fonts.regular, fontSize: 13, lineHeight: 19 },
   feedback: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   action: {
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    minHeight: 44,
-    backgroundColor: "#222b",
+    minHeight: 40,
+    backgroundColor: "rgba(0,0,0,0.4)",
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#fff4",
+    borderColor: "rgba(255,255,255,0.35)",
     justifyContent: "center",
   },
-  actionText: { color: colors.bone, fontSize: 12 },
+  actionPrimary: { backgroundColor: colors.bone, borderColor: colors.bone },
+  actionText: { color: colors.bone, fontFamily: fonts.semibold, fontSize: 12 },
+  actionTextPrimary: { color: colors.void },
   watch: {
     alignSelf: "flex-start",
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
     backgroundColor: colors.bone,
     borderRadius: 24,
-    minHeight: 44,
+    minHeight: 40,
     justifyContent: "center",
+    marginTop: 2,
   },
-  watchText: { color: colors.void, fontWeight: "700" },
-  arrows: { position: "absolute", right: 10, top: "35%", gap: 12 },
+  watchText: { color: colors.void, fontFamily: fonts.bold, fontSize: 13 },
+  arrows: { position: "absolute", right: 10, top: "40%", gap: 10, zIndex: 2 },
   notice: {
     position: "absolute",
-    top: 65,
+    top: 60,
     left: 15,
     right: 15,
     padding: 12,
-    borderRadius: 12,
-    backgroundColor: "#111e",
+    borderRadius: 14,
+    backgroundColor: "rgba(14,15,14,0.9)",
+    borderWidth: 1,
+    borderColor: "rgba(243,239,233,0.12)",
+    zIndex: 3,
   },
+  noticeText: { color: colors.bone, fontFamily: fonts.regular, fontSize: 13 },
   footer: { minHeight: 110, padding: 25, alignItems: "center", gap: 12 },
-  empty: { padding: 30 },
+  empty: { padding: 30, gap: 8 },
+  emptyTitle: { color: colors.text, fontFamily: fonts.extraBold, fontSize: 22 },
   fallback: {
     color: colors.muted,
+    fontFamily: fonts.regular,
     fontSize: 40,
     textAlign: "center",
     padding: 30,
@@ -512,7 +553,9 @@ const s = StyleSheet.create({
     left: 15,
     right: 15,
     color: colors.bone,
-    backgroundColor: "#000b",
+    backgroundColor: "rgba(0,0,0,0.8)",
     padding: 12,
+    fontFamily: fonts.regular,
+    fontSize: 13,
   },
 });

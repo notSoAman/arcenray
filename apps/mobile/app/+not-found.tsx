@@ -1,14 +1,12 @@
 import { Link } from "expo-router";
-import { Text, View } from "react-native";
-import { styles } from "../src/theme";
+import { Screen, PageTitle, Copy, Nav } from "../src/ui";
 
 export default function NotFound() {
   return (
-    <View style={[styles.screen, styles.content]}>
-      <Text style={styles.title}>Page unavailable</Text>
-      <Link href="/" style={styles.body}>
-        Return to films
-      </Link>
-    </View>
+    <Screen>
+      <PageTitle>Page unavailable</PageTitle>
+      <Copy>That screen doesn’t exist or has moved.</Copy>
+      <Nav title="Return to films" href="/" />
+    </Screen>
   );
 }

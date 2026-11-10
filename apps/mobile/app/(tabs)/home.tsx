@@ -1,41 +1,60 @@
 import { useCallback, useState } from "react";
+import { View } from "react-native";
 import { FILM_GENRES } from "@repo/shared";
 import { useSession } from "../../src/session";
 import { filmPage, type Film } from "../../src/data";
-import { FilmTile } from "../../src/cards";
+import { FeaturedFilm, PosterCard } from "../../src/cards";
+import { Spectrum } from "../../src/visuals";
 import {
   Screen,
-  Title,
+  Kicker,
+  PageTitle,
   Muted,
   Notice,
   Busy,
   Button,
-  Nav,
   Chips,
+  StatePanel,
+  Nav,
   useResource,
   useAction,
 } from "../../src/ui";
+import { colors } from "../../src/theme";
+
 export default function Home() {
   const { api, me } = useSession();
   const [activeGenre, setActiveGenre] = useState("");
   const [more, setMore] = useState<Film[]>([]);
-  const a = useAction();
   const [hasMore, setHasMore] = useState(true);
+  const a = useAction();
+
   const load = useCallback(async () => {
     if (!api) return [];
     return filmPage(api, 0, activeGenre || undefined);
   }, [api, activeGenre]);
   const r = useResource(load);
+
   const rows = [...(r.data ?? []), ...more];
+  const featured = rows[0];
+  const rest = rows.slice(1);
+  const firstName = me ? me.full_name.split(/\s+/)[0] || `@${me.handle}` : null;
+
   return (
     <Screen>
-      <Title>Find your people. Make your art.</Title>
+      <View style={{ gap: 8 }}>
+        <Kicker color={colors.pink}>
+          {firstName ? `For ${firstName}` : "Independent cinema"}
+        </Kicker>
+        <PageTitle>Short films for you</PageTitle>
+      </View>
+
       <Muted>
         {me
-          ? `For you, ${me.full_name}`
+          ? "Share your work with the community."
           : "Discover independent films. Browse as a guest."}
       </Muted>
       <Nav title="Publish your film" href="/publish" />
+
       <Chips
         label="Genre"
         options={FILM_GENRES}
@@ -47,19 +66,43 @@ export default function Home() {
           setActiveGenre(activeGenre === value ? "" : value);
         }}
       />
+
       {!api ? (
-        <Notice message="Add public backend configuration to load films." />
+        <StatePanel
+          title="Films aren't connected yet"
+          body="Add public backend configuration to load films."
+        />
       ) : r.loading ? (
         <Busy />
       ) : null}
+
       <Notice message={r.error} retry={r.reload} />
-      {rows.map((f) => (
-        <FilmTile key={f.id} film={f} />
-      ))}
-      {!r.loading && !rows.length && !r.error ? (
-        <Muted>No published films yet. Check back soon.</Muted>
+
+      {!r.loading && !r.error && !featured ? (
+        <StatePanel
+          title="No short films to show yet."
+          body="When filmmakers publish on arcenray, their work appears here — ranked by what you watch. Check back soon."
+        >
+          <Spectrum kind="strip" style={{ height: 72, borderRadius: 18 }} />
+        </StatePanel>
       ) : null}
+
+      {featured ? <FeaturedFilm film={featured} kicker="Tonight's pick" /> : null}
+
+      {rest.length > 0 ? (
+        <View style={{ gap: 16 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+            {rest.map((f) => (
+              <View key={f.id} style={{ width: "48%", flexGrow: 1, minWidth: 140 }}>
+                <PosterCard film={f} />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       <Notice message={a.error} />
+
       {rows.length >= 20 && hasMore ? (
         <Button
           title={a.busy ? "Loading…" : "Load more films"}
@@ -81,15 +124,6 @@ export default function Home() {
           }
         />
       ) : null}
-      <Button
-        title="Refresh"
-        secondary
-        onPress={() => {
-          setMore([]);
-          setHasMore(true);
-          r.reload();
-        }}
-      />
     </Screen>
   );
 }

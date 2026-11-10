@@ -5,7 +5,8 @@ import { router } from "expo-router";
 import { Gate, useSession } from "../src/session";
 import {
   Screen,
-  Title,
+  PageTitle,
+  SectionTitle,
   Copy,
   Muted,
   Nav,
@@ -26,7 +27,7 @@ function Settings() {
   const storage = useResource(load);
   return (
     <Screen>
-      <Title>Account & support</Title>
+      <PageTitle>Account & support</PageTitle>
       {storage.data &&
       typeof storage.data === "object" &&
       !Array.isArray(storage.data) ? (
@@ -48,33 +49,33 @@ function Settings() {
       <Nav title="Edit creative profile" href="/onboarding" />
       <Button
         title="Contact support"
-        secondary
+        variant="ghost"
         onPress={() => {
           void Linking.openURL("mailto:office@arcenray.com");
         }}
       />
       <Button
         title="Privacy policy"
-        secondary
+        variant="ghost"
         onPress={() => {
           void Linking.openURL("https://arcenray.com/privacy");
         }}
       />
       <Button
         title="Terms"
-        secondary
+        variant="ghost"
         onPress={() => {
           void Linking.openURL("https://arcenray.com/terms");
         }}
       />
-      <Title>Account deletion</Title>
+      <SectionTitle>Account deletion</SectionTitle>
       <Copy>
         Account deletion is available through the website’s secure confirmation
         flow. It requires a recent sign-in there.
       </Copy>
       <Button
         title="Open account deletion on the website"
-        secondary
+        variant="ghost"
         onPress={() => {
           void Linking.openURL("https://arcenray.com/settings");
         }}

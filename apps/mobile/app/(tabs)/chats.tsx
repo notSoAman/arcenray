@@ -1,17 +1,21 @@
 import { useCallback } from "react";
+import { View, Text, Pressable } from "react-native";
+import { router } from "expo-router";
 import { Gate, useSession } from "../../src/session";
+import { Avatar } from "../../src/visuals";
 import {
   Screen,
-  Title,
+  PageTitle,
+  Kicker,
   Muted,
-  Copy,
-  Panel,
-  Nav,
   Notice,
   Busy,
   Button,
+  StatePanel,
   useResource,
 } from "../../src/ui";
+import { colors, fonts, radius } from "../../src/theme";
+
 function Chats() {
   const { api, me } = useSession();
   const load = useCallback(async () => {
@@ -33,7 +37,7 @@ function Chats() {
     if (others.error) throw others.error;
     const profiles = await api!.supabase
       .from("profiles")
-      .select("id,full_name,handle")
+      .select("id,full_name,handle,profile_pic_key")
       .in(
         "id",
         (others.data ?? []).map((x) => x.user_id),
@@ -63,33 +67,68 @@ function Chats() {
       );
   }, [api, me]);
   const r = useResource(load);
+
   return (
     <Screen>
-      <Title>Conversations</Title>
+      <PageTitle>Conversations</PageTitle>
+      <Kicker color={colors.pink}>Private · one to one</Kicker>
       {r.loading ? <Busy /> : null}
       <Notice message={r.error} retry={r.reload} />
       {r.data?.length === 0 ? (
-        <Muted>
-          Find a creative and start a conversation from their profile.
-        </Muted>
+        <StatePanel
+          title="No conversations yet"
+          body="Find a creative and start a conversation from their profile or a film."
+        />
       ) : null}
       {r.data?.map((c) => (
-        <Panel key={c.conversation_id}>
-          <Copy>
-            {c.unread ? "● " : ""}
-            {c.profile?.full_name ?? "Creative"}
-          </Copy>
-          <Muted>{c.last?.body ?? "Start your conversation."}</Muted>
-          <Nav
-            title="Open conversation"
-            href={{ pathname: "/chat/[id]", params: { id: c.conversation_id } }}
+        <Pressable
+          key={c.conversation_id}
+          accessibilityRole="link"
+          onPress={() =>
+            router.push({
+              pathname: "/chat/[id]",
+              params: { id: c.conversation_id },
+            })
+          }
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 14,
+            padding: 14,
+            borderRadius: radius.card,
+            backgroundColor: colors.graphite,
+          }}
+        >
+          <Avatar
+            picKey={c.profile?.profile_pic_key}
+            name={c.profile?.full_name ?? "Creative"}
+            size={48}
           />
-        </Panel>
+          <View style={{ flex: 1, gap: 3 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              {c.unread ? (
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.ember }} />
+              ) : null}
+              <Text style={{ color: colors.text, fontFamily: fonts.bold, fontSize: 16 }}>
+                {c.profile?.full_name ?? "Creative"}
+              </Text>
+            </View>
+            <Text
+              numberOfLines={1}
+              style={{ color: c.unread ? colors.textSoft : colors.muted, fontFamily: fonts.regular, fontSize: 13 }}
+            >
+              {c.last?.body ?? "Start your conversation."}
+            </Text>
+          </View>
+        </Pressable>
       ))}
-      <Button title="Refresh conversations" secondary onPress={r.reload} />
+      {r.data && r.data.length > 0 ? (
+        <Button title="Refresh conversations" variant="ghost" onPress={r.reload} />
+      ) : null}
     </Screen>
   );
 }
+
 export default function Route() {
   return (
     <Gate>

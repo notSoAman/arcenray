@@ -11,7 +11,8 @@ import { Gate, useSession } from "../src/session";
 import { selectImage, smallMediaTask } from "../src/media";
 import {
   Screen,
-  Title,
+  PageTitle,
+  SectionTitle,
   Field,
   Copy,
   Muted,
@@ -45,13 +46,13 @@ function Editor() {
   }, []);
   return (
     <Screen>
-      <Title>
+      <PageTitle>
         {editing ? "Your creative profile" : "Make yourself known."}
-      </Title>
+      </PageTitle>
       <Field label="Name" value={name} onChangeText={setName} maxLength={100} />
       <Button
         title="Choose profile picture / retry upload"
-        secondary
+        variant="ghost"
         disabled={a.busy}
         onPress={() =>
           a.run(async () => {
@@ -86,7 +87,7 @@ function Editor() {
         <Button
           key={role}
           title={`${roles.includes(role) ? "✓ " : ""}${role.replaceAll("_", " ")}`}
-          secondary={!roles.includes(role)}
+          variant={roles.includes(role) ? "primary" : "ghost"}
           onPress={() =>
             setRoles((old) =>
               old.includes(role)
@@ -112,13 +113,13 @@ function Editor() {
       />
       {!editing ? (
         <>
-          <Title>Your visual vibe.</Title>
+          <SectionTitle>Your visual vibe.</SectionTitle>
           <Muted>Choose exactly three references.</Muted>
           {onboardingChoices.map((c) => (
             <Button
               key={c.id}
               title={`${choices.includes(c.id) ? "✓ " : ""}${c.label} — ${c.detail}`}
-              secondary={!choices.includes(c.id)}
+              variant={choices.includes(c.id) ? "primary" : "ghost"}
               onPress={() =>
                 setChoices((old) =>
                   old.includes(c.id)

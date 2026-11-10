@@ -103,7 +103,7 @@ function AudioClip({
     <View style={{ gap: 6 }}>
       <Button
         title={status.playing ? "Pause audio" : "Play audio"}
-        secondary
+        variant="ghost"
         onPress={() => {
           if (status.playing) player.pause();
           else {
@@ -198,7 +198,7 @@ export function ChatAttachment({
       {value ? (
         <Button
           title={`Open ${value.name}`}
-          secondary
+          variant="ghost"
           onPress={() =>
             void Linking.openURL(value.url).catch(() =>
               setError("This device couldn’t open the file."),

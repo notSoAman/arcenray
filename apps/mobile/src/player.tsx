@@ -72,7 +72,7 @@ function NativeVideo({
         style={{ width: "100%", aspectRatio: 16 / 9 }}
       />
       <Button
-        secondary
+        variant="ghost"
         title={muted ? "Turn sound on" : "Mute"}
         onPress={() => {
           // eslint-disable-next-line react-hooks/immutability -- expo-video exposes a mutable native player handle.
@@ -168,7 +168,7 @@ export function FilmPlayer({
       {external ? (
         <Button
           title="Open with the video provider"
-          secondary
+          variant="ghost"
           onPress={() => {
             void Linking.openURL(external);
           }}
