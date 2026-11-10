@@ -3,6 +3,8 @@ import { AppState, Alert } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import type { File } from "expo-file-system";
 import {
+  FILM_GENRES,
+  FILM_LANGUAGES,
   filmDraftSchema,
   parseFilmLink,
   uuidSchema,
@@ -29,6 +31,7 @@ import {
   Nav,
   Notice,
   Busy,
+  Chips,
   useAction,
   useResource,
 } from "../src/ui";
@@ -54,7 +57,6 @@ function Publisher() {
   );
   const [input, setInput] = useState<FilmDraft>(empty);
   const [published, setPublished] = useState(false);
-  const [genreText, setGenreText] = useState("");
   const [moodText, setMoodText] = useState("");
   const [deletionConfirmation, setDeletionConfirmation] = useState("");
   const [external, setExternal] = useState("");
@@ -109,7 +111,6 @@ function Publisher() {
         }
         setDraftId(f.id);
         setPublished(f.status === "published");
-        setGenreText(f.genres.join(", "));
         setMoodText(f.mood_tags.join(", "));
         setInput({
           title: f.title,
@@ -156,10 +157,6 @@ function Publisher() {
   function validated() {
     let value = {
       ...input,
-      genres: genreText
-        .split(",")
-        .map((v) => v.trim())
-        .filter(Boolean),
       mood_tags: moodText
         .split(",")
         .map((v) => v.trim())
@@ -278,10 +275,21 @@ function Publisher() {
             multiline
             maxLength={5000}
           />
-          <Field
-            label="Genres, separated by commas"
-            value={genreText}
-            onChangeText={setGenreText}
+          <Chips
+            label="Genres (up to 8)"
+            options={FILM_GENRES}
+            selected={input.genres}
+            disabled={a.busy}
+            onToggle={(genre) =>
+              set(
+                "genres",
+                input.genres.includes(genre)
+                  ? input.genres.filter((g) => g !== genre)
+                  : input.genres.length < 8
+                    ? [...input.genres, genre]
+                    : input.genres,
+              )
+            }
           />
           <Field
             label="Mood tags, separated by commas"
@@ -293,10 +301,14 @@ function Publisher() {
             value={input.location_city ?? ""}
             onChangeText={(v) => set("location_city", v || null)}
           />
-          <Field
+          <Chips
             label="Language"
-            value={input.language ?? ""}
-            onChangeText={(v) => set("language", v || null)}
+            options={FILM_LANGUAGES}
+            selected={input.language ? [input.language] : []}
+            disabled={a.busy}
+            onToggle={(language) =>
+              set("language", input.language === language ? null : language)
+            }
           />
           <Button
             title={

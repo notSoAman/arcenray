@@ -125,6 +125,61 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
     </View>
   );
 }
+export function Chips({
+  label,
+  options,
+  selected,
+  onToggle,
+  disabled = false,
+}: {
+  label: string;
+  options: readonly string[];
+  selected: readonly string[];
+  onToggle: (option: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <View style={{ gap: 8 }} accessibilityLabel={label}>
+      <Muted>{label}</Muted>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {options.map((option) => {
+          const on = selected.includes(option);
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="checkbox"
+              accessibilityLabel={option}
+              accessibilityState={{ checked: on, disabled }}
+              disabled={disabled}
+              onPress={() => onToggle(option)}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                minHeight: 40,
+                borderRadius: 20,
+                justifyContent: "center",
+                borderWidth: 1,
+                borderColor: on ? colors.bone : colors.muted,
+                backgroundColor: on ? colors.bone : colors.graphite,
+                opacity: disabled && !on ? 0.5 : 1,
+              }}
+            >
+              <Text
+                style={{
+                  color: on ? colors.void : colors.bone,
+                  fontSize: 14,
+                  fontWeight: on ? "600" : "400",
+                }}
+              >
+                {option}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 export function Notice({
   message,
   retry,

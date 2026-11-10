@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { FILM_GENRES } from "@repo/shared";
 import { useSession } from "../../src/session";
 import { filmPage, type Film } from "../../src/data";
 import { FilmTile } from "../../src/cards";
@@ -10,13 +11,12 @@ import {
   Busy,
   Button,
   Nav,
+  Chips,
   useResource,
   useAction,
-  Field,
 } from "../../src/ui";
 export default function Home() {
   const { api, me } = useSession();
-  const [genre, setGenre] = useState("");
   const [activeGenre, setActiveGenre] = useState("");
   const [more, setMore] = useState<Film[]>([]);
   const a = useAction();
@@ -36,16 +36,16 @@ export default function Home() {
           : "Discover independent films. Browse as a guest."}
       </Muted>
       <Nav title="Publish your film" href="/publish" />
-      <Field label="Genre filter" value={genre} onChangeText={setGenre} />
-      <Button
-        title="Apply filter"
-        onPress={() => {
+      <Chips
+        label="Genre"
+        options={FILM_GENRES}
+        selected={activeGenre ? [activeGenre] : []}
+        disabled={a.busy}
+        onToggle={(value) => {
           setMore([]);
           setHasMore(true);
-          setActiveGenre(genre.trim());
-          r.reload();
+          setActiveGenre(activeGenre === value ? "" : value);
         }}
-        secondary
       />
       {!api ? (
         <Notice message="Add public backend configuration to load films." />

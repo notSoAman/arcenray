@@ -21,7 +21,7 @@ ID `68a21561-8def-4dff-b6b8-e686e7c3a2c4`. `app.json` declares that owner/projec
 
 `app.config.ts` retains `com.arcenray.mobile.dev` and `arcenray-dev://` for local
 development. The EAS `production` profile selects `com.arcenray.mobile`,
-`arcenray://`, version code 1 and an Android App Bundle. Expo SDK 58 targets
+`arcenray://`, version code 3 and an Android App Bundle. Expo SDK 58 targets
 Android API 36. The Expo dependencies were aligned to the SDK's expected patch
 versions; run `expo install --check` before building.
 

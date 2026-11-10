@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { router } from "expo-router";
+import { FILM_GENRES } from "@repo/shared";
 import { useSession } from "../../src/session";
 import {
   Screen,
   Title,
   Field,
   Button,
+  Chips,
   Copy,
   Muted,
   Notice,
@@ -50,13 +52,15 @@ export default function Search() {
           }
         }}
       />
-      <Field
-        label="Genre (e.g. Drama)"
-        value={genre}
-        editable={!a.busy}
-        onChangeText={(value) => {
-          setGenre(value);
-          if (value.trim()) {
+      <Chips
+        label="Genre"
+        options={FILM_GENRES}
+        selected={genre ? [genre] : []}
+        disabled={a.busy}
+        onToggle={(value) => {
+          const next = genre === value ? "" : value;
+          setGenre(next);
+          if (next) {
             setKind("film");
             setRole("");
           }
