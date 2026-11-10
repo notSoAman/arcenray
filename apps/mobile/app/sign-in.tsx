@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { LogoTile, Lockup } from "../src/brand";
 import { Spectrum } from "../src/visuals";
 import { Button, Field, Kicker, Notice } from "../src/ui";
+import { IconGoogle } from "../src/icons";
 import { colors, fonts, radius } from "../src/theme";
 
 /**
@@ -49,6 +50,7 @@ function GoogleButton({ onPress, busy }: { onPress: () => void; busy: boolean })
         opacity: pressed || busy ? 0.6 : 1,
       })}
     >
+      <IconGoogle size={18} />
       <Text style={{ color: colors.bone, fontFamily: fonts.semibold, fontSize: 16 }}>
         Continue with Google
       </Text>

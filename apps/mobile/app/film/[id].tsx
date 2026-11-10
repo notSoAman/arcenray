@@ -4,9 +4,10 @@ import { useLocalSearchParams, router } from "expo-router";
 import * as Crypto from "expo-crypto";
 import { uuidSchema } from "@repo/shared";
 import { useSession } from "../../src/session";
-import { filmDetail, toggleFilm, report, duration } from "../../src/data";
+import { filmDetail, toggleFilm, report, duration, filmColumns, withCreators, type Film } from "../../src/data";
 import { FilmPlayer } from "../../src/player";
 import { Avatar } from "../../src/visuals";
+import { WideCard } from "../../src/cards";
 import { IconHeart, IconBookmark, IconShare } from "../../src/icons";
 import {
   Screen,
@@ -78,10 +79,10 @@ export default function FilmScreen() {
     if (!api || !key) return null;
     const film = await filmDetail(api, key);
     if (!film) return null;
-    const [creator, credits, likes, saves] = await Promise.all([
+    const [creator, credits, likes, saves, following, related] = await Promise.all([
       api.supabase
         .from("profiles")
-        .select("handle,full_name,roles,location_city,profile_pic_key")
+        .select("id,handle,full_name,roles,location_city,profile_pic_key")
         .eq("id", film.owner_id)
         .maybeSingle(),
       api.supabase
@@ -104,6 +105,24 @@ export default function FilmScreen() {
             .eq("user_id", me.id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      me && me.id !== film.owner_id
+        ? api.supabase
+            .from("profile_follows")
+            .select("following_id")
+            .eq("follower_id", me.id)
+            .eq("following_id", film.owner_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      film.genres[0]
+        ? api.supabase
+            .from("films")
+            .select(filmColumns)
+            .eq("status", "published")
+            .neq("id", key)
+            .contains("genres", [film.genres[0]])
+            .order("published_at", { ascending: false })
+            .limit(4)
+        : Promise.resolve({ data: [] }),
     ]);
     return {
       film,
@@ -111,6 +130,8 @@ export default function FilmScreen() {
       credits: credits.data ?? [],
       liked: !!likes.data,
       saved: !!saves.data,
+      following: !!following.data,
+      related: await withCreators(api, (related.data ?? []) as Film[]),
     };
   }, [api, key, me]);
   const r = useResource(load);
@@ -205,21 +226,44 @@ export default function FilmScreen() {
                   href={{ pathname: "/publish", params: { draft: d.film.id } }}
                 />
               ) : (
-                <Button
-                  title="Message"
-                  variant="accent"
-                  disabled={a.busy}
-                  onPress={() =>
-                    act(async () => {
-                      const c = await api!.chat.open(d.film.owner_id);
-                      if (c.error) throw c.error;
-                      router.push({
-                        pathname: "/chat/[id]",
-                        params: { id: c.data },
-                      });
-                    })
-                  }
-                />
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  <Button
+                    title="Message"
+                    variant="accent"
+                    disabled={a.busy}
+                    onPress={() =>
+                      act(async () => {
+                        const c = await api!.chat.open(d.film.owner_id);
+                        if (c.error) throw c.error;
+                        router.push({
+                          pathname: "/chat/[id]",
+                          params: { id: c.data },
+                        });
+                      })
+                    }
+                  />
+                  <Button
+                    title={d.following ? "Following" : "Follow"}
+                    variant="ghost"
+                    disabled={a.busy}
+                    onPress={() =>
+                      act(async () => {
+                        const x = d.following
+                          ? await api!.supabase
+                              .from("profile_follows")
+                              .delete()
+                              .eq("follower_id", me!.id)
+                              .eq("following_id", d.film.owner_id)
+                          : await api!.supabase.from("profile_follows").insert({
+                              follower_id: me!.id,
+                              following_id: d.film.owner_id,
+                            });
+                        if (x.error) throw x.error;
+                        r.reload();
+                      })
+                    }
+                  />
+                </View>
               )}
             </View>
           ) : null}
@@ -309,6 +353,15 @@ export default function FilmScreen() {
               <Muted>No credits listed yet.</Muted>
             )}
           </View>
+
+          {d.related.length > 0 ? (
+            <View style={{ gap: 16 }}>
+              <SectionTitle>On the same wavelength</SectionTitle>
+              {d.related.map((f) => (
+                <WideCard key={f.id} film={f} />
+              ))}
+            </View>
+          ) : null}
 
           {reported ? (
             <Copy>Report sent for review.</Copy>

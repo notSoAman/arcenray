@@ -9,15 +9,16 @@ import {
   Text,
   View,
 } from "react-native";
-import { Link, useFocusEffect } from "expo-router";
+import { Link, router, useFocusEffect } from "expo-router";
 import { useEvent, useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSession } from "../../src/session";
 import { config, publicMediaUrl } from "../../src/config";
-import type { Film } from "../../src/data";
+import { withCreators, type Film } from "../../src/data";
 import { colors, fonts } from "../../src/theme";
+import { Avatar } from "../../src/visuals";
 import { Busy } from "../../src/ui";
 
 function Action({
@@ -182,7 +183,7 @@ export default function Loop() {
       const result = await api.loop.page([...seen.current], 10);
       if (version !== generation.current) return;
       if (result.error) throw result.error;
-      const rows = result.data ?? [];
+      const rows = await withCreators(api, result.data ?? []);
       const fresh = rows.filter((film) => {
         if (seen.current.has(film.id)) return false;
         seen.current.add(film.id);
@@ -341,6 +342,28 @@ export default function Loop() {
                     {film.title}
                   </Text>
                 </Link>
+                {film.creator ? (
+                  <Pressable
+                    accessibilityRole="link"
+                    onPress={() =>
+                      router.push({
+                        pathname: "/u/[handle]",
+                        params: { handle: film.creator!.handle },
+                      })
+                    }
+                    style={s.creator}
+                  >
+                    <Avatar
+                      picKey={film.creator.profile_pic_key}
+                      name={film.creator.full_name}
+                      size={28}
+                    />
+                    <Text style={s.creatorText}>
+                      {film.creator.full_name}
+                      <Text style={s.creatorHandle}> @{film.creator.handle}</Text>
+                    </Text>
+                  </Pressable>
+                ) : null}
                 <Text style={s.synopsis} numberOfLines={2}>
                   {film.synopsis}
                 </Text>
@@ -497,6 +520,9 @@ const s = StyleSheet.create({
     gap: 8,
   },
   title: { color: colors.text, fontFamily: fonts.extraBold, fontSize: 24, lineHeight: 28 },
+  creator: { flexDirection: "row", alignItems: "center", gap: 8 },
+  creatorText: { color: colors.bone, fontFamily: fonts.semibold, fontSize: 13 },
+  creatorHandle: { color: colors.muted, fontFamily: fonts.regular },
   meta: { color: colors.bone, fontFamily: fonts.monoBold, fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase" },
   synopsis: { color: colors.bone, fontFamily: fonts.regular, fontSize: 13, lineHeight: 19 },
   feedback: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

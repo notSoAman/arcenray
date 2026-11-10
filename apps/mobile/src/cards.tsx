@@ -3,7 +3,7 @@ import { Link, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Poster, Avatar, Spectrum } from "./visuals";
 import { colors, fonts, radius } from "./theme";
-import { duration, type Film } from "./data";
+import { duration, byline, type Film } from "./data";
 
 function Badge({ label }: { label: string }) {
   return (
@@ -33,7 +33,7 @@ function meta(film: Film) {
 
 /** Portrait poster card (home grid, picks). */
 export function PosterCard({ film }: { film: Film }) {
-  const sub = meta(film);
+  const sub = byline(film) ?? meta(film);
   return (
     <Link href={{ pathname: "/film/[id]", params: { id: film.id } }} asChild>
       <Pressable
@@ -70,7 +70,7 @@ export function PosterCard({ film }: { film: Film }) {
 
 /** Landscape card (profile films, related films). */
 export function WideCard({ film }: { film: Film }) {
-  const sub = meta(film);
+  const sub = byline(film) ?? meta(film);
   return (
     <Link href={{ pathname: "/film/[id]", params: { id: film.id } }} asChild>
       <Pressable
@@ -102,7 +102,9 @@ export function WideCard({ film }: { film: Film }) {
 
 /** Search / discovery result row with a small poster. */
 export function RowCard({ film }: { film: Film }) {
-  const sub = meta(film);
+  const sub = [film.creator?.full_name, film.genres[0], film.location_city]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Link href={{ pathname: "/film/[id]", params: { id: film.id } }} asChild>
       <Pressable
@@ -144,6 +146,7 @@ export function RowCard({ film }: { film: Film }) {
 
 /** Cinematic spectrum panel with the poster on a calm surface (W1, W2). */
 export function FeaturedFilm({ film, kicker }: { film: Film; kicker: string }) {
+  const by = byline(film, { role: true });
   const sub = [film.genres[0], duration(film.duration_seconds)]
     .filter(Boolean)
     .join(" · ");
@@ -193,8 +196,13 @@ export function FeaturedFilm({ film, kicker }: { film: Film; kicker: string }) {
           >
             {film.title}
           </Text>
-          {sub ? (
+          {by ? (
             <Text style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 14 }}>
+              {by}
+            </Text>
+          ) : null}
+          {sub ? (
+            <Text style={{ color: colors.faint, fontFamily: fonts.regular, fontSize: 13 }}>
               {sub}
             </Text>
           ) : null}
