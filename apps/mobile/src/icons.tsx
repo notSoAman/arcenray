@@ -1,5 +1,6 @@
 import Svg, { Path, Circle, type SvgProps } from "react-native-svg";
-/** Exact stroke paths from the accepted web icons, rendered with native SVG. */
+
+/** Exact stroke paths from the accepted web icons (apps/web/components/icons.tsx). */
 export function TabIcon({
   name,
   color,
@@ -41,3 +42,106 @@ export function TabIcon({
     </Svg>
   );
 }
+
+type IconProps = {
+  size?: number;
+  color?: string;
+};
+
+function Base({
+  size = 20,
+  color = "currentColor",
+  children,
+  fill = "none",
+  strokeWidth = 1.7,
+}: IconProps & {
+  children: React.ReactNode;
+  fill?: string;
+  strokeWidth?: number;
+}) {
+  return (
+    <Svg
+      accessible={false}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={fill}
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </Svg>
+  );
+}
+
+export const IconPlay = ({ size = 16, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color} fill="currentColor" strokeWidth={0}>
+    <Path d="M8 5v14l11-7z" />
+  </Base>
+);
+
+export const IconHeart = ({
+  size = 18,
+  color = "currentColor",
+  filled = false,
+}: IconProps & { filled?: boolean }) => (
+  <Base size={size} color={color} fill={filled ? "currentColor" : "none"}>
+    <Path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />
+  </Base>
+);
+
+export const IconBookmark = ({
+  size = 18,
+  color = "currentColor",
+  filled = false,
+}: IconProps & { filled?: boolean }) => (
+  <Base size={size} color={color} fill={filled ? "currentColor" : "none"}>
+    <Path d="M6 4h12v17l-6-4-6 4z" />
+  </Base>
+);
+
+export const IconShare = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M12 15V4M8 8l4-4 4 4M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6" />
+  </Base>
+);
+
+export const IconFlag = ({ size = 16, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M5 21V4M5 4h11l-2 4 2 4H5" />
+  </Base>
+);
+
+export const IconPin = ({ size = 16, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" />
+    <Circle cx={12} cy={10} r={2.2} />
+  </Base>
+);
+
+export const IconCheck = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M5 12.5 10 17l9-10" />
+  </Base>
+);
+
+export const IconSend = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M4 12 20 4l-6 16-3-7z" />
+  </Base>
+);
+
+export const IconSearch = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Circle cx={11} cy={11} r={7} />
+    <Path d="m20 20-3.5-3.5" />
+  </Base>
+);
+
+export const IconChevron = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M9 5l7 7-7 7" />
+  </Base>
+);
