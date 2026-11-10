@@ -7,8 +7,44 @@ path. [Architecture and flow coverage](../../docs/architecture/mobile-parity.md)
 Home, Loop, search, film playback/actions, public profiles, onboarding/profile editing,
 creator publishing/credits, one-to-one chat and settings use the existing shared API,
 Clerk identity, Supabase RLS/RPCs and media protocol. Rendering is native. External
-Vimeo/YouTube players use provider embeds; Clerk authentication uses its hosted browser
-flow. Next.js server components and browser UI are not imported.
+Vimeo/YouTube players use provider embeds. Sign-in is a native in-app screen built on
+Clerk's future (Core 3) resources — email/username, password, email code and Google
+OAuth — with the hosted browser flow kept as a labelled fallback. Next.js server
+components and browser UI are not imported.
+
+## Web-parity visual rebuild — 10 November 2026
+
+The mobile UI was rebuilt to mirror the web design system instead of the earlier
+generic cards. No Clerk/Supabase schema, RLS, provider or deployment configuration
+was changed.
+
+- **Tokens and type:** `src/theme.ts` now mirrors `apps/web/app/globals.css` (full
+  palette, radii, type scale). Inter Tight and tracked uppercase Courier Prime are
+  loaded with `@expo-google-fonts/inter-tight` + `@expo-google-fonts/courier-prime`
+  and `expo-font`; the app gates on font load to avoid a system-font flash.
+- **Logo:** the accepted `arcenray-a.webp` / `arcenray-mark.webp` exports are used by
+  native `Lockup` (header), `LogoMark` and `LogoTile` (sign-in) components on Void.
+  The launcher/adaptive icon already used the accepted logo on Void (verified by
+  colour analysis) and were not redrawn.
+- **Chrome and surfaces:** frosted header lockup, glass bottom tab bar with an ember
+  active dot (translucent approximation; no `expo-blur` dependency), spectrum hero
+  and poster treatments, `expo-linear-gradient` for the film-play button and scrims.
+- **Screens:** home (featured spectrum panel + poster grid + intentional
+  loading/empty/error panels), Loop deck, film page, search, profile/You and chats.
+- **Sign-in:** native screen using `useSignIn`/`useSignUp` from `@clerk/expo` (future
+  resources): email/username identifier, password and email-code first factors,
+  email+username+password sign-up with email verification, and Google OAuth via
+  `useSSO` from `@clerk/expo/experimental`. `useHostedAuth` remains a fallback link.
+- **Dependencies added:** `expo-font@58.0.11`, `@expo-google-fonts/inter-tight`,
+  `@expo-google-fonts/courier-prime`, `expo-linear-gradient@58.0.3`.
+- **Verification:** mobile check-types/lint pass; mobile 13, shared 8 and web 53 tests
+  pass. Debug build installed on Pixel_9_Pro (API 36) and screens captured for home,
+  Loop, film, search, sign-in, You, empty and offline-error states at 1080×1920, beside
+  the web at 390×844. Release AAB rebuilt and verified (`jar verified.`, upload cert,
+  package `com.arcenray.mobile`, `SYSTEM_ALERT_WINDOW` absent).
+- **Not approved:** visual sign-off remains the founder's. Known gaps are listed in the
+  handoff (creator bylines/picks need a feed join; no true backdrop blur; no related
+  films; Google button has no logo).
 
 ## Accounts and public configuration
 
