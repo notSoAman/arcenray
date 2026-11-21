@@ -28,7 +28,12 @@
     }
   },
   "submit": {
-    "closed-testing": { "android": { "track": "Arcenray Closed Testing" } },
+    "closed-testing": {
+      "android": {
+        "applicationId": "com.arcenray.mobile",
+        "track": "Arcenray Closed Testing"
+      }
+    },
     "internal": { "android": { "track": "internal" } },
     "alpha": { "android": { "track": "alpha" } },
     "beta": { "android": { "track": "beta" } },
