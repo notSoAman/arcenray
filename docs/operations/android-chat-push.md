@@ -47,3 +47,25 @@ Run the rollback-only database assertions against an isolated Supabase instance
 with `pnpm exec supabase db query --local --file supabase/tests/chat-push.sql`.
 Confirm **Private Android chat push registration, delivery and authorization
 assertions passed**. The local check does not exercise Expo or FCM delivery.
+
+## Production rollout — 2026-11-21
+
+- Production project `ropbxsnjtejfomnpdllf`: migration
+  `20261121170337_android_chat_push` applied. The rollback-only registration,
+  delivery, read, block, revocation and authorization assertions passed on
+  production. Cron `arcenray-chat-push` is active at a ten-second interval.
+- `chat-push-device` and `chat-push-dispatch` are deployed. The production
+  `EXPO_PUSH_ACCESS_TOKEN` secret is set and Expo enhanced push security is
+  enabled. A dispatch smoke request authenticated with the Vault operations
+  credentials returned HTTP 200 with `{claimed:0,rejected:0}`.
+- Production build `067f0421-af84-4918-b1b4-e0fe56bee9f0` completed as
+  `0.1.0 (10)` from commit `e4e6c7c`. The AAB SHA-256 is
+  `fd69f1a5e93de7ea98816a33464f65f04a32a467f45feec2951f0b07d40f36b1`
+  and it is signed with upload key SHA-1
+  `9A:B2:F4:38:7A:5A:00:97:48:6C:E3:3E:63:05:E4:47:6E:57:4D:1D`.
+  The manifest contains `POST_NOTIFICATIONS`, the Expo Firebase messaging
+  service and the `chat-messages` default channel.
+- Play submission `9c054528-d03c-4055-975c-0c227ea14a3b` uploaded the build to
+  **Arcenray Closed Testing** with release status completed. Play Console showed
+  the release **in review** at the time of writing; tester availability and the
+  real lock-screen delivery test remain pending.
