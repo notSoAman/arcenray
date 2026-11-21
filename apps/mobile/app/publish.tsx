@@ -1,18 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Alert } from "react-native";
+import { AppState, Alert, Pressable, View } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import type { File } from "expo-file-system";
 import {
   FILM_GENRES,
   FILM_LANGUAGES,
+  assertFilmRights,
   filmDraftSchema,
+  filmLinkGuidance,
+  filmLinkOption,
+  filmLinkPlaceholder,
+  filmRightsConfirmation,
+  nativeFilmGuidance,
   parseFilmLink,
+  preferredFilmSource,
   uuidSchema,
   type FilmDraft,
 } from "@repo/shared";
 import type { MultipartState } from "@repo/shared/media";
 import { filmRequirements } from "@repo/shared/media-preflight";
 import { Gate, useSession } from "../src/session";
+import { IconCheck } from "../src/icons";
+import { colors } from "../src/theme";
 import {
   mainFilmTask,
   smallMediaTask,
@@ -33,6 +42,7 @@ import {
   Notice,
   Busy,
   Chips,
+  Pill,
   useAction,
   useResource,
 } from "../src/ui";
@@ -43,7 +53,7 @@ const empty: FilmDraft = {
   mood_tags: [],
   location_city: null,
   language: null,
-  source: "r2_native",
+  source: preferredFilmSource,
   provider_id: null,
   film_asset_id: null,
   hook_asset_id: null,
@@ -61,6 +71,7 @@ function Publisher() {
   const [moodText, setMoodText] = useState("");
   const [deletionConfirmation, setDeletionConfirmation] = useState("");
   const [external, setExternal] = useState("");
+  const [rights, setRights] = useState(false);
   const [file, setFile] = useState<{
     name: string;
     file: File;
@@ -190,13 +201,20 @@ function Publisher() {
   }
   async function upload() {
     let value = validated();
+    const main = value.source === "r2_native" ? file : null;
+    const hasUploads = Boolean(main || poster || hook);
+    if (hasUploads) assertFilmRights(value.source, rights);
     const id = await save(value);
+    if (!hasUploads) {
+      setStage("Draft saved.");
+      return;
+    }
     setStage("Checking storage…");
     const quota = await api!.media.storage();
     if (quota.error) throw quota.error;
-    if (file && value.source === "r2_native") {
+    if (main) {
       if (!task.current)
-        task.current = mainFilmTask(file.file, api!, me!.id, id, (next) => {
+        task.current = mainFilmTask(main.file, api!, me!.id, id, (next) => {
           setState(next);
           if (next.assetId)
             setInput((current) => ({
@@ -238,16 +256,21 @@ function Publisher() {
       delete small.current[item.kind];
     }
     setStage(
-      "Draft saved. Main films must finish processing before publication.",
+      value.source === "r2_native"
+        ? "Draft saved. Main films must finish processing before publication."
+        : "Draft saved.",
     );
+  }
+  const native = input.source === "r2_native";
+  const sourceLocked = a.busy || !!input.film_asset_id || !!state;
+  function changeSource(next: "r2_native" | typeof preferredFilmSource) {
+    setRights(false);
+    setInput((old) => ({ ...old, source: next, provider_id: null }));
   }
   return (
     <Screen>
       <PageTitle>Put your work out there.</PageTitle>
-      <Muted>
-        Native MP4 upload or an external Vimeo/YouTube link. A poster is
-        required; a discovery hook is optional.
-      </Muted>
+      <Muted>Save a private draft and publish when you’re ready.</Muted>
       {drafts.loading ? <Busy /> : null}
       <Notice message={drafts.error} retry={drafts.reload} />
       {!draftId ? (
@@ -311,23 +334,72 @@ function Publisher() {
               set("language", input.language === language ? null : language)
             }
           />
-          <Button
-            title={
-              input.source === "r2_native"
-                ? "Use external film link instead"
-                : "Use native MP4 upload instead"
-            }
-            variant="ghost"
-            disabled={a.busy || !!input.film_asset_id || !!state}
-            onPress={() => {
-              set(
-                "source",
-                input.source === "r2_native" ? "vimeo_embed" : "r2_native",
-              );
-              set("provider_id", null);
+          <Copy>Film source</Copy>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            <Pill
+              label={filmLinkOption}
+              on={!native}
+              disabled={sourceLocked}
+              onPress={() => {
+                if (native) changeSource(preferredFilmSource);
+              }}
+            />
+            <Pill
+              label="Upload an MP4 to Arcenray"
+              on={native}
+              disabled={sourceLocked}
+              onPress={() => {
+                if (!native) changeSource("r2_native");
+              }}
+            />
+          </View>
+          <Muted>{native ? nativeFilmGuidance : filmLinkGuidance}</Muted>
+          {!native ? (
+            <Field
+              label="YouTube or Vimeo video link"
+              value={external}
+              onChangeText={(value) => {
+                setExternal(value);
+                setRights(false);
+              }}
+              autoCapitalize="none"
+              autoComplete="url"
+              keyboardType="url"
+              placeholder={filmLinkPlaceholder}
+              editable={!a.busy}
+            />
+          ) : null}
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: rights, disabled: a.busy }}
+            disabled={a.busy}
+            onPress={() => setRights((value) => !value)}
+            style={{
+              minHeight: 44,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
             }}
-          />
-          {input.source === "r2_native" ? (
+          >
+            <View
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 5,
+                borderWidth: 1,
+                borderColor: rights ? colors.bone : colors.lineStrong,
+                backgroundColor: rights ? colors.bone : colors.graphite,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {rights && <IconCheck size={16} color={colors.void} />}
+            </View>
+            <Copy style={{ flex: 1 }}>
+              {filmRightsConfirmation(input.source)}
+            </Copy>
+          </Pressable>
+          {native ? (
             <>
               <Button
                 title={file ? `Selected: ${file.name}` : "Select an MP4 film"}
@@ -373,16 +445,9 @@ function Publisher() {
                 the same file to resume verified parts.
               </Muted>
             </>
-          ) : (
-            <Field
-              label="HTTPS Vimeo or YouTube link"
-              value={external}
-              onChangeText={setExternal}
-              autoCapitalize="none"
-            />
-          )}
+          ) : null}
           <Button
-            title={poster ? "Poster selected" : "Choose poster"}
+            title={poster ? "Poster selected" : "Choose optional poster"}
             variant="ghost"
             disabled={a.busy}
             onPress={() =>
@@ -526,13 +591,16 @@ function Publisher() {
               title="Publish film"
               disabled={
                 a.busy ||
-                !input.poster_asset_id ||
-                (input.source === "r2_native" &&
+                !rights ||
+                Boolean(poster || hook) ||
+                (native &&
                   (!input.film_asset_id || processing?.state !== "complete"))
               }
               onPress={() =>
                 a.run(async () => {
-                  await save(validated());
+                  const value = validated();
+                  assertFilmRights(value.source, rights);
+                  await save(value);
                   const x = await api!.films.publish(draftId);
                   if (x.error) throw x.error;
                   void api!.index("film", draftId).catch(() => {});

@@ -1,20 +1,47 @@
-import app from "./app.json";
+import type { ConfigContext, ExpoConfig } from "expo/config";
+import { mobileReleaseConfig } from "./src/release-config.ts";
 
-const production = process.env.APP_VARIANT === "production";
+export default ({ config }: ConfigContext): ExpoConfig => {
+  const release = mobileReleaseConfig({
+    variant: process.env.APP_VARIANT,
+    channel: process.env.EXPO_UPDATE_CHANNEL,
+    projectId: config.extra?.eas.projectId,
+  });
 
-export default {
-  expo: {
-    ...app.expo,
+  const googleServicesFile = process.env.ARCENRAY_ANDROID_GOOGLE_SERVICES_FILE;
+
+  return {
+    ...config,
+    name: config.name ?? "Arcenray",
+    slug: config.slug ?? "arcenray",
     icon: "./assets/icon.png",
-    scheme: production ? "arcenray" : app.expo.scheme,
+    scheme: release.scheme,
+    runtimeVersion: release.runtimeVersion,
+    updates: release.updates,
+    plugins: [
+      ...(config.plugins ?? []),
+      [
+        "expo-notifications",
+        { defaultChannel: "chat-messages", color: "#C2234B" },
+      ],
+    ],
     android: {
-      ...app.expo.android,
+      ...config.android,
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
+        foregroundImage: "./assets/adaptive-icon-safe-zone.png",
         backgroundColor: "#0E0F0E",
       },
-      package: production ? "com.arcenray.mobile" : app.expo.android.package,
-      versionCode: 4,
+      package: release.android.package,
+      ...(googleServicesFile ? { googleServicesFile } : {}),
     },
-  },
+    extra: {
+      ...config.extra,
+      chatPushEnabled: !!googleServicesFile,
+      // Public Google OAuth client ID for native Credential Manager sign-in.
+      EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID:
+        process.env.EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID ??
+        config.extra?.EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID ??
+        null,
+    },
+  };
 };

@@ -68,3 +68,66 @@ export function chatFileType(name: string, reported?: string | null) {
     )[ext ?? ""] ?? "application/octet-stream"
   );
 }
+
+export const voiceNoteName = "Voice note.m4a";
+export const voiceNoteLimitMs = 30 * 60 * 1000;
+
+export function isVoiceNote(name: string) {
+  return (
+    name === voiceNoteName ||
+    /^Voice note \d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.m4a$/.test(name)
+  );
+}
+
+export function chatPreview(body: string, attachmentId: string | null) {
+  return attachmentId && isVoiceNote(body)
+    ? "Voice note"
+    : body || "Attachment";
+}
+
+export function voiceNoteTime(seconds: number) {
+  const elapsed = Number.isFinite(seconds)
+    ? Math.max(0, Math.floor(seconds))
+    : 0;
+  return `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
+}
+
+type ChatActivity = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  created_at: string;
+};
+
+export function isUnreadChat(
+  message: ChatActivity,
+  lastRead: string,
+  userId: string,
+) {
+  return message.sender_id !== userId && message.created_at > lastRead;
+}
+
+export function newestChatAlert<T extends ChatActivity>(
+  messages: T[],
+  previous: T[],
+  receipts: ReadonlyMap<string, string>,
+  userId: string,
+  openThread: string | null,
+) {
+  const known = new Map(
+    previous.map((message) => [message.conversation_id, message]),
+  );
+  return messages.find((message) => {
+    const id = message.conversation_id;
+    const before = known.get(id);
+    const lastRead = receipts.get(id);
+    return (
+      id !== openThread &&
+      lastRead !== undefined &&
+      isUnreadChat(message, lastRead, userId) &&
+      (!before ||
+        message.created_at > before.created_at ||
+        (message.created_at === before.created_at && message.id > before.id))
+    );
+  });
+}

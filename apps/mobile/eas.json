@@ -1,13 +1,37 @@
 {
-  "cli": { "version": ">=25.3.0", "appVersionSource": "local" },
+  "cli": { "version": ">=27.10.0", "appVersionSource": "remote" },
   "build": {
-    "development": { "developmentClient": true, "distribution": "internal" },
-    "preview": { "distribution": "internal", "android": { "buildType": "apk" } },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development"
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "environment": "preview",
+      "env": { "APP_VARIANT": "production", "EXPO_UPDATE_CHANNEL": "preview" },
+      "android": { "buildType": "apk" }
+    },
     "production": {
+      "node": "24.18.0",
+      "pnpm": "11.25.0",
+      "autoIncrement": true,
       "distribution": "store",
       "environment": "production",
-      "env": { "APP_VARIANT": "production" },
+      "channel": "production",
+      "env": {
+        "APP_VARIANT": "production",
+        "EXPO_UPDATE_CHANNEL": "production"
+      },
       "android": { "buildType": "app-bundle" }
     }
+  },
+  "submit": {
+    "closed-testing": { "android": { "track": "Arcenray Closed Testing" } },
+    "internal": { "android": { "track": "internal" } },
+    "alpha": { "android": { "track": "alpha" } },
+    "beta": { "android": { "track": "beta" } },
+    "production": { "android": { "track": "production" } }
   }
 }

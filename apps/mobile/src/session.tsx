@@ -1,3 +1,4 @@
+import { View } from "react-native";
 import { ClerkProvider, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import {
@@ -12,7 +13,10 @@ import {
 import { createMobileApi } from "./api";
 import type { Database } from "@repo/shared";
 import { config } from "./config";
-import { useResource, Screen, Copy, Nav, Notice, Busy } from "./ui";
+import { useResource, Screen, Copy, Notice, Busy, Button, PageTitle, Kicker, StatePanel } from "./ui";
+import { Spectrum } from "./visuals";
+import { colors } from "./theme";
+import { router } from "expo-router";
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Api = ReturnType<typeof createMobileApi>;
@@ -114,11 +118,28 @@ export function Gate({
   if (!s.signedIn)
     return (
       <Screen>
+        <View style={{ borderRadius: 26, overflow: "hidden", height: 150 }}>
+          <Spectrum kind="hero" style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} />
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              backgroundColor: "rgba(14,15,14,0.45)",
+            }}
+          />
+        </View>
+        <View style={{ gap: 8 }}>
+          <Kicker color={colors.pink}>Your creative home</Kicker>
+          <PageTitle size={36}>Sign in to continue.</PageTitle>
+        </View>
         <Copy>
-          Sign in to continue. Public films and people are available without an
-          account.
+          Publish films, follow creatives, save your taste and start private
+          conversations. Public films and people are still open to browse.
         </Copy>
-        <Nav title="Sign in" href="/sign-in" />
+        <Button title="Sign in or create an account" onPress={() => router.push("/sign-in")} />
       </Screen>
     );
   if (s.problem || !s.me || !s.api)
@@ -133,8 +154,12 @@ export function Gate({
   if (onboarding && !s.me.onboarding_completed)
     return (
       <Screen>
-        <Copy>Finish your creative profile to continue.</Copy>
-        <Nav title="Complete your profile" href="/onboarding" />
+        <StatePanel
+          title="Finish your creative profile."
+          body="Pick your roles, city and a few films you love so arcenray can find your people."
+        >
+          <Button title="Complete your profile" onPress={() => router.push("/onboarding")} />
+        </StatePanel>
       </Screen>
     );
   return children;

@@ -1,4 +1,4 @@
-import { createArcenrayClient } from "@repo/shared";
+import { createArcenrayClient, scopeDiscoverySearch } from "@repo/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RowCard } from "../../../components/film-cards";
@@ -139,6 +139,22 @@ export default async function SearchPage({
     <main className="app-main">
       <section className={styles.top}>
         <h1 className="page-title">Search</h1>
+        <div className={styles.intro}>
+          <h2>Find your next collaborator.</h2>
+          <p>
+            Browse people by craft and city, explore their films and listed
+            credits, then message them about what you want to make. Public
+            profiles are open to browse; sign in to start a private
+            conversation.
+          </p>
+          <Link href="/search?kind=profile" className="btn btn-primary">
+            Find collaborators
+          </Link>
+          <p>
+            Project listings and interest submissions aren&apos;t available yet.
+            For now, introduce your project in a message.
+          </p>
+        </div>
         <form
           action="/search"
           method="get"
@@ -284,11 +300,13 @@ export default async function SearchPage({
                   key={key}
                   role="tab"
                   aria-selected={on}
-                  href={href(params, {
-                    kind: key === "all" ? undefined : key,
-                    role: key === "profile" ? params.role : undefined,
-                    genre: key === "film" ? params.genre : undefined,
-                  })}
+                  href={href(
+                    params,
+                    scopeDiscoverySearch(
+                      params,
+                      key as "all" | "film" | "profile",
+                    ),
+                  )}
                   className={styles.scope}
                 >
                   {label}
@@ -321,8 +339,9 @@ export default async function SearchPage({
             <div className="state-panel">
               <h2>Nothing matched that yet</h2>
               <p>
-                Try describing a mood, a place or a kind of person, or loosen
-                the advanced filters.
+                {kind === "profile"
+                  ? "No creatives matched these filters. Try another role or city, or clear your search. You can also discover people through a film’s listed credits."
+                  : "Try describing a mood, a place or a kind of person, or loosen the advanced filters."}
               </p>
               <Link href="/search" className="btn btn-primary">
                 Clear search and filters

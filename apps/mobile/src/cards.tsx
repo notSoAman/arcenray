@@ -1,21 +1,24 @@
 import { Pressable, Text, View } from "react-native";
-import { Link, router } from "expo-router";
+import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Poster, Avatar, Spectrum } from "./visuals";
-import { colors, fonts, radius } from "./theme";
-import { duration, byline, type Film } from "./data";
+import { colors, fonts, gradients, radius, shadow } from "./theme";
+import { duration, byline, personRole, type Film } from "./data";
+import { HookPreview } from "./hook-preview";
+import { Button, haptic } from "./ui";
+import { IconPlay } from "./icons";
 
 function Badge({ label }: { label: string }) {
   return (
     <View
       style={{
         position: "absolute",
-        right: 10,
-        bottom: 10,
+        right: 8,
+        bottom: 8,
         paddingHorizontal: 9,
         paddingVertical: 3,
         borderRadius: 10,
-        backgroundColor: "rgba(14, 15, 14, 0.8)",
+        backgroundColor: "rgba(14, 15, 14, 0.82)",
       }}
     >
       <Text style={{ color: colors.bone, fontFamily: fonts.semibold, fontSize: 12 }}>
@@ -35,14 +38,23 @@ function meta(film: Film) {
 export function PosterCard({ film }: { film: Film }) {
   const sub = byline(film) ?? meta(film);
   return (
-    <Link href={{ pathname: "/film/[id]", params: { id: film.id } }} asChild>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={`Watch ${film.title}`}
-        style={{ gap: 10, flex: 1, minWidth: 0 }}
+        onPress={() => {
+          haptic();
+          router.push({ pathname: "/film/[id]", params: { id: film.id } });
+        }}
+        style={({ pressed }) => ({
+          gap: 9,
+          flex: 1,
+          minWidth: 0,
+          opacity: pressed ? 0.82 : 1,
+          transform: [{ translateY: pressed ? -1 : 0 }],
+        })}
       >
         <View>
-          <Poster posterKey={film.poster_key} title={film.title} aspect={2 / 3} />
+          <Poster posterKey={film.poster_key} title={film.title} aspect={2 / 3} rounded />
           {duration(film.duration_seconds) ? (
             <Badge label={duration(film.duration_seconds)} />
           ) : null}
@@ -54,49 +66,57 @@ export function PosterCard({ film }: { film: Film }) {
             fontFamily: fonts.bold,
             fontSize: 16,
             lineHeight: 20,
+            letterSpacing: -0.2,
           }}
         >
           {film.title}
         </Text>
         {sub ? (
-          <Text numberOfLines={1} style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 13, marginTop: -4 }}>
+          <Text
+            numberOfLines={1}
+            style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 13, marginTop: -3 }}
+          >
             {sub}
           </Text>
         ) : null}
       </Pressable>
-    </Link>
   );
 }
 
 /** Landscape card (profile films, related films). */
-export function WideCard({ film }: { film: Film }) {
-  const sub = byline(film) ?? meta(film);
+export function WideCard({ film, note }: { film: Film; note?: string | null }) {
+  const sub = [byline(film) ?? meta(film), note].filter(Boolean).join(" · ");
   return (
-    <Link href={{ pathname: "/film/[id]", params: { id: film.id } }} asChild>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={`Watch ${film.title}`}
-        style={{ gap: 10 }}
+        onPress={() => {
+          haptic();
+          router.push({ pathname: "/film/[id]", params: { id: film.id } });
+        }}
+        style={({ pressed }) => ({ gap: 9, opacity: pressed ? 0.82 : 1 })}
       >
         <View>
-          <Poster posterKey={film.poster_key} title={film.title} aspect={16 / 9} />
+          <Poster posterKey={film.poster_key} title={film.title} aspect={16 / 9} rounded />
           {duration(film.duration_seconds) ? (
             <Badge label={duration(film.duration_seconds)} />
           ) : null}
         </View>
         <Text
           numberOfLines={1}
-          style={{ color: colors.text, fontFamily: fonts.bold, fontSize: 16 }}
+          style={{ color: colors.text, fontFamily: fonts.bold, fontSize: 16, letterSpacing: -0.2 }}
         >
           {film.title}
         </Text>
         {sub ? (
-          <Text numberOfLines={1} style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 13, marginTop: -4 }}>
+          <Text
+            numberOfLines={1}
+            style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 13, marginTop: -3 }}
+          >
             {sub}
           </Text>
         ) : null}
       </Pressable>
-    </Link>
   );
 }
 
@@ -106,25 +126,31 @@ export function RowCard({ film }: { film: Film }) {
     .filter(Boolean)
     .join(" · ");
   return (
-    <Link href={{ pathname: "/film/[id]", params: { id: film.id } }} asChild>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={`Watch ${film.title}`}
-        style={{
+        onPress={() => {
+          haptic();
+          router.push({ pathname: "/film/[id]", params: { id: film.id } });
+        }}
+        style={({ pressed }) => ({
           flexDirection: "row",
           gap: 14,
           padding: 12,
-          borderRadius: radius.card,
-          backgroundColor: colors.graphite,
-        }}
+          borderRadius: 22,
+          backgroundColor: pressed ? colors.graphiteRaised : colors.graphite,
+        })}
       >
-        <View style={{ width: 96 }}>
-          <Poster posterKey={film.poster_key} title={film.title} aspect={2 / 3} />
+        <View style={{ width: 104 }}>
+          <Poster posterKey={film.poster_key} title={film.title} aspect={2 / 3} rounded />
+          {duration(film.duration_seconds) ? (
+            <Badge label={duration(film.duration_seconds)} />
+          ) : null}
         </View>
-        <View style={{ flex: 1, gap: 6, paddingVertical: 4 }}>
+        <View style={{ flex: 1, gap: 6, paddingVertical: 4, minWidth: 0 }}>
           <Text
             numberOfLines={2}
-            style={{ color: colors.text, fontFamily: fonts.extraBold, fontSize: 18 }}
+            style={{ color: colors.text, fontFamily: fonts.extraBold, fontSize: 18, letterSpacing: -0.3 }}
           >
             {film.title}
           </Text>
@@ -134,13 +160,15 @@ export function RowCard({ film }: { film: Film }) {
             </Text>
           ) : null}
           {film.synopsis ? (
-            <Text numberOfLines={2} style={{ color: colors.textSoft, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 }}>
+            <Text
+              numberOfLines={3}
+              style={{ color: colors.textSoft, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 }}
+            >
               {film.synopsis}
             </Text>
           ) : null}
         </View>
       </Pressable>
-    </Link>
   );
 }
 
@@ -150,60 +178,78 @@ export function FeaturedFilm({ film, kicker }: { film: Film; kicker: string }) {
   const sub = [film.genres[0], duration(film.duration_seconds)]
     .filter(Boolean)
     .join(" · ");
+  const open = () =>
+    router.push({ pathname: "/film/[id]", params: { id: film.id } });
+  const play = () =>
+    router.push({ pathname: "/film/[id]", params: { id: film.id, play: "1" } });
   return (
-    <View style={{ borderRadius: radius.panel, overflow: "hidden" }}>
-      <Spectrum kind="hero" style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} />
-      <LinearGradient
-        colors={["rgba(14,15,14,0.55)", "rgba(14,15,14,0.9)", "rgba(14,15,14,0.96)"]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
+    <View
+      style={{
+        borderRadius: radius.panel,
+        overflow: "hidden",
+        backgroundColor: colors.plum,
+      }}
+    >
+      <Spectrum
+        kind="hero"
         style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
       />
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          gap: 20,
-          padding: 24,
-          alignItems: "center",
-        }}
-      >
-        <View style={{ width: 150 }}>
-          <Poster posterKey={film.poster_key} title={film.title} aspect={2 / 3} />
+      <LinearGradient
+        colors={["rgba(14,15,14,0.5)", "rgba(14,15,14,0.88)", "rgba(14,15,14,0.97)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+      />
+      <View style={{ padding: 22, gap: 18 }}>
+        <View
+          style={{
+            alignSelf: "center",
+            width: 176,
+            maxWidth: "56%",
+            aspectRatio: 2 / 3,
+            borderRadius: 20,
+            overflow: "hidden",
+            backgroundColor: colors.graphite,
+            ...shadow.poster,
+          }}
+        >
+          <HookPreview
+            hookKey={film.hook_key}
+            posterKey={film.poster_key}
+            title={film.title}
+            aspect={2 / 3}
+          />
         </View>
-        <View style={{ flex: 1, minWidth: 220, gap: 12 }}>
+        <View style={{ gap: 11 }}>
           <Text
             style={{
               fontFamily: fonts.monoItalic,
               fontSize: 11,
-              letterSpacing: 2.4,
+              letterSpacing: 2.2,
               textTransform: "uppercase",
               color: colors.orange,
             }}
           >
             {kicker}
           </Text>
-          <Text
-            numberOfLines={2}
-            style={{
-              color: colors.text,
-              fontFamily: fonts.extraBold,
-              fontSize: 30,
-              letterSpacing: -1,
-              lineHeight: 32,
-              textTransform: "uppercase",
-            }}
-          >
-            {film.title}
-          </Text>
+          <Pressable accessibilityRole="link" onPress={open} onPressIn={() => haptic()}>
+            <Text
+              numberOfLines={2}
+              style={{
+                color: colors.text,
+                fontFamily: fonts.extraBold,
+                fontSize: 36,
+                letterSpacing: -1.3,
+                lineHeight: 37,
+                textTransform: "uppercase",
+              }}
+            >
+              {film.title}
+            </Text>
+          </Pressable>
           {by ? (
             <Text style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 14 }}>
               {by}
-            </Text>
-          ) : null}
-          {sub ? (
-            <Text style={{ color: colors.faint, fontFamily: fonts.regular, fontSize: 13 }}>
-              {sub}
             </Text>
           ) : null}
           {film.synopsis ? (
@@ -214,20 +260,46 @@ export function FeaturedFilm({ film, kicker }: { film: Film; kicker: string }) {
               {film.synopsis}
             </Text>
           ) : null}
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+          {sub ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 7 }}>
+              {[film.genres[0], duration(film.duration_seconds)]
+                .filter((x): x is string => Boolean(x))
+                .map((tag) => (
+                  <View
+                    key={tag}
+                    style={{
+                      minHeight: 31,
+                      paddingHorizontal: 13,
+                      borderRadius: radius.pill,
+                      borderWidth: 1,
+                      borderColor: "rgba(243,239,233,0.18)",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ color: colors.chead, fontFamily: fonts.semibold, fontSize: 12 }}>
+                      {tag}
+                    </Text>
+                  </View>
+                ))}
+            </View>
+          ) : null}
+          <View style={{ flexDirection: "row", gap: 9, marginTop: 4 }}>
             <Pressable
               accessibilityRole="link"
               accessibilityLabel={`Play ${film.title}`}
-              onPress={() => router.push({ pathname: "/film/[id]", params: { id: film.id } })}
+              onPress={play}
+              onPressIn={() => haptic("medium")}
+              style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
             >
               <LinearGradient
-                colors={[colors.filmPlayStart, colors.filmPlayMid, colors.filmPlayEnd]}
-                locations={[0, 0.48, 1]}
+                colors={gradients.filmPlay}
+                locations={gradients.filmPlayLocations}
                 start={{ x: 0, y: 0.5 }}
                 end={{ x: 1, y: 0.5 }}
                 style={{
-                  minHeight: 44,
-                  paddingHorizontal: 20,
+                  minHeight: 48,
+                  paddingHorizontal: 22,
                   borderRadius: radius.pill,
                   alignItems: "center",
                   justifyContent: "center",
@@ -235,24 +307,11 @@ export function FeaturedFilm({ film, kicker }: { film: Film; kicker: string }) {
                   gap: 8,
                 }}
               >
-                <Text style={{ color: "#fff", fontFamily: fonts.bold, fontSize: 15 }}>Play</Text>
+                <IconPlay size={13} color="#fff" />
+                <Text style={{ color: "#fff", fontFamily: fonts.bold, fontSize: 14 }}>Play</Text>
               </LinearGradient>
             </Pressable>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel={`Details for ${film.title}`}
-              onPress={() => router.push({ pathname: "/film/[id]", params: { id: film.id } })}
-              style={{
-                minHeight: 44,
-                paddingHorizontal: 20,
-                borderRadius: radius.pill,
-                backgroundColor: "#fff",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ color: colors.void, fontFamily: fonts.bold, fontSize: 15 }}>Details</Text>
-            </Pressable>
+            <Button title="Details" size="md" variant="filmDetails" onPress={open} />
           </View>
         </View>
       </View>
@@ -273,29 +332,29 @@ export function PersonRow({
   };
 }) {
   return (
-    <Link
-      href={{ pathname: "/u/[handle]", params: { handle: person.handle } }}
-      asChild
-    >
       <Pressable
         accessibilityRole="link"
-        style={{
+        onPress={() => {
+          haptic();
+          router.push({ pathname: "/u/[handle]", params: { handle: person.handle } });
+        }}
+        style={({ pressed }) => ({
           flexDirection: "row",
           alignItems: "center",
           gap: 14,
           padding: 14,
-          borderRadius: radius.card,
-          backgroundColor: colors.graphite,
-        }}
+          borderRadius: radius.cardSm,
+          backgroundColor: pressed ? colors.graphiteRaised : colors.graphite,
+        })}
       >
         <Avatar picKey={person.profile_pic_key} name={person.full_name} size={52} />
-        <View style={{ flex: 1, gap: 3 }}>
+        <View style={{ flex: 1, gap: 3, minWidth: 0 }}>
           <Text style={{ color: colors.text, fontFamily: fonts.bold, fontSize: 16 }}>
             {person.full_name}
           </Text>
           <Text numberOfLines={1} style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 13 }}>
             {[
-              person.roles?.slice(0, 2).join(", "),
+              person.roles?.slice(0, 2).map(personRole).filter(Boolean).join(" · "),
               person.location_city,
             ]
               .filter(Boolean)
@@ -303,6 +362,5 @@ export function PersonRow({
           </Text>
         </View>
       </Pressable>
-    </Link>
   );
 }

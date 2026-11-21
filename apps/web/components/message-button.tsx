@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { openCollaboratorConversation } from "@repo/shared";
 import { browserApi } from "../lib/client-api";
 
 /** Opens (or reuses) the one-to-one conversation with a person, then goes there. */
@@ -16,46 +17,51 @@ export function MessageButton({
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "opening" | "error">("idle");
+  const lock = useRef(false);
 
   async function open() {
+    if (lock.current) return;
+    lock.current = true;
     setState("opening");
     try {
-      if (!(await browserApi().viewer.id())) {
+      const result = await openCollaboratorConversation(browserApi(), userId);
+      if (result.status === "sign-in") {
         router.push(
           `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
         );
         setState("idle");
         return;
       }
-      const { data, error } = await browserApi().chat.open(userId);
-      if (error || !data) {
-        setState("error");
-        return;
-      }
-      router.push(`/chats/${data}`);
+      router.push(`/chats/${result.conversationId}`);
     } catch {
       setState("error");
+    } finally {
+      lock.current = false;
     }
   }
 
   return (
-    <button
-      type="button"
-      className={className}
-      onClick={open}
-      disabled={state === "opening"}
-      aria-describedby={state === "error" ? `msg-error-${userId}` : undefined}
-    >
-      {state === "opening"
-        ? "Opening…"
-        : state === "error"
-          ? "Try again"
-          : children}
+    <>
+      <button
+        type="button"
+        className={className}
+        onClick={open}
+        disabled={state === "opening"}
+        aria-busy={state === "opening"}
+        aria-describedby={state === "error" ? `msg-error-${userId}` : undefined}
+      >
+        {state === "opening"
+          ? "Opening…"
+          : state === "error"
+            ? "Try again"
+            : children}
+      </button>
       {state === "error" ? (
-        <span id={`msg-error-${userId}`} className="visually-hidden">
-          Couldn&apos;t open the conversation. They may not accept messages.
+        <span id={`msg-error-${userId}`} role="alert">
+          Couldn&apos;t open the conversation. Check your connection and try
+          again.
         </span>
       ) : null}
-    </button>
+    </>
   );
 }

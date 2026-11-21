@@ -1,4 +1,11 @@
-import { Image, Text, View, type StyleProp, type ViewStyle, type ImageStyle } from "react-native";
+import {
+  Image,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+  type ImageStyle,
+} from "react-native";
 import { config, publicMediaUrl } from "./config";
 import { colors, fonts } from "./theme";
 
@@ -6,25 +13,32 @@ const spectrumStrip = require("../assets/spectrum-strip.webp");
 const spectrumHero = require("../assets/spectrum-hero.webp");
 
 /**
- * Film poster, or the signature spectrum artwork with the title when no
- * poster exists. Mirrors apps/web/components/media.tsx.
+ * Film poster or the signature spectrum artwork. Mirrors
+ * apps/web/components/media.tsx.
  */
 export function Poster({
   posterKey,
   title,
   aspect = 2 / 3,
   style,
+  rounded = false,
 }: {
   posterKey: string | null | undefined;
   title: string;
   aspect?: number;
   style?: StyleProp<ViewStyle>;
+  rounded?: boolean;
 }) {
   const src = publicMediaUrl(config.mediaOrigin, posterKey ?? null);
   return (
     <View
       style={[
-        { aspectRatio: aspect, overflow: "hidden", backgroundColor: colors.graphite },
+        {
+          aspectRatio: aspect,
+          overflow: "hidden",
+          backgroundColor: colors.graphite,
+          borderRadius: rounded ? 18 : 0,
+        },
         style,
       ]}
     >
@@ -37,33 +51,7 @@ export function Poster({
           style={{ width: "100%", height: "100%" }}
         />
       ) : (
-        <View
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 12,
-          }}
-        >
-          <Image
-            source={spectrumStrip}
-            accessibilityIgnoresInvertColors
-            resizeMode="cover"
-            style={{ position: "absolute", width: "100%", height: "100%" }}
-          />
-          <Text
-            numberOfLines={3}
-            style={{
-              color: colors.bone,
-              fontFamily: fonts.bold,
-              fontSize: 14,
-              lineHeight: 18,
-              textAlign: "center",
-            }}
-          >
-            {title}
-          </Text>
-        </View>
+        <Spectrum />
       )}
     </View>
   );
@@ -80,6 +68,7 @@ export function Spectrum({
   return (
     <Image
       source={kind === "hero" ? spectrumHero : spectrumStrip}
+      accessible={false}
       accessibilityIgnoresInvertColors
       resizeMode="cover"
       style={[{ width: "100%", height: "100%" }, style]}

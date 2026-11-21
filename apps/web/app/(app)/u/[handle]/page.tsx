@@ -28,13 +28,14 @@ type Tab = keyof typeof TABS;
 async function loadProfile(handle: string) {
   const { supabase, user } = await getViewer();
   if (!/^[a-z0-9_]{3,32}$/.test(handle)) return null;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select(
       "id,handle,full_name,bio,roles,location_city,skills_gear,profile_pic_key,onboarding_completed",
     )
     .eq("handle", handle)
     .maybeSingle();
+  if (error) throw new Error("Could not load this creative. Please retry.");
   return data ? { profile: data, supabase, user } : null;
 }
 
@@ -120,6 +121,10 @@ export default async function ProfilePage({
           .eq("blocked_id", profile.id)
           .maybeSingle(),
   ]);
+  if (filmsRes.error || creditsRes.error)
+    throw new Error(
+      "Could not load this creative’s work and credits. Please retry.",
+    );
 
   const films = (filmsRes.data ?? []).filter(
     (f) => isSelf || f.status === "published",
@@ -128,12 +133,13 @@ export default async function ProfilePage({
 
   // Titles + owners for credited films (RLS returns only films this viewer may see).
   const creditFilmIds = [...new Set(allCredits.map((c) => c.film_id))];
-  const { data: creditFilms } = creditFilmIds.length
+  const { data: creditFilms, error: creditFilmsError } = creditFilmIds.length
     ? await supabase
         .from("films")
         .select("id,title,owner_id,published_at")
         .in("id", creditFilmIds)
     : {
+        error: null,
         data: [] as {
           id: string;
           title: string;
@@ -141,6 +147,8 @@ export default async function ProfilePage({
           published_at: string | null;
         }[],
       };
+  if (creditFilmsError)
+    throw new Error("Could not load credited films. Please retry.");
   const filmById = new Map((creditFilms ?? []).map((f) => [f.id, f]));
   const credits = isSelf
     ? allCredits
@@ -219,6 +227,19 @@ export default async function ProfilePage({
 
       <div className={styles.layout}>
         <div className={styles.main}>
+          {!isSelf && !blockRes.data ? (
+            <div className="state-panel">
+              <h2>Start with their work.</h2>
+              <p>
+                Explore their films and filmmaker-listed credits, then use
+                Message to introduce your project, the craft you need, and why
+                their work fits.
+                {user
+                  ? " Messages stay private between the two of you."
+                  : " Sign in to message this creative."}
+              </p>
+            </div>
+          ) : null}
           <nav aria-label="Profile sections" className={styles.tabs}>
             {(Object.keys(TABS) as Tab[]).map((t) => (
               <Link
@@ -246,7 +267,7 @@ export default async function ProfilePage({
                 <p>
                   {isSelf
                     ? "Use Publish a film to save a draft and share your work. Your films will show here."
-                    : "When they publish, their short films will show here."}
+                    : "No published films here yet. Explore Credits for work they contributed to, or About for their skills."}
                 </p>
               </div>
             ) : (

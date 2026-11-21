@@ -5,9 +5,7 @@
     "owner": "notsoamans-team",
     "scheme": "arcenray-dev",
     "version": "0.1.0",
-    "platforms": [
-      "android"
-    ],
+    "platforms": ["android"],
     "userInterfaceStyle": "dark",
     "android": {
       "package": "com.arcenray.mobile.dev",
@@ -21,10 +19,23 @@
       ]
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0E0F0E",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ],
       "expo-router",
+      "expo-font",
+      "expo-asset",
+      "expo-status-bar",
       "expo-secure-store",
       "expo-web-browser",
       "@clerk/expo",
+      "@clerk/expo-google-signin",
       "expo-dev-client",
       "expo-video",
       [
@@ -50,7 +61,8 @@
     "extra": {
       "eas": {
         "projectId": "68a21561-8def-4dff-b6b8-e686e7c3a2c4"
-      }
+      },
+      "EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID": "456443622037-s6nb9t4i0d5634lkp3ilrc81meq6disi.apps.googleusercontent.com"
     }
   }
 }

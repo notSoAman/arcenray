@@ -438,3 +438,11 @@ import_map = "./functions/deno.json"
 [functions.chat-media]
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.chat-push-device]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.chat-push-dispatch]
+verify_jwt = true
+import_map = "./functions/deno.json"

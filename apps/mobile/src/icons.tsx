@@ -77,7 +77,7 @@ function Base({
 }
 
 export const IconPlay = ({ size = 16, color = "currentColor" }: IconProps) => (
-  <Base size={size} color={color} fill="currentColor" strokeWidth={0}>
+  <Base size={size} color={color} fill={color} strokeWidth={0}>
     <Path d="M8 5v14l11-7z" />
   </Base>
 );
@@ -146,6 +146,99 @@ export const IconChevron = ({ size = 18, color = "currentColor" }: IconProps) =>
   </Base>
 );
 
+export const IconChevronLeft = ({ size = 20, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M15 5l-7 7 7 7" />
+  </Base>
+);
+
+export const IconChevronDown = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M5 9l7 7 7-7" />
+  </Base>
+);
+
+export const IconChevronUp = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M5 15l7-7 7 7" />
+  </Base>
+);
+
+export const IconPause = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color} fill={color} strokeWidth={0}>
+    <Path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+  </Base>
+);
+
+export const IconVolume = ({
+  size = 20,
+  color = "currentColor",
+  muted = false,
+}: IconProps & { muted?: boolean }) => (
+  <Base size={size} color={color}>
+    <Path d="M4 9v6h4l5 4V5L8 9z" />
+    {muted ? (
+      <Path d="m16 9 5 6M21 9l-5 6" />
+    ) : (
+      <>
+        <Path d="M16 9.5a4 4 0 0 1 0 5" />
+        <Path d="M18.5 7a7.5 7.5 0 0 1 0 10" />
+      </>
+    )}
+  </Base>
+);
+
+export const IconExpand = ({ size = 20, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+  </Base>
+);
+
+export const IconRewind = ({ size = 22, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M4 9a8 8 0 1 1-1 6" />
+    <Path d="M4 4v5h5" />
+  </Base>
+);
+
+export const IconForward = ({ size = 22, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M20 9a8 8 0 1 0 1 6" />
+    <Path d="M20 4v5h-5" />
+  </Base>
+);
+
+export const IconClose = ({ size = 20, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M6 6l12 12M18 6 6 18" />
+  </Base>
+);
+
+export const IconMessage = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z" />
+  </Base>
+);
+
+export const IconPlus = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Path d="M12 5v14M5 12h14" />
+  </Base>
+);
+
+export const IconSettings = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color}>
+    <Circle cx={12} cy={12} r={3} />
+    <Path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-5L9 5.9a7 7 0 0 0-1.7 1L5 6l-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1L9.5 21h5l.5-2.9a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z" />
+  </Base>
+);
+
+export const IconSpark = ({ size = 18, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color} fill="currentColor" strokeWidth={0}>
+    <Path d="M12 2l1.9 5.6L20 9.5l-5.4 2.7L12 18l-2.6-5.8L4 9.5l6.1-1.9z" />
+  </Base>
+);
+
 /** Google "G" mark for the OAuth button (brand colours). */
 export const IconGoogle = ({ size = 18 }: { size?: number }) => (
   <Svg accessible={false} width={size} height={size} viewBox="0 0 24 24">
@@ -166,4 +259,23 @@ export const IconGoogle = ({ size = 18 }: { size?: number }) => (
       d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z"
     />
   </Svg>
+);
+
+export const IconMic = (props: IconProps) => (
+  <Base {...props}>
+    <Path d="M9 6a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0zM5 11v1a7 7 0 0 0 14 0v-1M12 19v3m-3 0h6" />
+  </Base>
+);
+
+export const IconStop = ({ size, color = "currentColor" }: IconProps) => (
+  <Base size={size} color={color} fill={color} strokeWidth={0}>
+    <Path d="M6 6h12v12H6z" />
+  </Base>
+);
+
+export const IconSmile = (props: IconProps) => (
+  <Base {...props}>
+    <Circle cx={12} cy={12} r={9} />
+    <Path d="M8 14a4.5 4.5 0 0 0 8 0M9 9h.01M15 9h.01" />
+  </Base>
 );

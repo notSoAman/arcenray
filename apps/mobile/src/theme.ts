@@ -9,10 +9,14 @@ import { fonts } from "./fonts";
 export const colors = {
   void: "#0E0F0E",
   graphite: "#1A1A1B",
+  graphiteRaised: "#202021",
+  ink: "#141415",
   bone: "#F3EFE9",
+  white: "#FFFFFF",
 
   // Accents
   ember: "#C2234B", // primary accent, key CTAs
+  emberHover: "#D12A55",
   pink: "#E8527A", // highlights, focus, accent words
   orange: "#FF8A2B", // badges, kickers
   lime: "#C6D79B", // success
@@ -24,10 +28,12 @@ export const colors = {
   textSoft: "#D9D3CA",
   muted: "#A8A39C",
   faint: "#8F8A83",
+  chead: "#CFC9C0",
 
   // Hairlines
   line: "rgba(243, 239, 233, 0.1)",
   lineStrong: "rgba(243, 239, 233, 0.22)",
+  lineFaint: "rgba(243, 239, 233, 0.06)",
 
   // Film playback spectrum (btn-film-play gradient endpoints)
   filmPlayStart: "#713B9B",
@@ -38,6 +44,7 @@ export const colors = {
 export const radius = {
   pill: 999,
   card: 24,
+  cardSm: 20,
   panel: 32,
   input: 16,
   poster: 18,
@@ -45,8 +52,46 @@ export const radius = {
   tag: 14,
 } as const;
 
+export const space = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 28,
+  section: 36,
+} as const;
+
+export const shadow = {
+  poster: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.45,
+    shadowRadius: 30,
+    elevation: 16,
+  },
+  floating: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 22,
+    elevation: 12,
+  },
+} as const;
+
+export const gradients = {
+  filmPlay: [colors.filmPlayStart, colors.filmPlayMid, colors.filmPlayEnd] as const,
+  filmPlayLocations: [0, 0.48, 1] as const,
+  scrimStrong: ["rgba(14,15,14,0)", "rgba(14,15,14,0.55)", "rgba(14,15,14,0.95)"] as const,
+  scrimTop: ["rgba(14,15,14,0.72)", "rgba(14,15,14,0)"] as const,
+} as const;
+
+/**
+ * Shared type styles. Never set a pixel lineHeight below the font size on
+ * display text — React Native clips the glyphs (the "dashes" bug).
+ */
 export const typography: Record<
-  "kicker" | "display" | "sectionTitle" | "body" | "bodySoft" | "muted",
+  "kicker" | "display" | "sectionTitle" | "body" | "bodySoft" | "muted" | "small",
   TextStyle
 > = {
   /** Kicker / label — tracked uppercase Courier Prime. Labels and kickers only. */
@@ -54,19 +99,19 @@ export const typography: Record<
     fontFamily: fonts.monoBold,
     fontSize: 11,
     letterSpacing: 2.4, // ~0.22em at 11px
+    lineHeight: 16,
     textTransform: "uppercase",
   },
-  /** Large page / film title (tuned per use via fontSize). */
+  /** Large page / film title (tuned per use via fontSize + lineHeight). */
   display: {
     fontFamily: fonts.extraBold,
     letterSpacing: -1.2, // -0.035em at 34px
-    lineHeight: 1,
   },
   sectionTitle: {
     fontFamily: fonts.extraBold,
     fontSize: 26,
     letterSpacing: -0.52, // -0.02em at 26px
-    lineHeight: 30,
+    lineHeight: 31,
   },
   body: {
     fontFamily: fonts.regular,
@@ -83,6 +128,33 @@ export const typography: Record<
     fontSize: 13,
     lineHeight: 20,
   },
+  small: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 17,
+  },
 };
+
+/** Web `.page-title` on a phone: clamp(36px, 5vw, 64px). */
+export function displayTitle(size = 38): TextStyle {
+  return {
+    color: colors.text,
+    fontFamily: fonts.extraBold,
+    fontSize: size,
+    lineHeight: Math.round(size * 1.02),
+    letterSpacing: -size * 0.04,
+  };
+}
+
+/** Web `.section-title`. */
+export function sectionTitleStyle(size = 26): TextStyle {
+  return {
+    color: colors.text,
+    fontFamily: fonts.extraBold,
+    fontSize: size,
+    lineHeight: Math.round(size * 1.18),
+    letterSpacing: -size * 0.02,
+  };
+}
 
 export { fonts };

@@ -1,3 +1,31 @@
+import type { FilmDraft } from "./contracts.ts";
+
+export const preferredFilmSource = "youtube_embed";
+export const filmLinkOption = "Link a film (YouTube preferred)";
+export const filmLinkPlaceholder = "https://www.youtube.com/watch?v=…";
+export const filmLinkGuidance =
+  "Link an embeddable YouTube upload you have permission to share and save Arcenray storage. Vimeo links also work. If you’re unsure about the rights to music, clips or other material, check before publishing.";
+export const nativeFilmGuidance =
+  "Upload an MP4 only if you own or have cleared all rights to the film, including music and clips.";
+
+export function filmRightsConfirmation(source: FilmDraft["source"]) {
+  return source === "r2_native"
+    ? "I own or have cleared all rights to this film, including music and clips, and any poster or discovery clip I upload."
+    : "I have permission to share this film and upload any poster or discovery clip I provide.";
+}
+
+export function assertFilmRights(
+  source: FilmDraft["source"],
+  confirmed: boolean,
+) {
+  if (!confirmed)
+    throw new Error(
+      source === "r2_native"
+        ? "Confirm that you own or have cleared all rights before uploading or publishing."
+        : "Confirm that you have permission to share this film and any assets you upload.",
+    );
+}
+
 export function parseFilmLink(value: string): {
   source: "youtube_embed" | "vimeo_embed";
   provider_id: string;

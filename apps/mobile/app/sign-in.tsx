@@ -1,47 +1,76 @@
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useClerk, useSignIn, useSignUp } from "@clerk/expo";
+import { usePushSignOut } from "../src/chat-push";
 import { useSSO } from "@clerk/expo/experimental";
 import { useHostedAuth } from "@clerk/expo/hosted-auth";
+import {
+  completeGoogleSignUp,
+  googleAuthOutcome,
+  googleRedirectUrl,
+  authFailureMessage,
+  type PendingGoogleSignUp,
+} from "../src/google-auth";
 import Constants from "expo-constants";
-import { LinearGradient } from "expo-linear-gradient";
-import { LogoTile, Lockup } from "../src/brand";
-import { Spectrum } from "../src/visuals";
-import { Button, Field, Kicker, Notice } from "../src/ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Lockup } from "../src/brand";
+import { SignInUpdates } from "../src/sign-in-updates";
+import { KeyboardForm } from "../src/keyboard-form";
+import {
+  Button,
+  Field,
+  Kicker,
+  Notice,
+  IconButton,
+  PageTitle,
+  haptic,
+} from "../src/ui";
 import { IconGoogle } from "../src/icons";
 import { colors, fonts, radius } from "../src/theme";
 
 /**
  * Native in-app sign-in / sign-up using Clerk's future (Core 3) resources.
- * Matches the web sign-in art + form layout. Clerk production factors:
- * email code, password (min 15), username; Google OAuth.
+ * Google uses the system browser with the registered Clerk callback. This avoids
+ * relying on a device Credential Manager registration matching the Play signer.
  */
 
 type Mode = "sign-in" | "sign-up";
 
-/**
- * Clerk authorizes `clerk://<package>.callback` for the registered native app.
- * The SDK default (`<scheme>://sso-callback`) is not on that allowlist, so pass
- * the registered callback explicitly.
- */
 const packageName =
   Constants.expoConfig?.android?.package ?? "com.arcenray.mobile";
-const ssoRedirectUrl = `clerk://${packageName}.callback`;
+const ssoRedirectUrl = googleRedirectUrl(packageName);
 
 function errorText(error: { longMessage?: string; message?: string } | null) {
-  return error?.longMessage ?? error?.message ?? "That didn't finish. Try again.";
+  return (
+    error?.longMessage ?? error?.message ?? "That didn't finish. Try again."
+  );
 }
 
-function GoogleButton({ onPress, busy }: { onPress: () => void; busy: boolean }) {
+function GoogleMark() {
+  return (
+    <View
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: "#fff",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <IconGoogle size={15} />
+    </View>
+  );
+}
+
+function GoogleButton({
+  onPress,
+  busy,
+}: {
+  onPress: () => void;
+  busy: boolean;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -49,22 +78,98 @@ function GoogleButton({ onPress, busy }: { onPress: () => void; busy: boolean })
       disabled={busy}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 52,
+        minHeight: 54,
         borderRadius: radius.pill,
         borderWidth: 1,
         borderColor: colors.lineStrong,
+        backgroundColor: "rgba(243,239,233,0.03)",
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "row",
-        gap: 10,
-        opacity: pressed || busy ? 0.6 : 1,
+        gap: 11,
+        opacity: pressed || busy ? 0.65 : 1,
       })}
     >
-      <IconGoogle size={18} />
-      <Text style={{ color: colors.bone, fontFamily: fonts.semibold, fontSize: 16 }}>
+      {busy ? <ActivityIndicator color={colors.bone} /> : <GoogleMark />}
+      <Text
+        style={{ color: colors.bone, fontFamily: fonts.semibold, fontSize: 16 }}
+      >
         Continue with Google
       </Text>
     </Pressable>
+  );
+}
+
+function GoogleUsernameCompletion({
+  signUp,
+  onDone,
+  onError,
+}: {
+  signUp: PendingGoogleSignUp;
+  onDone: (newAccount: boolean) => void;
+  onError: (message: string) => void;
+}) {
+  const [username, setUsername] = useState("");
+  const [busy, setBusy] = useState(false);
+  const handle = username.trim().toLowerCase();
+
+  async function finish() {
+    setBusy(true);
+    onError("");
+    try {
+      const result = await completeGoogleSignUp(signUp, username);
+      if (result.kind === "complete") onDone(true);
+      else onError(result.message);
+    } catch (error) {
+      onError(authFailureMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View style={{ gap: 14 }}>
+      <Text
+        style={{
+          color: colors.text,
+          fontFamily: fonts.extraBold,
+          fontSize: 22,
+          letterSpacing: -0.5,
+        }}
+      >
+        Finish your Google account
+      </Text>
+      <Text
+        style={{
+          color: colors.muted,
+          fontFamily: fonts.regular,
+          fontSize: 14,
+          lineHeight: 21,
+        }}
+      >
+        Your Google details are ready. Choose the handle Arcenray will use for
+        your public profile.
+      </Text>
+      <Field
+        label="Username"
+        value={username}
+        onChangeText={setUsername}
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={!busy}
+        placeholder="your-handle"
+        hint="4–64 characters. Used to share your profile."
+        onSubmitEditing={finish}
+        returnKeyType="done"
+      />
+      <Button
+        title={busy ? "Finishing…" : "Continue"}
+        block
+        disabled={busy || handle.length < 4}
+        busy={busy}
+        onPress={finish}
+      />
+    </View>
   );
 }
 
@@ -72,7 +177,9 @@ function Divider({ label }: { label: string }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
       <View style={{ flex: 1, height: 1, backgroundColor: colors.line }} />
-      <Text style={{ color: colors.faint, fontFamily: fonts.regular, fontSize: 13 }}>
+      <Text
+        style={{ color: colors.faint, fontFamily: fonts.regular, fontSize: 12 }}
+      >
         {label}
       </Text>
       <View style={{ flex: 1, height: 1, backgroundColor: colors.line }} />
@@ -80,14 +187,78 @@ function Divider({ label }: { label: string }) {
   );
 }
 
+function GoogleFlow({
+  onDone,
+  onError,
+}: {
+  onDone: (newAccount: boolean) => void;
+  onError: (message: string) => void;
+}) {
+  const { startSSOFlow } = useSSO();
+  const { loaded } = useClerk();
+  const [busy, setBusy] = useState(false);
+  const [pendingSignUp, setPendingSignUp] =
+    useState<PendingGoogleSignUp | null>(null);
+  const inFlight = useRef(false);
+  const alive = useRef(true);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  async function go() {
+    if (inFlight.current) return;
+    if (!loaded) {
+      onError("Sign-in is still loading. Check your connection and try again.");
+      return;
+    }
+    inFlight.current = true;
+    setBusy(true);
+    onError("");
+    haptic("medium");
+    try {
+      // The installed Core 3 hook finalizes/activates before resolving.
+      const result = await startSSOFlow({
+        strategy: "oauth_google",
+        redirectUrl: ssoRedirectUrl,
+        oidcPrompt: "select_account",
+      });
+      if (!alive.current) return;
+      const outcome = googleAuthOutcome(result);
+      if (outcome.kind === "complete") onDone(outcome.newAccount);
+      else if (outcome.kind === "needs-username")
+        setPendingSignUp(outcome.signUp);
+      else if (outcome.kind === "incomplete") onError(outcome.message);
+    } catch (error) {
+      if (alive.current) onError(authFailureMessage(error));
+    } finally {
+      inFlight.current = false;
+      if (alive.current) setBusy(false);
+    }
+  }
+
+  if (pendingSignUp)
+    return (
+      <GoogleUsernameCompletion
+        signUp={pendingSignUp}
+        onDone={onDone}
+        onError={onError}
+      />
+    );
+  return <GoogleButton onPress={() => void go()} busy={busy} />;
+}
+
 function SignInForm() {
   const { signIn, errors } = useSignIn();
-  const { startSSOFlow } = useSSO();
-
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"identifier" | "password" | "code">("identifier");
+  const [step, setStep] = useState<"identifier" | "password" | "code">(
+    "identifier",
+  );
   const [allowCode, setAllowCode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,7 +316,10 @@ function SignInForm() {
     setBusy(true);
     setError(null);
     try {
-      const { error: pwError } = await signIn.password({ identifier: id, password });
+      const { error: pwError } = await signIn.password({
+        identifier: id,
+        password,
+      });
       if (pwError) {
         setError(errorText(pwError));
         return;
@@ -172,7 +346,9 @@ function SignInForm() {
     setBusy(true);
     setError(null);
     try {
-      const { error: codeError } = await signIn.emailCode.verifyCode({ code: code.trim() });
+      const { error: codeError } = await signIn.emailCode.verifyCode({
+        code: code.trim(),
+      });
       if (codeError) {
         setError(errorText(codeError));
         return;
@@ -193,28 +369,20 @@ function SignInForm() {
     router.replace("/home");
   }
 
-  async function google() {
-    setBusy(true);
-    setError(null);
-    try {
-      const { createdSessionId } = await startSSOFlow({ strategy: "oauth_google", redirectUrl: ssoRedirectUrl });
-      if (createdSessionId) router.replace("/home");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Google sign-in didn't finish.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <View style={{ gap: 14 }}>
-      <GoogleButton onPress={google} busy={busy} />
-      <Divider label="or with your account" />
+      <GoogleFlow
+        onError={setError}
+        onDone={(newAccount) =>
+          router.replace(newAccount ? "/onboarding" : "/home")
+        }
+      />
+      <Divider label="or continue with email" />
 
       {step === "identifier" ? (
         <>
           <Field
-            label="Email or username"
+            label="Email address"
             value={identifier}
             onChangeText={setIdentifier}
             autoCapitalize="none"
@@ -223,10 +391,13 @@ function SignInForm() {
             editable={!busy}
             onSubmitEditing={identify}
             returnKeyType="next"
+            placeholder="you@example.com"
+            autoComplete="email"
+            textContentType="emailAddress"
             error={errors.fields.identifier?.message ?? null}
           />
           <Button
-            title="Continue"
+            title="Continue with email"
             block
             disabled={busy || !id}
             busy={busy}
@@ -237,8 +408,18 @@ function SignInForm() {
 
       {step === "password" ? (
         <>
-          <Pressable accessibilityRole="button" onPress={() => setStep("identifier")} hitSlop={8}>
-            <Text style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 14 }}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setStep("identifier")}
+            hitSlop={8}
+          >
+            <Text
+              style={{
+                color: colors.muted,
+                fontFamily: fonts.regular,
+                fontSize: 14,
+              }}
+            >
               ‹ {id}
             </Text>
           </Pressable>
@@ -247,6 +428,9 @@ function SignInForm() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            autoFocus
+            autoComplete="current-password"
+            textContentType="password"
             autoCapitalize="none"
             editable={!busy}
             onSubmitEditing={submitPassword}
@@ -261,8 +445,19 @@ function SignInForm() {
             onPress={submitPassword}
           />
           {allowCode ? (
-            <Pressable accessibilityRole="button" onPress={() => void sendCode()} disabled={busy}>
-              <Text style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 14, textDecorationLine: "underline" }}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void sendCode()}
+              disabled={busy}
+            >
+              <Text
+                style={{
+                  color: colors.muted,
+                  fontFamily: fonts.regular,
+                  fontSize: 14,
+                  textDecorationLine: "underline",
+                }}
+              >
                 Email me a sign-in code instead
               </Text>
             </Pressable>
@@ -273,13 +468,26 @@ function SignInForm() {
       {step === "code" ? (
         <>
           {info ? <Notice message={info} tone="success" /> : null}
-          <Pressable accessibilityRole="button" onPress={() => setStep("identifier")} hitSlop={8}>
-            <Text style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 14 }}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setStep("identifier")}
+            hitSlop={8}
+          >
+            <Text
+              style={{
+                color: colors.muted,
+                fontFamily: fonts.regular,
+                fontSize: 14,
+              }}
+            >
               ‹ Use a different account
             </Text>
           </Pressable>
           <Field
             label="Verification code"
+            autoFocus
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
             value={code}
             onChangeText={setCode}
             keyboardType="number-pad"
@@ -306,8 +514,6 @@ function SignInForm() {
 
 function SignUpForm() {
   const { signUp, errors } = useSignUp();
-  const { startSSOFlow } = useSSO();
-
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [name, setName] = useState("");
@@ -379,19 +585,6 @@ function SignUpForm() {
     router.replace("/onboarding");
   }
 
-  async function google() {
-    setBusy(true);
-    setError(null);
-    try {
-      const { createdSessionId } = await startSSOFlow({ strategy: "oauth_google", redirectUrl: ssoRedirectUrl });
-      if (createdSessionId) router.replace("/onboarding");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Google sign-up didn't finish.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (step === "code")
     return (
       <View style={{ gap: 14 }}>
@@ -420,7 +613,12 @@ function SignUpForm() {
 
   return (
     <View style={{ gap: 14 }}>
-      <GoogleButton onPress={google} busy={busy} />
+      <GoogleFlow
+        onError={setError}
+        onDone={(newAccount) =>
+          router.replace(newAccount ? "/onboarding" : "/home")
+        }
+      />
       <Divider label="or create with email" />
       <Field
         label="Email"
@@ -430,6 +628,7 @@ function SignUpForm() {
         autoCorrect={false}
         keyboardType="email-address"
         editable={!busy}
+        placeholder="you@example.com"
         error={errors.fields.emailAddress?.message ?? null}
       />
       <Field
@@ -439,6 +638,7 @@ function SignUpForm() {
         autoCapitalize="none"
         autoCorrect={false}
         editable={!busy}
+        placeholder="your-handle"
         hint="4–64 characters. Used to sign in and share your profile."
         error={errors.fields.username?.message ?? null}
       />
@@ -448,6 +648,7 @@ function SignUpForm() {
         onChangeText={setName}
         autoCapitalize="words"
         editable={!busy}
+        placeholder="Your name"
         hint="Shown on your profile."
         error={errors.fields.firstName?.message ?? null}
       />
@@ -473,17 +674,23 @@ function SignUpForm() {
 }
 
 export default function SignInScreen() {
-  const { signOut } = useClerk();
+  const { isSignedIn } = useClerk();
+  const signOut = usePushSignOut();
+  const insets = useSafeAreaInsets();
   const { startHostedAuth } = useHostedAuth();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [hostedBusy, setHostedBusy] = useState(false);
+
+  useEffect(() => {
+    if (isSignedIn) router.replace("/home");
+  }, [isSignedIn]);
 
   async function openHosted() {
     setHostedBusy(true);
     try {
       await startHostedAuth({ mode });
     } catch {
-      /* The native screen is primary; hosted auth is only a fallback. */
+      /* Native remains primary; hosted auth is only a fallback. */
     } finally {
       setHostedBusy(false);
     }
@@ -491,92 +698,147 @@ export default function SignInScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.void }}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
+      <KeyboardForm
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          paddingTop: insets.top + 8,
+          paddingHorizontal: 20,
+          paddingBottom: 40 + insets.bottom,
+          gap: 22,
+        }}
       >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: 24, paddingBottom: 60, gap: 24 }}
+        <View
+          style={{ flexDirection: "row", alignItems: "center", height: 48 }}
         >
-          <Lockup />
-
-          {/* Art panel — the accepted sign-in artboard, stacked on phone. */}
-          <View style={{ borderRadius: radius.panel, overflow: "hidden" }}>
-            <LinearGradient
-              colors={["rgba(14,15,14,0.2)", "rgba(14,15,14,0.75)"]}
-              style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, zIndex: 1 }}
-            />
-            <Spectrum kind="hero" style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} />
-            <View style={{ padding: 28, gap: 20, zIndex: 2 }}>
-              <LogoTile size={120} />
-              <Text style={{ color: colors.text, fontFamily: fonts.extraBold, fontSize: 32, letterSpacing: -1.3, lineHeight: 34 }}>
-                Find your people.{"\n"}
-                <Text style={{ color: colors.pink }}>Make your art.</Text>
+          <IconButton
+            label="Back"
+            onPress={() =>
+              router.canGoBack() ? router.back() : router.replace("/home")
+            }
+            glass={false}
+            icon={
+              <Text
+                style={{
+                  color: colors.bone,
+                  fontSize: 28,
+                  lineHeight: 30,
+                  marginTop: -2,
+                }}
+              >
+                ‹
               </Text>
-            </View>
+            }
+          />
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <Lockup size={24} />
           </View>
+          <View style={{ width: 44 }} />
+        </View>
 
-          <View style={{ gap: 14 }}>
-            <Kicker color={colors.ember}>
-              {mode === "sign-in" ? "Welcome back" : "Join arcenray."}
-            </Kicker>
-            <Text style={{ color: colors.text, fontFamily: fonts.extraBold, fontSize: 36, letterSpacing: -1.4, lineHeight: 40 }}>
-              {mode === "sign-in" ? "Sign in" : "Create your account"}
-            </Text>
-            <Text style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 16, lineHeight: 24 }}>
-              {mode === "sign-in"
-                ? "Sign in with Google, your email address or account username."
-                : "Use Google or an email and username to join arcenray."}
-            </Text>
-          </View>
+        <View style={{ gap: 6 }}>
+          <Kicker color={colors.ember}>
+            {mode === "sign-in" ? "Welcome back" : "Join arcenray."}
+          </Kicker>
+          <PageTitle size={38}>
+            {mode === "sign-in" ? "Sign in" : "Create your account"}
+          </PageTitle>
+          <Text
+            style={{
+              color: colors.muted,
+              fontFamily: fonts.regular,
+              fontSize: 15,
+              lineHeight: 23,
+            }}
+          >
+            {mode === "sign-in"
+              ? "Use Google or your email address."
+              : "Use Google or your email to join arcenray."}
+          </Text>
+        </View>
 
-          {mode === "sign-in" ? <SignInForm /> : <SignUpForm />}
-
-          <View style={{ gap: 10 }}>
-            {mode === "sign-in" ? (
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 4,
+            padding: 4,
+            borderRadius: radius.pill,
+            backgroundColor: colors.graphite,
+          }}
+        >
+          {(["sign-in", "sign-up"] as const).map((m) => {
+            const on = mode === m;
+            return (
               <Pressable
-                accessibilityRole="button"
-                onPress={() => setMode("sign-up")}
-                style={{ minHeight: 44, justifyContent: "center" }}
+                key={m}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                onPress={() => {
+                  haptic();
+                  setMode(m);
+                }}
+                style={{
+                  flex: 1,
+                  minHeight: 42,
+                  borderRadius: radius.pill,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: on ? colors.bone : "transparent",
+                }}
               >
-                <Text style={{ color: colors.bone, fontFamily: fonts.bold, fontSize: 15 }}>
-                  New to arcenray? Create an account
+                <Text
+                  style={{
+                    color: on ? colors.void : colors.chead,
+                    fontFamily: fonts.bold,
+                    fontSize: 14,
+                  }}
+                >
+                  {m === "sign-in" ? "Sign in" : "Create account"}
                 </Text>
               </Pressable>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setMode("sign-in")}
-                style={{ minHeight: 44, justifyContent: "center" }}
-              >
-                <Text style={{ color: colors.bone, fontFamily: fonts.bold, fontSize: 15 }}>
-                  Already have an account? Sign in
-                </Text>
-              </Pressable>
-            )}
+            );
+          })}
+        </View>
+
+        {mode === "sign-in" ? <SignInForm /> : <SignUpForm />}
+
+        <SignInUpdates />
+        <View style={{ gap: 10, paddingTop: 4 }}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={hostedBusy}
+            onPress={() => void openHosted()}
+            style={{ minHeight: 40, justifyContent: "center" }}
+          >
+            <Text
+              style={{
+                color: colors.faint,
+                fontFamily: fonts.regular,
+                fontSize: 12,
+                textDecorationLine: "underline",
+              }}
+            >
+              {hostedBusy ? "Opening…" : "Trouble signing in? Use the browser"}
+            </Text>
+          </Pressable>
+          {isSignedIn ? (
             <Pressable
               accessibilityRole="button"
               onPress={() => void signOut()}
               style={{ minHeight: 40, justifyContent: "center" }}
             >
-              <Text style={{ color: colors.faint, fontFamily: fonts.regular, fontSize: 13 }}>
-                Sign out
+              <Text
+                style={{
+                  color: colors.faint,
+                  fontFamily: fonts.regular,
+                  fontSize: 12,
+                }}
+              >
+                Sign out of the current account
               </Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={hostedBusy}
-              onPress={() => void openHosted()}
-              style={{ minHeight: 40, justifyContent: "center" }}
-            >
-              <Text style={{ color: colors.faint, fontFamily: fonts.regular, fontSize: 13, textDecorationLine: "underline" }}>
-                {hostedBusy ? "Opening…" : "Trouble signing in? Use the browser"}
-              </Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          ) : null}
+        </View>
+      </KeyboardForm>
     </View>
   );
 }

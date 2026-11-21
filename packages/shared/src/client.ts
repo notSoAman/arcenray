@@ -128,15 +128,6 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
           p_exclude_ids: ids,
         });
       },
-      feedback: (filmId: string, preference: "more" | "less") => {
-        if (preference !== "more" && preference !== "less")
-          throw new Error("Invalid preference");
-        return supabase.rpc("set_film_feedback", {
-          p_film_id: uuidSchema.parse(filmId),
-          p_preference: preference,
-        });
-      },
-      preferences: () => supabase.rpc("get_my_film_feedback"),
     },
     chat: {
       attachment: {

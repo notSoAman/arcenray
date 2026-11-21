@@ -447,6 +447,7 @@ export type Database = {
           full_name: string
           handle: string
           id: string
+          is_official: boolean
           location_city: string | null
           onboarding_completed: boolean
           profile_pic_key: string | null
@@ -461,6 +462,7 @@ export type Database = {
           full_name?: string
           handle: string
           id: string
+          is_official?: boolean
           location_city?: string | null
           onboarding_completed?: boolean
           profile_pic_key?: string | null
@@ -475,6 +477,7 @@ export type Database = {
           full_name?: string
           handle?: string
           id?: string
+          is_official?: boolean
           location_city?: string | null
           onboarding_completed?: boolean
           profile_pic_key?: string | null
@@ -544,6 +547,18 @@ export type Database = {
       backend_chat_attachment: {
         Args: { p_action: string; p_actor: string; p_data: Json }
         Returns: Json
+      }
+      backend_claim_chat_push_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          conversation_id: string
+          id: string
+          lease: string
+          recipient_id: string
+          send_before: string
+          ticket: string
+          token: string
+        }[]
       }
       backend_claim_expired_assets: {
         Args: never
@@ -640,6 +655,15 @@ export type Database = {
         Args: { p_job: string }
         Returns: boolean
       }
+      backend_finish_chat_push_job: {
+        Args: {
+          p_id: string
+          p_lease: string
+          p_result: string
+          p_ticket?: string
+        }
+        Returns: boolean
+      }
       backend_finish_film_publication: {
         Args: { p_film: string; p_token: string }
         Returns: boolean
@@ -710,6 +734,10 @@ export type Database = {
       backend_list_multipart: {
         Args: { p_draft: string; p_owner: string }
         Returns: Json
+      }
+      backend_manage_chat_push_device: {
+        Args: { p_actor: string; p_installation: string; p_token?: string }
+        Returns: boolean
       }
       backend_mark_clerk_deleted: {
         Args: { p_job: string }
@@ -943,6 +971,43 @@ export type Database = {
         }[]
       }
       is_moderator: { Args: never; Returns: boolean }
+      list_moderation_films: {
+        Args: { p_hidden: boolean; p_offset: number }
+        Returns: {
+          id: string
+          owner_handle: string
+          owner_name: string
+          published_at: string
+          restore_requested: boolean
+          review_media_key: string
+          review_url: string
+          title: string
+        }[]
+      }
+      list_moderation_reports: {
+        Args: {
+          p_film?: string
+          p_offset: number
+          p_status: string
+          p_view: string
+        }
+        Returns: {
+          created_at: string
+          film_id: string | null
+          id: string
+          message_id: string | null
+          profile_id: string | null
+          reason: string
+          reporter_id: string
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "content_reports"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       moderate_film: {
         Args: { p_film: string; p_hidden: boolean; p_reason: string }
         Returns: undefined

@@ -142,6 +142,40 @@ export function personRole(role: string | undefined) {
   return rolePersonLabels[role] ?? role;
 }
 
+/** Display labels for the canonical role taxonomy (web `lib/roles.ts`). */
+export const roleLabels: Record<string, string> = {
+  director: "Directing",
+  actor: "Acting",
+  cinematographer: "Cinematography",
+  editor: "Editing",
+  writer: "Screenwriting",
+  producer: "Producing",
+  sound_designer: "Sound design",
+  colorist: "Colour grading",
+  composer: "Composing",
+  musician: "Music",
+  other: "Something else",
+};
+
+/** Ordered as in the onboarding design; canonical values are what get stored. */
+export const roleOptions = [
+  "director",
+  "actor",
+  "cinematographer",
+  "editor",
+  "writer",
+  "producer",
+  "sound_designer",
+  "colorist",
+  "composer",
+  "musician",
+  "other",
+] as const;
+
+export function isCreativeRole(value: string) {
+  return (roleOptions as readonly string[]).includes(value);
+}
+
 /** "Name · Role · City" creator line, matching the web byline. */
 export function byline(film: Film, opts: { role?: boolean } = {}) {
   if (!film.creator) return null;

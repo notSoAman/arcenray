@@ -14,6 +14,8 @@ node_modules
 
 # Review credentials (contains passwords — never commit)
 play-review-credentials.md
+apps/mobile/credentials.json
+apps/mobile/credentials/
 
 # Testing
 coverage

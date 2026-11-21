@@ -46,6 +46,39 @@ was changed.
   backdrop blur (translucent approximation); wavelength "like/pass" picks and
   nearby-people sections are not on the native home; store screenshots not regenerated.
 
+## Second visual/playback/auth pass — 10 November 2026
+
+The clipped page-title bug (`lineHeight: 1` on 34–40px display text) is fixed, and the mobile
+UI now reuses the web's full kit: Bone/Ember/Ghost/film-play buttons, glass icon buttons, tags,
+scope tabs, sheets, skeletons and safe-area/bottom-tab insets. Home gained the spectrum featured
+preview and real wavelength picks; Loop is a full-bleed deck; the film page follows the web's
+player → title → creator → actions order; Search, profiles, chats, account, onboarding, sign-in
+and 404 were rebuilt on the same components. See
+[`docs/architecture/mobile-parity.md`](../../docs/architecture/mobile-parity.md) for the exact
+scope and remaining gaps.
+
+Native R2 playback now has custom play/seek/mute/fullscreen chrome instead of system controls.
+Provider films mount only after a deliberate play; YouTube runs through the IFrame API with
+`baseUrl`, `origin` and `widget_referrer` set to `https://arcenray.com`, which fixes the
+missing-referrer **error 153**. Errors fall back to a styled poster card.
+
+Google sign-in now uses Clerk's native Android Credential Manager module
+(`@clerk/expo-google-signin` + `useSignInWithGoogle`), so it stays inside the app instead of
+opening a browser. The browser SSO flow remains a fallback. The app needs the public
+`EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID`; a store build also needs an Android OAuth client for
+the release package/SHA-1 in the same Google Cloud project. Without that registration the native
+flow falls back to the existing browser flow.
+
+Added `expo-blur`, `expo-haptics`, `expo-splash-screen` and `@clerk/expo-google-signin`; a dark
+splash icon replaces the white launch flash. `@types/react` is aligned to 19.3.0 across the
+workspace so web, docs and mobile type-check against one React type identity. Android's new BlurView API needs a `blurTarget`, so
+the current glass surfaces use translucent `blurMethod="none"` rather than claiming real blur.
+
+Verified on the Pixel_9_Pro emulator: guest Home, Loop, Search, You, film detail, native Katha
+playback/fullscreen, Bhram and Jungle YouTube playback, native sign-in and 404. Mobile
+check-types/lint and 13 tests pass. Signed-in journeys, publish/upload and chat send/receive were
+not re-run in this pass, and native visual approval is still the founder's.
+
 ## Accounts and public configuration
 
 The explicitly approved Expo CLI connection is logged in as `notsoaman`. This app uses

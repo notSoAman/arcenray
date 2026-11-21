@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import { Pressable, Text, View } from "react-native";
 import { AppState } from "react-native";
 import { router } from "expo-router";
 import {
-  creativeRoles,
   profileInputSchema,
   onboardingChoices,
   validOnboardingChoices,
@@ -18,8 +18,12 @@ import {
   Muted,
   Button,
   Notice,
+  Pill,
+  Kicker,
   useAction,
 } from "../src/ui";
+import { roleLabels, roleOptions } from "../src/data";
+import { colors, fonts, radius } from "../src/theme";
 function Editor() {
   const { api, me, refresh } = useSession();
   const [name, setName] = useState(me!.full_name);
@@ -82,21 +86,28 @@ function Editor() {
         autoCapitalize="none"
         maxLength={32}
       />
-      <Copy>Your roles — choose more than one.</Copy>
-      {creativeRoles.map((role) => (
-        <Button
-          key={role}
-          title={`${roles.includes(role) ? "✓ " : ""}${role.replaceAll("_", " ")}`}
-          variant={roles.includes(role) ? "primary" : "ghost"}
-          onPress={() =>
-            setRoles((old) =>
-              old.includes(role)
-                ? old.filter((x) => x !== role)
-                : [...old, role],
-            )
-          }
-        />
-      ))}
+      <View style={{ gap: 10 }}>
+        <Kicker>People · role</Kicker>
+        <Text style={{ color: colors.textSoft, fontFamily: fonts.regular, fontSize: 14 }}>
+          Choose every craft you work in — roles are additive.
+        </Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {roleOptions.map((role) => (
+            <Pill
+              key={role}
+              label={roleLabels[role] ?? role}
+              on={roles.includes(role)}
+              onPress={() =>
+                setRoles((old) =>
+                  old.includes(role)
+                    ? old.filter((x) => x !== role)
+                    : [...old, role],
+                )
+              }
+            />
+          ))}
+        </View>
+      </View>
       <Field label="City" value={city} onChangeText={setCity} maxLength={100} />
       <Field
         label="Bio"
@@ -114,23 +125,51 @@ function Editor() {
       {!editing ? (
         <>
           <SectionTitle>Your visual vibe.</SectionTitle>
-          <Muted>Choose exactly three references.</Muted>
-          {onboardingChoices.map((c) => (
-            <Button
-              key={c.id}
-              title={`${choices.includes(c.id) ? "✓ " : ""}${c.label} — ${c.detail}`}
-              variant={choices.includes(c.id) ? "primary" : "ghost"}
-              onPress={() =>
-                setChoices((old) =>
-                  old.includes(c.id)
-                    ? old.filter((x) => x !== c.id)
-                    : old.length < 3
-                      ? [...old, c.id]
-                      : old,
-                )
-              }
-            />
-          ))}
+          <Muted>Choose exactly three references that feel like you.</Muted>
+          <View style={{ gap: 8 }}>
+            {onboardingChoices.map((c) => {
+              const on = choices.includes(c.id);
+              return (
+                <Pressable
+                  key={c.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  onPress={() =>
+                    setChoices((old) =>
+                      old.includes(c.id)
+                        ? old.filter((x) => x !== c.id)
+                        : old.length < 3
+                          ? [...old, c.id]
+                          : old,
+                    )
+                  }
+                  style={({ pressed }) => ({
+                    padding: 16,
+                    borderRadius: radius.cardSm,
+                    borderWidth: 1,
+                    borderColor: on ? colors.pink : colors.line,
+                    backgroundColor: on ? "rgba(232,82,122,0.1)" : colors.graphite,
+                    gap: 4,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                >
+                  <Text
+                    style={{
+                      color: on ? colors.pink : colors.text,
+                      fontFamily: fonts.bold,
+                      fontSize: 15,
+                    }}
+                  >
+                    {on ? "✓ " : ""}
+                    {c.label}
+                  </Text>
+                  <Text style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 13 }}>
+                    {c.detail}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </>
       ) : null}
       <Notice message={validation ?? a.error} />
@@ -163,6 +202,10 @@ function Editor() {
           setValidation(null);
           void a.run(async () => {
             const p = await api!.profiles.update(parsed.data);
+            if (p.error?.code === "23514" && p.error.message.endsWith("is reserved for Arcenray.")) {
+              setValidation(p.error.message);
+              return;
+            }
             if (p.error) throw p.error;
             if (!editing) {
               const seed = await api!.supabase.rpc(

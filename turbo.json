@@ -5,6 +5,12 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": [
+        "APP_VARIANT",
+        "EXPO_UPDATE_CHANNEL",
+        "EAS_BUILD_PROFILE",
+        "ARCENRAY_ANDROID_GOOGLE_SERVICES_FILE"
+      ],
       "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
     },
     "lint": {
