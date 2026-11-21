@@ -113,3 +113,20 @@ to the production channel with, from `apps/mobile`:
 The runtime fingerprint is unchanged from the v10 build, so the update applies
 to installed v10 clients on first launch. Verify with
 `npx eas-cli update:list`.
+
+## Web rollout of the chat rework — 2026-11-21
+
+- Production build from `feat/chat-excellence` (37020d4) with the production
+  public environment supplied as process env (Supabase URL/publishable key,
+  Clerk `pk_live`, `https://cdn.arcenray.com`, issuer `https://clerk.arcenray.com`).
+  Next.js 16.4.1 now hard-stops production builds on a published security
+  advisory (agent upgrade nudge); the official retry path lets the same
+  command continue once. **A Next.js security upgrade remains recommended
+  before the next build.**
+- Worker version `7274b38f-b2ad-45c6-982e-911eb7c2bd56` (arcenray-web):
+  preview-tested on apex and staging (home 200, /chats guest 307, sign-in 200),
+  then deployed at 100%. Live smoke after cutover: `/`, `/loop`, `/sign-in`
+  200, `/chats` 307 for guests, staging 200. The served chunks contain the new
+  chat code (`chat-presence`, `recording audio…`).
+- Rollback: `wrangler rollback` or redeploy the previous version
+  (`dbea0620-d23a-4e40-89e1-7a99c34d3` era) via `wrangler versions deploy`.
