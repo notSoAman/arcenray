@@ -272,6 +272,14 @@ export function ChatPushProvider({ children }: PropsWithChildren) {
   );
 }
 
+export function chatPushSupported() {
+  return supported;
+}
+
+export function useChatPush(): ChatPush {
+  return useContext(Context);
+}
+
 export function usePushSignOut() {
   const { signOut } = useClerk();
   const { disable } = useContext(Context);

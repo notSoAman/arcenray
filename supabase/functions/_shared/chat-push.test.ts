@@ -1,6 +1,6 @@
 import { deepStrictEqual, equal } from "node:assert/strict";
 import { test } from "node:test";
-import { dispatchChatPush, type PushJob } from "./chat-push.ts";
+import { chatPushMessage, dispatchChatPush, type PushJob } from "./chat-push.ts";
 
 const base: PushJob = {
   id: "job",
@@ -10,6 +10,9 @@ const base: PushJob = {
   conversation_id: "conversation",
   ticket: null,
   send_before: new Date(Date.now() + 60_000).toISOString(),
+  sender_name: "Ava Rao",
+  preview: "Loved the grading on Katha",
+  message_id: "message",
 };
 
 test("sends a private alert and keeps the Expo ticket for receipt checks", async () => {
@@ -18,8 +21,8 @@ test("sends a private alert and keeps the Expo ticket for receipt checks", async
     deepStrictEqual(request, [
       {
         to: base.token,
-        title: "Arcenray",
-        body: "New chat message",
+        title: "Ava Rao",
+        body: "Loved the grading on Katha",
         priority: "high",
         sound: "default",
         channelId: "chat-messages",
@@ -28,6 +31,7 @@ test("sends a private alert and keeps the Expo ticket for receipt checks", async
           kind: "chat_message",
           recipient_id: "recipient",
           conversation_id: "conversation",
+          message_id: "message",
         },
       },
     ]);
@@ -36,6 +40,19 @@ test("sends a private alert and keeps the Expo ticket for receipt checks", async
   deepStrictEqual(outcomes, [
     { job: base, result: "accepted", ticket: "ticket" },
   ]);
+});
+
+test("alerts degrade to a generic title and preview when enrichment is absent", () => {
+  const legacy: PushJob = {
+    ...base,
+    sender_name: null,
+    preview: null,
+    message_id: "",
+  };
+  const message = chatPushMessage(legacy);
+  equal(message.title, "New message");
+  equal(message.body, "Sent you a message");
+  equal(message.data.message_id, "");
 });
 
 test("handles unregistered devices, transient failures and delayed receipts", async () => {

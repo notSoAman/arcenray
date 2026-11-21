@@ -1,11 +1,18 @@
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, RefreshControl, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { router } from "expo-router";
-import { useChatActivity } from "../../src/chat-activity";
+import { useChatActivity, useChatActivityActions } from "../../src/chat-activity";
 import { chatPreview, isUnreadChat } from "../../src/chat-state";
 import { Gate, useSession } from "../../src/session";
 import { Avatar } from "../../src/visuals";
-import { IconSearch } from "../../src/icons";
+import { IconCheck, IconCheckDouble, IconSearch } from "../../src/icons";
 import {
   Screen,
   PageTitle,
@@ -33,6 +40,10 @@ type ChatRow = {
     created_at: string;
     attachment_id: string | null;
   } | null;
+  /** My own last message carries a delivery tick in the preview line. */
+  mine: boolean;
+  /** The peer's read receipt has reached my last message (double tick). */
+  seen: boolean;
   unread: boolean;
 };
 
@@ -51,7 +62,8 @@ function Chats() {
   const [filter, setFilter] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const { snapshot, refresh, loading, error } = useChatActivity();
+  const { snapshot, loading, error } = useChatActivity();
+  const { refresh } = useChatActivityActions();
   const memberKey =
     snapshot?.receipts
       .map((row) => row.conversation_id)
@@ -84,14 +96,23 @@ function Chats() {
     const latest = new Map(
       snapshot?.messages.map((row) => [row.conversation_id, row]),
     );
+    const peerRead = new Map(
+      snapshot?.peerReceipts.map((row) => [
+        row.conversation_id,
+        row.last_read_at,
+      ]),
+    );
     return (snapshot?.receipts ?? [])
       .map((receipt): ChatRow => {
         const id = receipt.conversation_id;
         const last = latest.get(id);
+        const read = peerRead.get(id);
         return {
           conversation_id: id,
           profile: profiles.data?.get(id),
           last,
+          mine: !!last && last.sender_id === meId,
+          seen: !!last && read !== undefined && read >= last.created_at,
           unread: !!last && isUnreadChat(last, receipt.last_read_at, meId),
         };
       })
@@ -127,24 +148,12 @@ function Chats() {
         />
       }
     >
-      <View style={{ gap: 6 }}>
+      <View style={s.head}>
         <PageTitle size={38}>Chats</PageTitle>
         <Kicker color={colors.pink}>Private · one to one</Kicker>
       </View>
 
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 10,
-          height: 44,
-          paddingHorizontal: 16,
-          borderRadius: 22,
-          backgroundColor: colors.void,
-          borderWidth: 1,
-          borderColor: colors.line,
-        }}
-      >
+      <View style={s.search}>
         <IconSearch size={18} color={colors.faint} />
         <TextInput
           accessibilityLabel="Filter conversations"
@@ -153,27 +162,14 @@ function Chats() {
           placeholder="Filter conversations"
           placeholderTextColor={colors.faint}
           autoCapitalize="none"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            color: colors.text,
-            fontFamily: fonts.regular,
-            fontSize: 14,
-          }}
+          style={s.searchInput}
         />
       </View>
 
       {loading ? (
-        <View style={{ gap: 10 }}>
+        <View style={s.skeletons}>
           {[0, 1, 2].map((i) => (
-            <View
-              key={i}
-              style={{
-                height: 76,
-                borderRadius: radius.cardSm,
-                backgroundColor: colors.graphite,
-              }}
-            />
+            <View key={i} style={s.skeleton} />
           ))}
         </View>
       ) : null}
@@ -201,87 +197,71 @@ function Chats() {
         <Muted>No conversation matches “{filter}”.</Muted>
       ) : null}
 
-      {filtered.map((c) => (
-        <Pressable
-          key={c.conversation_id}
-          accessibilityRole="link"
-          accessibilityLabel={`${c.profile?.full_name ?? "Creative"}${c.unread ? ", unread message" : ""}`}
-          onPress={() => {
-            haptic();
-            router.push({
-              pathname: "/chat/[id]",
-              params: { id: c.conversation_id },
-            });
-          }}
-          style={({ pressed }) => ({
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 14,
-            padding: 14,
-            borderRadius: radius.cardSm,
-            backgroundColor: pressed ? colors.graphiteRaised : colors.graphite,
-          })}
-        >
-          <Avatar
-            picKey={c.profile?.profile_pic_key}
-            name={c.profile?.full_name ?? "Creative"}
-            size={48}
-          />
-          <View style={{ flex: 1, gap: 3, minWidth: 0 }}>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+      {filtered.length > 0 ? (
+        <View style={s.list}>
+          {filtered.map((c) => (
+            <Pressable
+              key={c.conversation_id}
+              accessibilityRole="link"
+              accessibilityLabel={`${c.profile?.full_name ?? "Creative"}${c.unread ? ", unread message" : ""}`}
+              onPress={() => {
+                haptic();
+                router.push({
+                  pathname: "/chat/[id]",
+                  params: { id: c.conversation_id },
+                });
+              }}
+              style={({ pressed }) => [
+                s.row,
+                pressed ? s.rowPressed : null,
+              ]}
             >
-              <Text
-                numberOfLines={1}
-                style={{
-                  flex: 1,
-                  color: colors.text,
-                  fontFamily: c.unread ? fonts.extraBold : fonts.bold,
-                  fontSize: 16,
-                }}
-              >
-                {c.profile?.full_name ?? "Creative"}
-              </Text>
-              <Text
-                style={{
-                  color: colors.faint,
-                  fontFamily: fonts.regular,
-                  fontSize: 11,
-                }}
-              >
-                {when(c.last?.created_at)}
-              </Text>
-            </View>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              <Text
-                numberOfLines={1}
-                style={{
-                  flex: 1,
-                  color: c.unread ? colors.chead : colors.muted,
-                  fontFamily: fonts.regular,
-                  fontSize: 13,
-                }}
-              >
-                {c.last
-                  ? chatPreview(c.last.body, c.last.attachment_id)
-                  : "Start your conversation."}
-              </Text>
-              {c.unread ? (
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: colors.orange,
-                  }}
-                />
-              ) : null}
-            </View>
-          </View>
-        </Pressable>
-      ))}
+              <Avatar
+                picKey={c.profile?.profile_pic_key}
+                name={c.profile?.full_name ?? "Creative"}
+                size={52}
+              />
+              <View style={s.copy}>
+                <View style={s.topLine}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      s.name,
+                      c.unread ? s.nameUnread : s.nameRead,
+                    ]}
+                  >
+                    {c.profile?.full_name ?? "Creative"}
+                  </Text>
+                  <Text style={s.when}>{when(c.last?.created_at)}</Text>
+                </View>
+                <View style={s.previewLine}>
+                  <View style={s.previewBody}>
+                    {c.mine ? (
+                      c.seen ? (
+                        <IconCheckDouble size={13} color={colors.faint} />
+                      ) : (
+                        <IconCheck size={13} color={colors.faint} />
+                      )
+                    ) : null}
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        s.preview,
+                        c.unread ? s.previewUnread : s.previewRead,
+                      ]}
+                    >
+                      {c.last
+                        ? chatPreview(c.last.body, c.last.attachment_id)
+                        : "Start your conversation."}
+                    </Text>
+                  </View>
+                  {c.unread ? <View style={s.dot} /> : null}
+                </View>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -293,3 +273,72 @@ export default function Route() {
     </Gate>
   );
 }
+
+const s = StyleSheet.create({
+  head: { gap: 6 },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    height: 44,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    backgroundColor: colors.void,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    color: colors.text,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+  },
+  skeletons: { gap: 10 },
+  skeleton: {
+    height: 76,
+    borderRadius: radius.cardSm,
+    backgroundColor: colors.graphite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
+  },
+  list: { gap: 10 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 14,
+    borderRadius: radius.cardSm,
+    backgroundColor: colors.graphite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
+  },
+  rowPressed: { backgroundColor: colors.graphiteRaised },
+  copy: { flex: 1, gap: 3, minWidth: 0 },
+  topLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+  name: { flex: 1, fontSize: 16 },
+  nameUnread: { color: colors.bone, fontFamily: fonts.extraBold },
+  nameRead: { color: colors.text, fontFamily: fonts.bold },
+  when: {
+    color: colors.faint,
+    fontFamily: fonts.regular,
+    fontSize: 11,
+  },
+  previewLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+  previewBody: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minWidth: 0,
+  },
+  preview: { flex: 1, minWidth: 0, fontSize: 13.5 },
+  previewUnread: { color: colors.chead, fontFamily: fonts.medium },
+  previewRead: { color: colors.muted, fontFamily: fonts.regular },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.ember,
+  },
+});

@@ -127,6 +127,26 @@ export const IconCheck = ({ size = 18, color = "currentColor" }: IconProps) => (
   </Base>
 );
 
+export const IconCheckDouble = ({
+  size = 18,
+  color = "currentColor",
+}: IconProps) => (
+  <Base size={size} color={color} strokeWidth={2}>
+    <Path d="M2.5 13 7 17.5 15.5 7" />
+    <Path d="M9 13l4.5 4.5L22 7" />
+  </Base>
+);
+
+export const IconClock = ({
+  size = 18,
+  color = "currentColor",
+}: IconProps) => (
+  <Base size={size} color={color}>
+    <Circle cx={12} cy={12} r={8.25} />
+    <Path d="M12 7.5V12l3 2" />
+  </Base>
+);
+
 export const IconSend = ({ size = 18, color = "currentColor" }: IconProps) => (
   <Base size={size} color={color}>
     <Path d="M4 12 20 4l-6 16-3-7z" />

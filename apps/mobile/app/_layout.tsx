@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ChatActivityProvider } from "../src/chat-activity";
+import { ChatPushPrompt } from "../src/chat-prompt";
 import { ChatPushProvider } from "../src/chat-push";
 import { SessionProvider } from "../src/session";
 import { LogoMark } from "../src/brand";
@@ -67,6 +68,7 @@ export default function RootLayout() {
               <Stack.Screen name="chat/[id]" />
               <Stack.Screen name="+not-found" />
             </Stack>
+            <ChatPushPrompt />
           </ChatActivityProvider>
         </ChatPushProvider>
       </SessionProvider>

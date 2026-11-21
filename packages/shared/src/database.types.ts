@@ -856,6 +856,20 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_chat_overview: {
+        Args: never
+        Returns: {
+          conversation_id: string
+          last_read_at: string
+          last_message_id: string | null
+          last_message_client_id: string | null
+          last_message_sender_id: string | null
+          last_message_body: string | null
+          last_message_attachment_id: string | null
+          last_message_created_at: string | null
+          peer_last_read_at: string | null
+        }[]
+      }
       get_film_publication: { Args: { p_film: string }; Returns: Json }
       get_loop_feed: {
         Args: { p_exclude_ids?: string[]; p_limit?: number }

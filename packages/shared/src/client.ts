@@ -128,6 +128,18 @@ export function createArcenrayClient(supabase: SupabaseClient<Database>) {
           p_exclude_ids: ids,
         });
       },
+      // Restored 2026-11-21: the film-feedback RPCs still exist in production
+      // and apps/web loop depends on both. Removing them (e4e6c7c) broke the
+      // web type check; retire these together with the web loop UI, not alone.
+      feedback: (filmId: string, preference: "more" | "less") => {
+        if (preference !== "more" && preference !== "less")
+          throw new Error("Invalid preference");
+        return supabase.rpc("set_film_feedback", {
+          p_film_id: uuidSchema.parse(filmId),
+          p_preference: preference,
+        });
+      },
+      preferences: () => supabase.rpc("get_my_film_feedback"),
     },
     chat: {
       attachment: {

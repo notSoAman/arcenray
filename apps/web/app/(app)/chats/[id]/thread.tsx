@@ -50,6 +50,19 @@ function merge(list: Local[], msg: Local) {
   );
 }
 
+/**
+ * Typing indicator protocol, kept identical to apps/mobile/src/chat-state.ts
+ * so both platforms interoperate on the same broadcast channel. A composer
+ * re-announces while text keeps changing; receivers expire the hint instead
+ * of trusting a "stopped" event that may never arrive.
+ */
+const typingRefreshMs = 1500;
+const typingExpiryMs = 5000;
+
+function shouldSendTyping(lastSentAt: number, now: number) {
+  return now - lastSentAt >= typingRefreshMs;
+}
+
 /** RLS-scoped history uses a stable timestamp/ID cursor; older pages never mark new messages read. */
 export function Thread({
   conversationId,
@@ -83,9 +96,18 @@ export function Thread({
   const [live, setLive] = useState<"connecting" | "live" | "offline">(
     "connecting",
   );
+  const [peerTyping, setPeerTyping] = useState(false);
+  const [peerRecording, setPeerRecording] = useState(false);
+  const [peerReadAt, setPeerReadAt] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
+  const lastTypingSent = useRef(0);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const announceRef = useRef<(kind: "text" | "audio") => void>(() => {});
   const name = other?.full_name ?? "Someone on arcenray";
   const first = name.split(/\s+/)[0];
+  const otherId = other?.id ?? null;
 
   useLayoutEffect(() => {
     const previous = restoreScroll.current;
@@ -166,6 +188,17 @@ export function Thread({
       if (!active || syncing || document.hidden) return;
       syncing = true;
       try {
+        // Reconcile the peer's read receipt first so "Seen" self-heals
+        // after a dropped realtime connection.
+        const receipt = await supabase
+          .from("conversation_participants")
+          .select("last_read_at")
+          .eq("conversation_id", conversationId)
+          .neq("user_id", me)
+          .limit(1);
+        const seen = receipt.data?.[0]?.last_read_at;
+        if (typeof seen === "string")
+          setPeerReadAt((previous) => (previous >= seen ? previous : seen));
         for (let page=0; page<20 && active; page++) {
           let query=supabase.from("messages").select("*").eq("conversation_id",conversationId)
             .order("created_at").order("id").limit(100);
@@ -193,8 +226,31 @@ export function Thread({
           table: "messages",
           filter: `conversation_id=eq.${conversationId}`,
         },
-        ({ new: row }) =>
-          setMessages((list) => merge(list, row as ThreadMessage)),
+        ({ new: row }) => {
+          const message = row as ThreadMessage;
+          setMessages((list) => merge(list, message));
+          // A delivered peer message is proof the typing stopped; clear now.
+          if (message.sender_id === otherId) {
+            setPeerTyping(false);
+            setPeerRecording(false);
+            clearTimeout(typingTimer.current);
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "conversation_participants",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        ({ new: participant }) => {
+          if (participant.user_id === me) return;
+          const seen = participant.last_read_at;
+          if (typeof seen !== "string") return;
+          setPeerReadAt((previous) => (previous >= seen ? previous : seen));
+        },
       )
       .subscribe((status) => {
         if(status === "SUBSCRIBED")void catchUp();
@@ -211,7 +267,41 @@ export function Thread({
       document.removeEventListener("visibilitychange",wake);window.removeEventListener("online",wake);
       void supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, initialMessages, me, otherId]);
+
+  // Typing indicator: same ephemeral broadcast protocol as the mobile app
+  // (channel chat-presence:<id>, event "typing"). Receivers expire the hint
+  // after five seconds of silence instead of waiting for a stop event.
+  useEffect(() => {
+    const supabase = browserApi().supabase;
+    const channel = supabase
+      .channel(`chat-presence:${conversationId}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        if (payload?.user !== otherId) return;
+        if (payload.kind === "audio") setPeerRecording(true);
+        else setPeerTyping(true);
+        clearTimeout(typingTimer.current);
+        typingTimer.current = setTimeout(() => {
+          setPeerTyping(false);
+          setPeerRecording(false);
+        }, typingExpiryMs);
+      })
+      .subscribe();
+    announceRef.current = (kind) => {
+      channel.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { user: me, kind },
+      });
+    };
+    return () => {
+      clearTimeout(typingTimer.current);
+      announceRef.current = () => {};
+      void supabase.removeChannel(channel);
+    };
+  }, [conversationId, me, otherId]);
 
   // Keep the newest message in view and mark the thread read.
   const lastId = messages[messages.length - 1]?.id;
@@ -276,6 +366,7 @@ export function Thread({
     const body = draft.trim() || attachment?.name || "";
     if (!body) return;
     setDraft("");
+    lastTypingSent.current = 0;
     const id=attachment?.id??null;setAttachment(null);
     void send(body.slice(0, 5000),newId(),id);
   }
@@ -287,6 +378,31 @@ export function Thread({
     }
   }
 
+  function onDraft(value: string) {
+    setDraft(value);
+    // The first keystroke announces immediately; further changes at most
+    // once per refresh window. Clearing the draft resets the throttle.
+    if (!value.trim()) {
+      lastTypingSent.current = 0;
+      return;
+    }
+    const now = Date.now();
+    if (shouldSendTyping(lastTypingSent.current, now)) {
+      lastTypingSent.current = now;
+      announceRef.current("text");
+    }
+  }
+
+  // Only the newest own message carries a Seen/Sent label; rows still
+  // sending or failed keep their existing state line instead.
+  let lastMineKey: string | null = null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.sender_id !== me) continue;
+    lastMineKey = m.status ? null : `${m.sender_id}:${m.client_id || m.id}`;
+    break;
+  }
+
   return (
     <section className={styles.thread} aria-label={`Conversation with ${name}`}>
       <header className={styles.threadHead}>
@@ -296,14 +412,25 @@ export function Thread({
         <Avatar picKey={other?.profile_pic_key} name={name} size={44} />
         <span className={styles.threadWho}>
           <span className={styles.threadName}>{name}</span>
-          <span className={styles.threadRole}>
-            {[
-              other?.roles.map(personRole).filter(Boolean)[0],
-              other?.location_city,
-            ]
-              .filter(Boolean)
-              .join(" · ") || (live === "offline" ? "Reconnecting…" : "")}
-          </span>
+          {peerTyping || peerRecording ? (
+            <span className={styles.threadTyping}>
+              <span className={styles.typingDots} aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+              {peerRecording ? "recording audio…" : "typing…"}
+            </span>
+          ) : (
+            <span className={styles.threadRole}>
+              {[
+                other?.roles.map(personRole).filter(Boolean)[0],
+                other?.location_city,
+              ]
+                .filter(Boolean)
+                .join(" · ") || (live === "offline" ? "Reconnecting…" : "")}
+            </span>
+          )}
         </span>
         {other ? (
           <Link
@@ -347,9 +474,10 @@ export function Thread({
         {messages.map((m) => {
           const mine = m.sender_id === me;
           const film = m.film_id ? filmMap[m.film_id] : undefined;
+          const key = `${m.sender_id}:${m.client_id || m.id}`;
           return (
             <div
-              key={`${m.sender_id}:${m.client_id || m.id}`}
+              key={key}
               className={styles.msgWrap}
               data-mine={mine ? "true" : undefined}
             >
@@ -399,6 +527,11 @@ export function Thread({
                   </button>
                 </span>
               ) : null}
+              {mine && key === lastMineKey ? (
+                <span className={styles.msgState}>
+                  {peerReadAt >= m.created_at ? "Seen" : "Sent"}
+                </span>
+              ) : null}
             </div>
           );
         })}
@@ -407,7 +540,7 @@ export function Thread({
       <div className="chat-tools">
         <AttachmentPicker conversationId={conversationId} onReady={setAttachment} onBusy={setFileBusy} disabled={fileBusy}/>
         {attachment?<span>{attachment.name} <button type="button" onClick={()=>setAttachment(null)}>Remove</button></span>:null}
-        <div aria-label="Emojis">{["😀","❤️","👏","🎬","🔥","🙏"].map(emoji=><button className="pill" type="button" key={emoji} aria-label={`Add ${emoji}`} onClick={()=>setDraft(text=>text+emoji)}>{emoji}</button>)}</div>
+        <div aria-label="Emojis">{["😀","❤️","👏","🎬","🔥","🙏"].map(emoji=><button className="pill" type="button" key={emoji} aria-label={`Add ${emoji}`} onClick={()=>onDraft((draft+emoji).slice(0,5000))}>{emoji}</button>)}</div>
       </div>
       <form className={styles.composer} onSubmit={submit}>
         <label htmlFor="chat-draft" className="visually-hidden">
@@ -417,7 +550,7 @@ export function Thread({
           id="chat-draft"
           rows={1}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => onDraft(e.target.value)}
           onKeyDown={onKey}
           placeholder={`Message ${first}`}
           maxLength={5000}

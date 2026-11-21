@@ -1,21 +1,42 @@
 # Android chat push
 
 The Android app has an opt-in **Settings → Chat notifications → Message alerts**
-switch. Android controls lock-screen visibility and notification permission.
-Alerts say “New chat message” and contain no sender name, message body or media.
-A tap opens the intended thread only for the signed-in recipient. Thread access
-continues to use the chat membership rules. Foreground messaging uses the
-existing in-app banner and unread badge.
+switch, plus a contextual one-time prompt after onboarding and after the first
+unread message. Android controls lock-screen visibility and notification
+permission. Alerts show the sender display name and a short preview; the
+lock-screen stays PRIVATE, so content is hidden until unlock. A tap opens the
+intended thread only for the signed-in recipient. Thread access continues to
+use the chat membership rules. Foreground messaging uses the in-app banner
+(sender, avatar and preview) and the unread badge.
 
-The migration adds private device and delivery tables, a message insert trigger,
-three service-only RPCs, and a ten-second Cron dispatch. It uses the existing
-Supabase operations JWT and cleanup secret in Vault. The worker checks read state,
-account availability, blocks, and the active device registration before sending.
-Dispatch timing depends on the scheduler and delivery provider. It retries transient failures, checks Expo receipts, and retires invalid tokens.
-A crash after Expo accepts a send but before saving its ticket can cause a duplicate.
-Sign-out and disable revoke registration. If the device is offline, revocation
-is best effort until the app reconnects under that account or the registration
-expires. Any alert already handed to Android contains generic text.
+The original migration added private device and delivery tables, a message
+insert trigger, three service-only RPCs, and a ten-second Cron dispatch. The
+`20261121191000_chat_delivery_overview` migration made dispatch near-instant:
+jobs are due the moment a message commits, an AFTER INSERT
+`messages_notify_chat_push` trigger posts the worker through pg_net (it runs
+after `messages_enqueue_chat_push` by alphabetical trigger order), and the Cron
+was relaxed to 30 seconds as the retry and Expo-receipt sweeper. The claim
+query was split into `private.prune_chat_push_jobs()` plus the claim itself,
+and now returns `sender_name`, `preview` and `message_id` (voice notes and
+attachments get "Sent a voice note" / "Sent an attachment" copy; whitespace
+collapses to one line, 140 characters max). `public.get_chat_overview()` gives
+clients one consistent snapshot of receipts, newest message and the peer
+receipt, so unread badges and delivery ticks cannot race. It uses the existing
+Supabase operations JWT and cleanup secret in Vault. The worker checks read
+state, account availability, blocks, and the active device registration before
+sending. It retries transient failures, checks Expo receipts, and retires
+invalid tokens. A crash after Expo accepts a send but before saving its ticket
+can cause a duplicate. Sign-out and disable revoke registration. If the device
+is offline, revocation is best effort until the app reconnects under that
+account or the registration expires.
+
+Deployment note (2026-11-21): the Supabase MCP transport corrupts dense
+multi-kilobyte single statements, so the claim pair is split and the migration
+was applied in small batches through `execute_sql`; the ledger row
+`20261121191000` was recorded to match the committed file. The service role
+needs `grant execute` on the private claim pair for the security-invoker
+wrapper; that grant is part of the migration file. `chat-push-dispatch`
+deploys as a self-contained bundle (v3) with no relative imports.
 
 ## Staging and release
 
@@ -36,28 +57,38 @@ expires. Any alert already handed to Android contains generic text.
    through an over-the-air update.
 4. With two staging accounts and an Android device, opt in, background the
    recipient app, lock the device, and send from the other account. Confirm
-   generic alert text, tap-to-thread after a cold start, and no duplicate
-   foreground banner. Repeat with Android permission denied, chat alerts
-   disabled, a read message, a block, and sign-out.
+   sender name and preview text, tap-to-thread after a cold start, and no
+   duplicate foreground banner. Repeat with Android permission denied, chat
+   alerts disabled, a read message, a block, and sign-out.
 
-Sub-minute dispatch requires the PostgreSQL build listed in the
-[Supabase Cron quickstart](https://supabase.com/docs/guides/cron/quickstart).
+Sub-minute dispatch no longer depends on the Cron: the insert trigger
+delivers within tens of milliseconds (verified 22 ms to the worker POST).
 
-Run the rollback-only database assertions against an isolated Supabase instance
-with `pnpm exec supabase db query --local --file supabase/tests/chat-push.sql`.
+Run the rollback-only database assertions against an isolated Supabase
+instance with `pnpm exec supabase db query --local --file supabase/tests/chat-push.sql`.
 Confirm **Private Android chat push registration, delivery and authorization
 assertions passed**. The local check does not exercise Expo or FCM delivery.
 
 ## Production rollout — 2026-11-21
 
 - Production project `ropbxsnjtejfomnpdllf`: migration
-  `20261121170337_android_chat_push` applied. The rollback-only registration,
-  delivery, read, block, revocation and authorization assertions passed on
-  production. Cron `arcenray-chat-push` is active at a ten-second interval.
-- `chat-push-device` and `chat-push-dispatch` are deployed. The production
-  `EXPO_PUSH_ACCESS_TOKEN` secret is set and Expo enhanced push security is
-  enabled. A dispatch smoke request authenticated with the Vault operations
-  credentials returned HTTP 200 with `{claimed:0,rejected:0}`.
+  `20261121170337_android_chat_push` applied earlier, then
+  `20261121191000_chat_delivery_overview` applied in batched form (MCP
+  transport limits; the ledger row matches the committed file). The
+  registration, delivery, read, block, revocation and authorization behaviors
+  carry over; new assertions cover immediacy, enriched claims and the
+  overview grants. Cron `arcenray-chat-push` is active at a 30-second sweeper
+  cadence.
+- `chat-push-device` unchanged; `chat-push-dispatch` redeployed as version 3
+  (self-contained bundle) with sender name and preview alerts. The production
+  `EXPO_PUSH_ACCESS_TOKEN` secret and Expo enhanced push security were already
+  set. A dispatch smoke with the Vault operations credentials returned HTTP 200
+  `{claimed:0,rejected:0}` before the live test.
+- Live delivery proof (2026-11-21 19:25 UTC): a real message inserted into the
+  founder↔reviewer conversation produced a due job instantly, the notify
+  trigger posted the worker 22 ms later, the 30-second sweeper claimed it after
+  the permissions fix above, Expo accepted the send, and a forced receipt check
+  confirmed **delivered** to the registered device.
 - Production build `067f0421-af84-4918-b1b4-e0fe56bee9f0` completed as
   `0.1.0 (10)` from commit `e4e6c7c`. The AAB SHA-256 is
   `fd69f1a5e93de7ea98816a33464f65f04a32a467f45feec2951f0b07d40f36b1`
@@ -68,4 +99,17 @@ assertions passed**. The local check does not exercise Expo or FCM delivery.
 - Play submission `9c054528-d03c-4055-975c-0c227ea14a3b` uploaded the build to
   **Arcenray Closed Testing** with release status completed. Play Console showed
   the release **in review** at the time of writing; tester availability and the
-  real lock-screen delivery test remain pending.
+  real lock-screen delivery test remain pending with the founder.
+
+## JS-only rework delivery — 2026-11-21 (feat/chat-excellence)
+
+The chat experience rework (typing indicators, delivery ticks, grouped
+bubbles, memoized rows, consistent unread state, contextual push prompt, web
+typing/Seen parity) is JavaScript-only and rides the v10 native base. Ship it
+to the production channel with, from `apps/mobile`:
+
+    EXPO_TOKEN=<token> npx eas-cli update --branch production --auto
+
+The runtime fingerprint is unchanged from the v10 build, so the update applies
+to installed v10 clients on first launch. Verify with
+`npx eas-cli update:list`.

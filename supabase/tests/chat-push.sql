@@ -70,5 +70,29 @@ select pg_temp.assert(not exists(select from public.backend_claim_chat_push_jobs
 select pg_temp.assert(public.backend_manage_chat_push_device('77000000-0000-4000-8000-000000000003','77000000-0000-4000-8000-000000000012'),'current owner can revoke');
 select pg_temp.assert(not exists(select from private.chat_push_devices where token='ExpoPushToken[TestReceiver]'),'revocation removes the registration');
 
+-- Immediacy, enriched alerts and the overview read (20261121191000_chat_delivery_overview).
+select public.backend_manage_chat_push_device('77000000-0000-4000-8000-000000000002','77000000-0000-4000-8000-000000000012','ExpoPushToken[TestReceiver]');
+insert into public.messages(id,conversation_id,sender_id,body)
+values ('77000000-0000-4000-8000-000000000030','77000000-0000-4000-8000-000000000004','77000000-0000-4000-8000-000000000001','Instant fixture');
+select pg_temp.assert(exists(select 1 from private.chat_push_jobs
+ where message_id='77000000-0000-4000-8000-000000000030' and available_at<=now() and ticket is null),'new message jobs are immediately due');
+select pg_temp.assert(exists(select 1 from pg_trigger
+ where tgname='messages_notify_chat_push' and tgrelid='public.messages'::regclass),'immediate dispatch trigger installed');
+create temp table claimed_instant as
+ select * from public.backend_claim_chat_push_jobs() where message_id='77000000-0000-4000-8000-000000000030';
+select pg_temp.assert((select count(*)=1 from claimed_instant),'immediately due job is claimed without a scheduler round');
+select pg_temp.assert((select sender_name='Push QA' and preview='Instant fixture' from claimed_instant),'claimed jobs carry sender name and preview');
+select pg_temp.assert((select conversation_id='77000000-0000-4000-8000-000000000004' from claimed_instant),'claimed jobs keep the conversation reference');
+select pg_temp.assert(public.backend_finish_chat_push_job((select id from claimed_instant),(select lease from claimed_instant),'delivered'),'instant job finishes');
+select pg_temp.assert(not exists(select from public.backend_claim_chat_push_jobs() where message_id='77000000-0000-4000-8000-000000000030'),'finished jobs never redeliver');
+select public.backend_manage_chat_push_device('77000000-0000-4000-8000-000000000002','77000000-0000-4000-8000-000000000012',null);
+
+set local role authenticated;
+select pg_temp.assert(has_function_privilege(current_user,'public.get_chat_overview()','execute'),'authenticated reads chat overview');
+reset role;
+set local role anon;
+select pg_temp.assert(not has_function_privilege(current_user,'public.get_chat_overview()','execute'),'guest cannot read chat overview');
+reset role;
+
 rollback;
 select 'Private Android chat push registration, delivery and authorization assertions passed' as result;

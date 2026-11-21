@@ -6,6 +6,9 @@ export type PushJob = {
   conversation_id: string;
   ticket: string | null;
   send_before: string;
+  sender_name: string | null;
+  preview: string | null;
+  message_id: string;
 };
 
 type Result = "accepted" | "delivered" | "unregistered" | "rejected" | "retry";
@@ -41,6 +44,26 @@ function status(job: PushJob, response: ExpoResult | undefined): Outcome {
   return { job, result: "retry" };
 }
 
+export function chatPushMessage(job: PushJob) {
+  return {
+    to: job.token,
+    // Sender name with a privacy-preserving preview. Android lock-screen
+    // visibility stays PRIVATE, so the body is hidden until the device unlocks.
+    title: job.sender_name || "New message",
+    body: job.preview || "Sent you a message",
+    priority: "high" as const,
+    sound: "default",
+    channelId: "chat-messages",
+    expiration: Math.floor(Date.parse(job.send_before) / 1000),
+    data: {
+      kind: "chat_message",
+      recipient_id: job.recipient_id,
+      conversation_id: job.conversation_id,
+      message_id: job.message_id,
+    },
+  };
+}
+
 export async function dispatchChatPush(
   jobs: PushJob[],
   request: ExpoRequest,
@@ -49,23 +72,7 @@ export async function dispatchChatPush(
   const receipts = jobs.filter((job) => job.ticket);
   const [sent, checked] = await Promise.all([
     sends.length
-      ? request(
-          "send",
-          sends.map((job) => ({
-            to: job.token,
-            title: "Arcenray",
-            body: "New chat message",
-            priority: "high",
-            sound: "default",
-            channelId: "chat-messages",
-            expiration: Math.floor(Date.parse(job.send_before) / 1000),
-            data: {
-              kind: "chat_message",
-              recipient_id: job.recipient_id,
-              conversation_id: job.conversation_id,
-            },
-          })),
-        ).catch(() => null)
+      ? request("send", sends.map(chatPushMessage)).catch(() => null)
       : null,
     receipts.length
       ? request("getReceipts", {
