@@ -150,3 +150,31 @@ to installed v10 clients on first launch. Verify with
   chat code (`chat-presence`, `recording audio…`).
 - Rollback: `wrangler rollback` or redeploy the previous version
   (`dbea0620-d23a-4e40-89e1-7a99c34d3` era) via `wrangler versions deploy`.
+
+## Notification actions and branded icons — 2026-11-22
+
+- Production `chat-push-dispatch` is active as version 4. The Vault-backed
+  dispatcher smoke returned HTTP 200 without a timeout before the native build.
+- Feature commit `907196f` adds the `arcenray_chat_message` action category,
+  background Task Manager handling for Reply and Mark as read, and the
+  notification-safe monochrome `a` and Void large icons.
+- Production build `974ac12d-9e54-41be-9451-a70f1b22ef5f` completed from
+  fingerprint-fix commit `ed18f4f` as `0.1.0 (12)` with runtime
+  `914b87cb9b66f3d031f0438e0154239d64543ce3`. The AAB SHA-256 is
+  `d9efd0bad2162122ffb4ea333d7e6cfeb7dfd3cbd8004475eaafba0203ca79f4`.
+  It is signed with the established upload key SHA-1
+  `9A:B2:F4:38:7A:5A:00:97:48:6C:E3:3E:63:05:E4:47:6E:57:4D:1D`
+  and contains the 96px monochrome and 256px large notification drawables.
+- `apps/mobile/fingerprint.config.js` excludes EAS's mounted
+  `eas-environment-secrets` path. Push support now derives from the release
+  identity rather than the EAS-only Google services path, eliminating the
+  runtime fingerprint mismatch while preserving Expo's compatibility guard.
+- Play submission `d9fd5d3c-c41b-4f01-8d5d-4b5c28073d1d` completed
+  successfully to **Arcenray Closed Testing**. A Play API read confirms that
+  track now serves version code `12`.
+- The public `production` track is still empty. Play rejected completed and
+  draft submissions `51d2e79e-6e88-4e45-b414-0e6920152cdc` and
+  `7f718a97-bae0-44f8-951e-377b895779ee` with the same precondition failure:
+  "Google Play rejected the release or review settings". The release cannot be
+  promoted through EAS until the Play account clears its production-access
+  gate in Play Console.
