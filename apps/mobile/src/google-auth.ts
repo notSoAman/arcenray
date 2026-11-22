@@ -1,6 +1,12 @@
+import { signupHandle } from "@repo/shared";
+
 type SignUpLike = {
   createdSessionId?: string | null;
   existingSession?: { sessionId: string } | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  emailAddress?: string | null;
+  username?: string | null;
   missingFields?: string[];
   status?: string | null;
   update?: PendingGoogleSignUp["update"];
@@ -9,6 +15,10 @@ type SignUpLike = {
 export type PendingGoogleSignUp = {
   status: string | null;
   createdSessionId: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  emailAddress?: string | null;
+  username?: string | null;
   missingFields: string[];
   update: (params: { username: string }) => Promise<{ error: unknown }>;
   finalize: () => Promise<{ error: unknown }>;
@@ -28,9 +38,7 @@ export type GoogleAuthResult = {
   signIn?: Resource | null;
   signUp?: SignUpLike | null;
 };
-export function googleAuthOutcome(
-  result: GoogleAuthResult,
-):
+export function googleAuthOutcome(result: GoogleAuthResult):
   | { kind: "complete"; newAccount: boolean }
   | {
       kind: "needs-username";
@@ -98,9 +106,12 @@ export async function completeGoogleSignUp(
   signUp: PendingGoogleSignUp,
   username: string,
 ): Promise<GoogleSignUpCompletion> {
-  const handle = username.trim().toLowerCase();
+  const handle = normalizeGoogleUsername(username);
   if (!handle)
-    return { kind: "error", message: "Choose a username to continue." };
+    return {
+      kind: "error",
+      message: "Use 4–32 lowercase letters, numbers or underscores.",
+    };
 
   const { error: updateError } = await signUp.update({ username: handle });
   if (updateError)
@@ -117,4 +128,35 @@ export async function completeGoogleSignUp(
     return { kind: "error", message: authFailureMessage(finalizeError) };
 
   return { kind: "complete", createdSessionId: signUp.createdSessionId };
+}
+
+export function normalizeGoogleUsername(value: string | null | undefined) {
+  const normalized = value
+    ?.normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 32)
+    .replace(/_+$/g, "");
+  if (!normalized || normalized.length < 4) return null;
+  return signupHandle(normalized);
+}
+
+/** Prefill the one optional Clerk field from the Google profile already returned by SSO. */
+export function googleUsernameSeed(
+  signUp: Pick<
+    PendingGoogleSignUp,
+    "username" | "firstName" | "lastName" | "emailAddress"
+  >,
+) {
+  const name = [signUp.firstName, signUp.lastName]
+    .filter((part): part is string => !!part?.trim())
+    .join("_");
+  const emailLocal = signUp.emailAddress?.split("@")[0];
+  for (const candidate of [signUp.username, name, emailLocal]) {
+    const handle = normalizeGoogleUsername(candidate);
+    if (handle) return handle;
+  }
+  return "";
 }

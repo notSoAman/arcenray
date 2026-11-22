@@ -359,6 +359,7 @@ function Composer({
   meId,
   announce,
   onSubmit,
+  bottomInset,
 }: {
   api: NonNullable<ReturnType<typeof useSession>["api"]>;
   conversation: string;
@@ -367,6 +368,7 @@ function Composer({
   meId: string;
   announce: (kind: "text" | "audio") => void;
   onSubmit: (body: string, attachmentId: string | null) => Promise<void>;
+  bottomInset: number;
 }) {
   const [text, setText] = useState("");
   const [selected, setSelected] = useState<SelectedChatFile | null>(null);
@@ -587,7 +589,16 @@ function Composer({
   }
 
   return (
-    <View style={[s.composer, { paddingBottom: keyboardVisible ? 8 : 14 }]}>
+    <View
+      style={[
+        s.composer,
+        {
+          paddingBottom: keyboardVisible
+            ? Math.max(8, Math.min(bottomInset, 12))
+            : Math.max(12, bottomInset),
+        },
+      ]}
+    >
       <Notice message={error} />
       {selected ? (
         <View style={s.file}>
@@ -727,9 +738,7 @@ function Composer({
             ]}
             onPress={() => {
               haptic("light");
-              void (recording.isRecording
-                ? stopRecording()
-                : startRecording());
+              void (recording.isRecording ? stopRecording() : startRecording());
             }}
           >
             {recording.isRecording ? (
@@ -1174,8 +1183,7 @@ function Thread() {
         new Date(below.created_at).toDateString() === date.toDateString();
       const newDay =
         !above ||
-        date.toDateString() !==
-          new Date(above.created_at).toDateString();
+        date.toDateString() !== new Date(above.created_at).toDateString();
       return (
         <View>
           {newDay ? <DayChip label={dayLabel(date)} /> : null}
@@ -1215,30 +1223,13 @@ function Thread() {
           }
         />
       </View>
-      {!ready && !error ? <Busy /> : null}
-      <FlatList
-        ref={list}
-        inverted={messages.length > 0}
-        data={newestFirst}
-        keyExtractor={(row) => `${row.sender_id}:${row.client_id}`}
-        style={{ flex: 1 }}
-        contentContainerStyle={s.history}
-        keyboardShouldPersistTaps="handled"
-        maintainVisibleContentPosition={keepPosition}
-        onScroll={onScroll}
-        scrollEventThrottle={32}
-        ListFooterComponent={
-          hasOlder ? (
-            <Button
-              title={olderBusy ? "Loading…" : "Load older messages"}
-              disabled={olderBusy}
-              variant="ghost"
-              onPress={() => void loadOlder()}
-            />
-          ) : undefined
-        }
-        ListEmptyComponent={
-          ready && other ? (
+      <View style={s.body}>
+        {!ready && !error ? (
+          <View style={s.centerState}>
+            <Busy />
+          </View>
+        ) : messages.length === 0 && !error ? (
+          other ? (
             <View style={s.empty}>
               <Avatar
                 picKey={other.profile_pic_key}
@@ -1253,15 +1244,47 @@ function Thread() {
                 Say what you liked about their work, or what you’re making.
               </Text>
             </View>
-          ) : undefined
-        }
-        renderItem={renderItem}
-      />
-      {!atLatest ? (
+          ) : (
+            <View style={s.centerState}>
+              <Text style={s.emptyBody}>Loading this conversation…</Text>
+            </View>
+          )
+        ) : messages.length > 0 ? (
+          <FlatList
+            ref={list}
+            inverted
+            data={newestFirst}
+            keyExtractor={(row) => `${row.sender_id}:${row.client_id}`}
+            style={{ flex: 1 }}
+            contentContainerStyle={s.history}
+            keyboardShouldPersistTaps="handled"
+            maintainVisibleContentPosition={keepPosition}
+            onScroll={onScroll}
+            scrollEventThrottle={32}
+            ListFooterComponent={
+              hasOlder ? (
+                <Button
+                  title={olderBusy ? "Loading…" : "Load older messages"}
+                  disabled={olderBusy}
+                  variant="ghost"
+                  onPress={() => void loadOlder()}
+                />
+              ) : undefined
+            }
+            renderItem={renderItem}
+          />
+        ) : null}
+        {error ? (
+          <View style={s.errorState}>
+            <Notice message={error} retry={() => void load()} />
+          </View>
+        ) : null}
+      </View>
+      {!atLatest && messages.length > 0 ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Jump to latest message"
-          style={s.jump}
+          style={[s.jump, { bottom: 78 + insets.bottom }]}
           onPress={() => jumpToLatest()}
         >
           <IconChevronDown color={colors.bone} size={19} />
@@ -1282,6 +1305,7 @@ function Thread() {
         meId={meId}
         announce={(kind) => announceRef.current(kind)}
         onSubmit={submitFromComposer}
+        bottomInset={insets.bottom}
       />
     </KeyboardAvoidingView>
   );
@@ -1340,6 +1364,17 @@ const s = StyleSheet.create({
   typingRow: { flexDirection: "row", alignItems: "center", gap: 3 },
   typingDot: { width: 5, height: 5, borderRadius: 2.5 },
   history: { paddingHorizontal: 14, paddingVertical: 10 },
+  body: { flex: 1 },
+  centerState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  errorState: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
   message: {},
   messageFirst: { marginTop: 6 },
   messageGrouped: { marginTop: 2 },
@@ -1423,11 +1458,13 @@ const s = StyleSheet.create({
     fontSize: 11,
   },
   empty: {
-    paddingVertical: 48,
+    flex: 1,
+    minHeight: 260,
+    justifyContent: "center",
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 30,
-    transform: [{ scaleY: -1 }],
+    paddingVertical: 48,
   },
   emptyTitle: {
     color: colors.bone,

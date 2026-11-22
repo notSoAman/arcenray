@@ -5,8 +5,10 @@ import { router } from "expo-router";
 import {
   profileInputSchema,
   onboardingChoices,
+  initialProfileHandle,
   validOnboardingChoices,
 } from "@repo/shared";
+import { useUser } from "@clerk/expo";
 import { Gate, useSession } from "../src/session";
 import { selectImage, smallMediaTask } from "../src/media";
 import {
@@ -24,10 +26,18 @@ import {
 } from "../src/ui";
 import { roleLabels, roleOptions } from "../src/data";
 import { colors, fonts, radius } from "../src/theme";
-function Editor() {
+function Editor({
+  clerkName,
+  clerkUsername,
+}: {
+  clerkName?: string | null;
+  clerkUsername?: string | null;
+}) {
   const { api, me, refresh } = useSession();
-  const [name, setName] = useState(me!.full_name);
-  const [handle, setHandle] = useState(me!.handle);
+  const [name, setName] = useState(me!.full_name || clerkName || "");
+  const [handle, setHandle] = useState(() =>
+    initialProfileHandle(me!, clerkUsername),
+  );
   const [bio, setBio] = useState(me!.bio);
   const [city, setCity] = useState(me!.location_city ?? "");
   const [skills, setSkills] = useState(me!.skills_gear.join(", "));
@@ -85,10 +95,17 @@ function Editor() {
         onChangeText={setHandle}
         autoCapitalize="none"
         maxLength={32}
+        hint="Your sign-in username becomes your public handle. Edit it if you prefer."
       />
       <View style={{ gap: 10 }}>
         <Kicker>People · role</Kicker>
-        <Text style={{ color: colors.textSoft, fontFamily: fonts.regular, fontSize: 14 }}>
+        <Text
+          style={{
+            color: colors.textSoft,
+            fontFamily: fonts.regular,
+            fontSize: 14,
+          }}
+        >
           Choose every craft you work in — roles are additive.
         </Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -148,7 +165,9 @@ function Editor() {
                     borderRadius: radius.cardSm,
                     borderWidth: 1,
                     borderColor: on ? colors.pink : colors.line,
-                    backgroundColor: on ? "rgba(232,82,122,0.1)" : colors.graphite,
+                    backgroundColor: on
+                      ? "rgba(232,82,122,0.1)"
+                      : colors.graphite,
                     gap: 4,
                     opacity: pressed ? 0.8 : 1,
                   })}
@@ -163,7 +182,13 @@ function Editor() {
                     {on ? "✓ " : ""}
                     {c.label}
                   </Text>
-                  <Text style={{ color: colors.muted, fontFamily: fonts.regular, fontSize: 13 }}>
+                  <Text
+                    style={{
+                      color: colors.muted,
+                      fontFamily: fonts.regular,
+                      fontSize: 13,
+                    }}
+                  >
                     {c.detail}
                   </Text>
                 </Pressable>
@@ -202,7 +227,10 @@ function Editor() {
           setValidation(null);
           void a.run(async () => {
             const p = await api!.profiles.update(parsed.data);
-            if (p.error?.code === "23514" && p.error.message.endsWith("is reserved for Arcenray.")) {
+            if (
+              p.error?.code === "23514" &&
+              p.error.message.endsWith("is reserved for Arcenray.")
+            ) {
               setValidation(p.error.message);
               return;
             }
@@ -229,9 +257,14 @@ function Editor() {
   );
 }
 export default function Onboarding() {
+  const { user } = useUser();
   return (
     <Gate onboarding={false}>
-      <Editor />
+      <Editor
+        key={`${user?.id ?? "pending"}:${user?.username ?? "pending"}`}
+        clerkName={user?.fullName}
+        clerkUsername={user?.username}
+      />
     </Gate>
   );
 }

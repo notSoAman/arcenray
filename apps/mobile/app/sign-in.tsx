@@ -8,8 +8,10 @@ import { useHostedAuth } from "@clerk/expo/hosted-auth";
 import {
   completeGoogleSignUp,
   googleAuthOutcome,
+  googleUsernameSeed,
   googleRedirectUrl,
   authFailureMessage,
+  normalizeGoogleUsername,
   type PendingGoogleSignUp,
 } from "../src/google-auth";
 import Constants from "expo-constants";
@@ -104,16 +106,20 @@ function GoogleUsernameCompletion({
   signUp,
   onDone,
   onError,
+  onStart,
 }: {
   signUp: PendingGoogleSignUp;
   onDone: (newAccount: boolean) => void;
   onError: (message: string) => void;
+  onStart: () => void;
 }) {
-  const [username, setUsername] = useState("");
+  const suggestedUsername = googleUsernameSeed(signUp);
+  const [username, setUsername] = useState(suggestedUsername);
   const [busy, setBusy] = useState(false);
-  const handle = username.trim().toLowerCase();
+  const handle = normalizeGoogleUsername(username);
 
   async function finish() {
+    onStart();
     setBusy(true);
     onError("");
     try {
@@ -147,25 +153,30 @@ function GoogleUsernameCompletion({
           lineHeight: 21,
         }}
       >
-        Your Google details are ready. Choose the handle Arcenray will use for
-        your public profile.
+        Your Google details are ready. Confirm the username Arcenray will use
+        for sign-in and your public profile.
       </Text>
       <Field
-        label="Username"
+        label="Username (@handle)"
         value={username}
         onChangeText={setUsername}
         autoCapitalize="none"
         autoCorrect={false}
+        maxLength={32}
         editable={!busy}
         placeholder="your-handle"
-        hint="4–64 characters. Used to share your profile."
+        hint={
+          suggestedUsername
+            ? "Prefilled from Google. Use 4–32 letters, numbers or underscores."
+            : "Use 4–32 lowercase letters, numbers or underscores."
+        }
         onSubmitEditing={finish}
         returnKeyType="done"
       />
       <Button
         title={busy ? "Finishing…" : "Continue"}
         block
-        disabled={busy || handle.length < 4}
+        disabled={busy || !handle}
         busy={busy}
         onPress={finish}
       />
@@ -190,9 +201,13 @@ function Divider({ label }: { label: string }) {
 function GoogleFlow({
   onDone,
   onError,
+  onStart,
+  onStop,
 }: {
   onDone: (newAccount: boolean) => void;
   onError: (message: string) => void;
+  onStart: () => void;
+  onStop: () => void;
 }) {
   const { startSSOFlow } = useSSO();
   const { loaded } = useClerk();
@@ -218,7 +233,9 @@ function GoogleFlow({
     inFlight.current = true;
     setBusy(true);
     onError("");
+    onStart();
     haptic("medium");
+    let completed = false;
     try {
       // The installed Core 3 hook finalizes/activates before resolving.
       const result = await startSSOFlow({
@@ -228,14 +245,17 @@ function GoogleFlow({
       });
       if (!alive.current) return;
       const outcome = googleAuthOutcome(result);
-      if (outcome.kind === "complete") onDone(outcome.newAccount);
-      else if (outcome.kind === "needs-username")
+      if (outcome.kind === "complete") {
+        completed = true;
+        onDone(outcome.newAccount);
+      } else if (outcome.kind === "needs-username")
         setPendingSignUp(outcome.signUp);
       else if (outcome.kind === "incomplete") onError(outcome.message);
     } catch (error) {
       if (alive.current) onError(authFailureMessage(error));
     } finally {
       inFlight.current = false;
+      if (!completed) onStop();
       if (alive.current) setBusy(false);
     }
   }
@@ -246,12 +266,21 @@ function GoogleFlow({
         signUp={pendingSignUp}
         onDone={onDone}
         onError={onError}
+        onStart={onStart}
       />
     );
   return <GoogleButton onPress={() => void go()} busy={busy} />;
 }
 
-function SignInForm() {
+function SignInForm({
+  onGoogleDone,
+  onGoogleStart,
+  onGoogleStop,
+}: {
+  onGoogleDone: (newAccount: boolean) => void;
+  onGoogleStart: () => void;
+  onGoogleStop: () => void;
+}) {
   const { signIn, errors } = useSignIn();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -373,9 +402,9 @@ function SignInForm() {
     <View style={{ gap: 14 }}>
       <GoogleFlow
         onError={setError}
-        onDone={(newAccount) =>
-          router.replace(newAccount ? "/onboarding" : "/home")
-        }
+        onDone={onGoogleDone}
+        onStart={onGoogleStart}
+        onStop={onGoogleStop}
       />
       <Divider label="or continue with email" />
 
@@ -512,7 +541,15 @@ function SignInForm() {
   );
 }
 
-function SignUpForm() {
+function SignUpForm({
+  onGoogleDone,
+  onGoogleStart,
+  onGoogleStop,
+}: {
+  onGoogleDone: (newAccount: boolean) => void;
+  onGoogleStart: () => void;
+  onGoogleStop: () => void;
+}) {
   const { signUp, errors } = useSignUp();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -530,9 +567,14 @@ function SignUpForm() {
     setError(null);
     try {
       const parts = name.trim().split(/\s+/);
+      const normalizedUsername = normalizeGoogleUsername(username);
+      if (!normalizedUsername) {
+        setError("Use 4–32 lowercase letters, numbers or underscores.");
+        return;
+      }
       const { error: createError } = await signUp.create({
         emailAddress: email.trim(),
-        username: username.trim().toLowerCase(),
+        username: normalizedUsername,
         password,
         firstName: parts[0] || undefined,
         lastName: parts.slice(1).join(" ") || undefined,
@@ -615,9 +657,9 @@ function SignUpForm() {
     <View style={{ gap: 14 }}>
       <GoogleFlow
         onError={setError}
-        onDone={(newAccount) =>
-          router.replace(newAccount ? "/onboarding" : "/home")
-        }
+        onDone={onGoogleDone}
+        onStart={onGoogleStart}
+        onStop={onGoogleStop}
       />
       <Divider label="or create with email" />
       <Field
@@ -637,9 +679,10 @@ function SignUpForm() {
         onChangeText={setUsername}
         autoCapitalize="none"
         autoCorrect={false}
+        maxLength={32}
         editable={!busy}
         placeholder="your-handle"
-        hint="4–64 characters. Used to sign in and share your profile."
+        hint="4–32 lowercase letters, numbers or underscores."
         error={errors.fields.username?.message ?? null}
       />
       <Field
@@ -680,10 +723,16 @@ export default function SignInScreen() {
   const { startHostedAuth } = useHostedAuth();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [hostedBusy, setHostedBusy] = useState(false);
+  const googleNavigationPending = useRef(false);
 
   useEffect(() => {
-    if (isSignedIn) router.replace("/home");
+    if (isSignedIn && !googleNavigationPending.current) router.replace("/home");
   }, [isSignedIn]);
+
+  function finishGoogle(newAccount: boolean) {
+    googleNavigationPending.current = true;
+    router.replace(newAccount ? "/onboarding" : "/home");
+  }
 
   async function openHosted() {
     setHostedBusy(true);
@@ -799,7 +848,27 @@ export default function SignInScreen() {
           })}
         </View>
 
-        {mode === "sign-in" ? <SignInForm /> : <SignUpForm />}
+        {mode === "sign-in" ? (
+          <SignInForm
+            onGoogleDone={finishGoogle}
+            onGoogleStart={() => {
+              googleNavigationPending.current = true;
+            }}
+            onGoogleStop={() => {
+              googleNavigationPending.current = false;
+            }}
+          />
+        ) : (
+          <SignUpForm
+            onGoogleDone={finishGoogle}
+            onGoogleStart={() => {
+              googleNavigationPending.current = true;
+            }}
+            onGoogleStop={() => {
+              googleNavigationPending.current = false;
+            }}
+          />
+        )}
 
         <SignInUpdates />
         <View style={{ gap: 10, paddingTop: 4 }}>
