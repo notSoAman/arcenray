@@ -30,6 +30,44 @@ test("Expo consumes the static config through its dynamic config input", () => {
   });
 });
 
+test("push support follows the release identity instead of an EAS-only file path", async () => {
+  const { default: createConfig } = await import("../app.config.ts");
+  const createExpoConfig = createConfig as (
+    context: Pick<Parameters<typeof createConfig>[0], "config">,
+  ) => ReturnType<typeof createConfig>;
+  const baseConfig = JSON.parse(
+    readFileSync(new URL("../app.json", import.meta.url), "utf8"),
+  ).expo;
+  const previousVariant = process.env.APP_VARIANT;
+  const previousChannel = process.env.EXPO_UPDATE_CHANNEL;
+  const previousGoogleServicesFile =
+    process.env.ARCENRAY_ANDROID_GOOGLE_SERVICES_FILE;
+
+  try {
+    process.env.APP_VARIANT = "production";
+    process.env.EXPO_UPDATE_CHANNEL = "production";
+    delete process.env.ARCENRAY_ANDROID_GOOGLE_SERVICES_FILE;
+    const withoutMountedFile = createExpoConfig({ config: baseConfig });
+
+    process.env.ARCENRAY_ANDROID_GOOGLE_SERVICES_FILE =
+      "/tmp/google-services.json";
+    const withMountedFile = createExpoConfig({ config: baseConfig });
+
+    assert.equal(withoutMountedFile.extra?.chatPushEnabled, true);
+    assert.equal(withMountedFile.extra?.chatPushEnabled, true);
+  } finally {
+    if (previousVariant === undefined) delete process.env.APP_VARIANT;
+    else process.env.APP_VARIANT = previousVariant;
+    if (previousChannel === undefined) delete process.env.EXPO_UPDATE_CHANNEL;
+    else process.env.EXPO_UPDATE_CHANNEL = previousChannel;
+    if (previousGoogleServicesFile === undefined)
+      delete process.env.ARCENRAY_ANDROID_GOOGLE_SERVICES_FILE;
+    else
+      process.env.ARCENRAY_ANDROID_GOOGLE_SERVICES_FILE =
+        previousGoogleServicesFile;
+  }
+});
+
 test("audio native peers are direct dependencies for standalone builds", () => {
   const pkg = require("./package.json");
   const audio = require("expo-audio/package.json");
@@ -49,6 +87,7 @@ test("store builds and updates share production identity and fingerprint compati
     projectId,
   });
   assert.equal(config.android.package, "com.arcenray.mobile");
+  assert.equal(config.chatPushEnabled, true);
   assert.equal(config.scheme, "arcenray");
   assert.deepEqual(config.runtimeVersion, { policy: "fingerprint" });
   assert.equal(
@@ -76,6 +115,7 @@ test("preview uses the release package but cannot read the production update cha
 test("development retains its separate identity and cannot accidentally consume production updates", () => {
   const config = release.mobileReleaseConfig({ projectId });
   assert.equal(config.android.package, "com.arcenray.mobile.dev");
+  assert.equal(config.chatPushEnabled, false);
   assert.equal(config.scheme, "arcenray-dev");
   assert.equal(
     config.updates.requestHeaders["expo-channel-name"],

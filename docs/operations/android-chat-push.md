@@ -22,6 +22,13 @@ high-contrast large icon derived from the accepted `a` mark on Void. These are
 native drawables, so this improvement requires a new app build rather than an
 OTA-only update.
 
+Production builds mount `google-services.json` from an EAS file secret outside
+the uploaded workspace. Push support therefore follows the release identity,
+and `apps/mobile/fingerprint.config.js` excludes the mounted
+`eas-environment-secrets` path from the fingerprint. This keeps the pre-build
+and worker runtime versions equal without disabling Expo's native compatibility
+guard.
+
 The original migration added private device and delivery tables, a message
 insert trigger, three service-only RPCs, and a ten-second Cron dispatch. The
 `20261121191000_chat_delivery_overview` migration made dispatch near-instant:

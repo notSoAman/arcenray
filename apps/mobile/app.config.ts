@@ -41,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     extra: {
       ...config.extra,
-      chatPushEnabled: !!googleServicesFile,
+      chatPushEnabled: release.chatPushEnabled,
       // Public Google OAuth client ID for native Credential Manager sign-in.
       EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID:
         process.env.EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID ??

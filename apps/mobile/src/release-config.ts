@@ -18,6 +18,7 @@ export function mobileReleaseConfig({
     throw new Error("Release update channels require the production variant.");
   return {
     scheme: production ? "arcenray" : "arcenray-dev",
+    chatPushEnabled: production,
     android: {
       package: production ? "com.arcenray.mobile" : "com.arcenray.mobile.dev",
     },
