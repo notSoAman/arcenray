@@ -34,9 +34,20 @@
         "track": "Arcenray Closed Testing"
       }
     },
-    "internal": { "android": { "track": "internal" } },
-    "alpha": { "android": { "track": "alpha" } },
-    "beta": { "android": { "track": "beta" } },
-    "production": { "android": { "track": "production" } }
+    "internal": {
+      "android": { "applicationId": "com.arcenray.mobile", "track": "internal" }
+    },
+    "alpha": {
+      "android": { "applicationId": "com.arcenray.mobile", "track": "alpha" }
+    },
+    "beta": {
+      "android": { "applicationId": "com.arcenray.mobile", "track": "beta" }
+    },
+    "production": {
+      "android": {
+        "applicationId": "com.arcenray.mobile",
+        "track": "production"
+      }
+    }
   }
 }

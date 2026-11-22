@@ -148,6 +148,10 @@ test("native store automation increments the remote version and submits only to 
   assert.equal(eas.build.production.node, "24.18.0");
   assert.equal(eas.build.production.pnpm, "11.25.0");
   for (const track of ["internal", "alpha", "beta", "production"]) {
+    assert.equal(
+      eas.submit[track].android.applicationId,
+      "com.arcenray.mobile",
+    );
     assert.equal(eas.submit[track].android.track, track);
   }
   assert.equal(eas.submit.default, undefined);
