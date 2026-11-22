@@ -14,6 +14,11 @@ import Constants from "expo-constants";
 import { randomUUID } from "expo-crypto";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
+import {
+  handleChatNotificationWithApi,
+  isChatNotificationAction,
+  prepareChatNotifications,
+} from "./chat-notification-runtime";
 import { chatPushConversation } from "./chat-push-state";
 import { useSession, type Api } from "./session";
 import { Button, Copy, Muted, SectionTitle } from "./ui";
@@ -111,31 +116,60 @@ async function dismissChatNotifications() {
 }
 
 function NotificationNavigation() {
-  const { me, pending } = useSession();
+  const { api, me, pending } = useSession();
   const root = useRootNavigationState()?.key;
   const pathname = usePathname();
   const response = Notifications.useLastNotificationResponse();
   const seen = useRef("");
   useEffect(() => {
-    if (
-      !root ||
-      pending ||
-      !response ||
-      response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER
-    )
-      return;
+    if (pending || !response) return;
     const request = response.notification.request;
+    const seenKey = `${request.identifier}:${response.actionIdentifier}:${
+      response.userText ?? ""
+    }`;
+    if (seen.current === seenKey) return;
+    if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+      if (
+        !api ||
+        !me ||
+        !isChatNotificationAction(response.actionIdentifier) ||
+        AppState.currentState !== "active"
+      )
+        return;
+      seen.current = seenKey;
+      const conversation = chatPushConversation(
+        request.content.data ?? {},
+        me.id,
+      );
+      void handleChatNotificationWithApi(api, me.id, response)
+        .then((completed) => {
+          if (
+            !completed &&
+            conversation &&
+            pathname !== `/chat/${conversation}`
+          )
+            router.push({
+              pathname: "/chat/[id]",
+              params: { id: conversation },
+            });
+        })
+        .finally(() =>
+          Notifications.clearLastNotificationResponseAsync().catch(() => {}),
+        );
+      return;
+    }
+    if (!root) return;
     if (
       request.content.data?.kind !== "chat_message" ||
-      seen.current === request.identifier
+      seen.current === seenKey
     )
       return;
-    seen.current = request.identifier;
+    seen.current = seenKey;
     const id = chatPushConversation(request.content.data, me?.id ?? null);
     void Notifications.clearLastNotificationResponseAsync().catch(() => {});
     if (id && pathname !== `/chat/${id}`)
       router.push({ pathname: "/chat/[id]", params: { id } });
-  }, [me?.id, pathname, pending, response, root]);
+  }, [api, me, pathname, pending, response, root]);
   return null;
 }
 
@@ -229,6 +263,11 @@ export function ChatPushProvider({ children }: PropsWithChildren) {
       }),
     [api, revoke, run, updateMode, userId],
   );
+
+  useEffect(() => {
+    if (!supported) return;
+    void prepareChatNotifications().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!supported || !userId) return;

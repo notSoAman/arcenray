@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { chatPushConversation } from "../src/chat-push-state.ts";
-import { chatPushMessage, dispatchChatPush, type PushJob } from "../../../supabase/functions/_shared/chat-push.ts";
+import {
+  chatPushMessage,
+  dispatchChatPush,
+  type PushJob,
+} from "../../../supabase/functions/_shared/chat-push.ts";
 
 test("a chat alert opens only a validated conversation for its signed-in recipient", () => {
   const recipient = "8eb77408-c53d-47b8-adaf-63f0e93e33fb";
@@ -46,6 +50,8 @@ test("rich alerts carry the sender name, preview and thread reference", () => {
   assert.equal(message.body, "Loved the grading on Katha");
   assert.equal(message.priority, "high");
   assert.equal(message.channelId, "chat-messages");
+  assert.equal(message.categoryId, "arcenray_chat_message");
+  assert.equal(message.icon, "notification_icon");
   assert.deepEqual(message.data, {
     kind: "chat_message",
     recipient_id: "8eb77408-c53d-47b8-adaf-63f0e93e33fb",
@@ -66,7 +72,10 @@ test("alerts degrade gracefully when enrichment fields are missing", () => {
 test("the dispatcher sends fresh jobs and checks accepted receipts together", async () => {
   const seen: { path: string; body: unknown }[] = [];
   const outcomes = await dispatchChatPush(
-    [job(), job({ id: "f47ac10b-58cc-4372-a567-0e02b2c3d479", ticket: "ticket-1" })],
+    [
+      job(),
+      job({ id: "f47ac10b-58cc-4372-a567-0e02b2c3d479", ticket: "ticket-1" }),
+    ],
     async (path, body) => {
       seen.push({ path, body });
       if (path === "send")
@@ -74,10 +83,10 @@ test("the dispatcher sends fresh jobs and checks accepted receipts together", as
       return { data: { "ticket-1": { status: "ok" } } };
     },
   );
-  assert.deepEqual(
-    seen.map((call) => call.path).sort(),
-    ["getReceipts", "send"],
-  );
+  assert.deepEqual(seen.map((call) => call.path).sort(), [
+    "getReceipts",
+    "send",
+  ]);
   assert.equal(outcomes[0]?.result, "accepted");
   assert.equal(outcomes[0]?.ticket, "expo-ticket-1");
   assert.equal(outcomes[1]?.result, "delivered");

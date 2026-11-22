@@ -18,6 +18,16 @@ test("Expo consumes the static config through its dynamic config input", () => {
   assert.equal(config.exp.name, "Arcenray");
   assert.equal(config.exp.extra.eas.projectId, projectId);
   assert.ok(config.exp.plugins.includes("expo-router"));
+  const notifications = config.exp.plugins.find(
+    (plugin: unknown) =>
+      Array.isArray(plugin) && plugin[0] === "expo-notifications",
+  );
+  assert.deepEqual(notifications?.[1], {
+    defaultChannel: "chat-messages",
+    color: "#C2234B",
+    icon: "./assets/notification-icon.png",
+    largeIcon: "./assets/notification-large-icon.png",
+  });
 });
 
 test("audio native peers are direct dependencies for standalone builds", () => {

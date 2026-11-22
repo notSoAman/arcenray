@@ -54,6 +54,8 @@ export function chatPushMessage(job: PushJob) {
     priority: "high" as const,
     sound: "default",
     channelId: "chat-messages",
+    categoryId: "arcenray_chat_message",
+    icon: "notification_icon",
     expiration: Math.floor(Date.parse(job.send_before) / 1000),
     data: {
       kind: "chat_message",

@@ -9,6 +9,19 @@ intended thread only for the signed-in recipient. Thread access continues to
 use the chat membership rules. Foreground messaging uses the in-app banner
 (sender, avatar and preview) and the unread badge.
 
+Expanded alerts expose **Reply** and **Mark as read** without opening the app.
+The `arcenray_chat_message` category is registered at runtime, and
+`expo-task-manager` executes custom actions while the app is foregrounded,
+backgrounded or terminated. Reply uses the source message ID as its stable
+client ID so a foreground/background handoff cannot create duplicates. Mark as
+read persists the newest visible message timestamp and never moves an existing
+receipt backwards. Successful actions dismiss the matching notification.
+
+The `expo-notifications` config uses a white transparent small icon and a
+high-contrast large icon derived from the accepted `a` mark on Void. These are
+native drawables, so this improvement requires a new app build rather than an
+OTA-only update.
+
 The original migration added private device and delivery tables, a message
 insert trigger, three service-only RPCs, and a ten-second Cron dispatch. The
 `20261121191000_chat_delivery_overview` migration made dispatch near-instant:

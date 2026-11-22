@@ -22,7 +22,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...(config.plugins ?? []),
       [
         "expo-notifications",
-        { defaultChannel: "chat-messages", color: "#C2234B" },
+        {
+          defaultChannel: "chat-messages",
+          color: "#C2234B",
+          icon: "./assets/notification-icon.png",
+          largeIcon: "./assets/notification-large-icon.png",
+        },
       ],
     ],
     android: {

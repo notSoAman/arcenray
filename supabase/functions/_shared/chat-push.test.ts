@@ -1,6 +1,10 @@
 import { deepStrictEqual, equal } from "node:assert/strict";
 import { test } from "node:test";
-import { chatPushMessage, dispatchChatPush, type PushJob } from "./chat-push.ts";
+import {
+  chatPushMessage,
+  dispatchChatPush,
+  type PushJob,
+} from "./chat-push.ts";
 
 const base: PushJob = {
   id: "job",
@@ -26,6 +30,8 @@ test("sends a private alert and keeps the Expo ticket for receipt checks", async
         priority: "high",
         sound: "default",
         channelId: "chat-messages",
+        categoryId: "arcenray_chat_message",
+        icon: "notification_icon",
         expiration: Math.floor(Date.parse(base.send_before) / 1000),
         data: {
           kind: "chat_message",
