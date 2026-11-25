@@ -1,3 +1,4 @@
+import { initialProfileHandle } from "@repo/shared";
 import { floatingTabBarLayout } from "./native-layout.ts";
 
 type AccountProfile = {
@@ -9,8 +10,8 @@ type AccountProfile = {
 
 export function accountIdentity(profile: AccountProfile) {
   const fullName = profile.full_name.trim();
-  const generatedHandle = profile.handle === profile.id.replaceAll("-", "");
-  const publicHandle = generatedHandle ? null : `@${profile.handle}`;
+  const handle = initialProfileHandle(profile);
+  const publicHandle = handle ? `@${handle}` : null;
 
   if (!profile.onboarding_completed && !fullName) {
     return {
