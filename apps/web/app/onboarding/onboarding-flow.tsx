@@ -19,6 +19,7 @@ import styles from "./onboarding.module.css";
 import { onboardingChoices, validOnboardingChoices } from "./preferences";
 import {
   MIN_ROLES,
+  VIBE_MAX,
   handleIssue,
   nextVibeSelection,
   skillsHint,
