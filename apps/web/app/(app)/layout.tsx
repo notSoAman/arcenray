@@ -24,6 +24,7 @@ export default async function AppLayout({
                 name: profile.full_name,
                 handle: profile.handle,
                 picKey: profile.profile_pic_key,
+                pending: !profile.onboarding_completed,
               }
             : null
         }

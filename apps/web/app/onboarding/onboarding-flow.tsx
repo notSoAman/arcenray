@@ -17,6 +17,13 @@ import { roleLabels, roleOptions, type CreativeRole } from "../../lib/roles";
 import { LocationInput } from "../../components/location-input";
 import styles from "./onboarding.module.css";
 import { onboardingChoices, validOnboardingChoices } from "./preferences";
+import {
+  MIN_ROLES,
+  handleIssue,
+  nextVibeSelection,
+  skillsHint,
+  vibeInstruction,
+} from "./steps";
 
 type Initial = {
   roles: CreativeRole[];
@@ -65,7 +72,9 @@ export function OnboardingFlow({
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [roles, setRoles] = useState<CreativeRole[]>(initial.roles);
   const [fullName, setFullName] = useState(initial.full_name);
-  const [handle, setHandle] = useState(initial.handle);
+  const [handle, setHandle] = useState(
+    initial.handle || suggestHandle(initial.full_name),
+  );
   const [handleTouched, setHandleTouched] = useState(initial.handle !== "");
   const [city, setCity] = useState(initial.location_city);
   const [bio, setBio] = useState(initial.bio);
@@ -102,7 +111,7 @@ export function OnboardingFlow({
   }
 
   function continueToDetails() {
-    if (roles.length === 0) {
+    if (roles.length < MIN_ROLES) {
       setRolesError(true);
       return;
     }
@@ -312,7 +321,7 @@ export function OnboardingFlow({
               What do you make?
             </h1>
             <p className={styles.lede}>
-              Choose everything that fits. This shapes who you meet.
+              Choose at least one role. Select all that apply.
             </p>
             <div
               className={styles.chips}
@@ -441,7 +450,8 @@ export function OnboardingFlow({
                       />
                     </div>
                     <span id="handle-hint" className="field-hint">
-                      Lowercase letters, numbers and underscores.
+                      {handleIssue(handle) ??
+                        "Lowercase letters, numbers and underscores."}
                     </span>
                     {errors.handle ? (
                       <span id="handle-error" className="field-error">
@@ -493,10 +503,21 @@ export function OnboardingFlow({
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="skills">
-                  Skills &amp; gear{" "}
-                  <span className={styles.optional}>optional</span>
-                </label>
+                <div className={styles.labelRow}>
+                  <label className="field-label" htmlFor="skills">
+                    Skills &amp; gear{" "}
+                    <span className={styles.optional}>optional</span>
+                  </label>
+                  {skills.length > 0 ? (
+                    <button
+                      type="button"
+                      className={styles.clearBtn}
+                      onClick={() => setSkills([])}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
                 <div className={styles.tagInput}>
                   {skills.map((skill) => (
                     <span key={skill} className={styles.tag}>
@@ -541,8 +562,7 @@ export function OnboardingFlow({
                   />
                 </div>
                 <span id="skills-hint" className="field-hint">
-                  {errors.skills_gear ??
-                    "Press Enter or comma to add each one."}
+                  {errors.skills_gear ?? skillsHint(skills.length, SKILLS_MAX)}
                 </span>
               </div>
 
@@ -580,8 +600,10 @@ export function OnboardingFlow({
               What draws you in?
             </h1>
             <p className={styles.lede}>
-              Choose three cinematic references. Start with what you love; your
-              taste can grow as you explore.
+              Start with what you love — your taste can grow as you explore.
+            </p>
+            <p role="status" className={styles.lede}>
+              {vibeInstruction(choices.length, onboardingChoices.length)}
             </p>
             <form className={styles.form} onSubmit={onSubmit}>
               <div
@@ -598,15 +620,11 @@ export function OnboardingFlow({
                       className={styles.vibeCard}
                       data-tone={choice.color}
                       aria-pressed={selected}
-                      disabled={saving || (!selected && choices.length === 3)}
+                      disabled={saving}
                       onClick={() => {
                         setSaveError(null);
                         setChoices((current) =>
-                          current.includes(choice.id)
-                            ? current.filter((id) => id !== choice.id)
-                            : current.length < 3
-                              ? [...current, choice.id]
-                              : current,
+                          nextVibeSelection(current, choice.id),
                         );
                       }}
                     >
@@ -620,12 +638,6 @@ export function OnboardingFlow({
                   );
                 })}
               </div>
-              <p role="status" className={styles.lede}>
-                {choices.length} of 3 selected.{" "}
-                {choices.length === 3
-                  ? "Deselect a card to change your choices."
-                  : "Choose what feels like you."}
-              </p>
               <p className="field-hint">
                 These are starting preferences, not a test. You can explore
                 immediately even while film recommendations are still building.

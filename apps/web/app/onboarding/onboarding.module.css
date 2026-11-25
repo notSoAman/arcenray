@@ -185,6 +185,28 @@
   color: var(--text-faint);
 }
 
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clearBtn {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.clearBtn:hover {
+  color: var(--bone);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
 .prefixed {
   position: relative;
 }

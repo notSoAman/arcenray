@@ -6,9 +6,15 @@ import { Lockup } from "./brand";
 import { IconChat, IconLoop, IconHome, IconSearch } from "./icons";
 import { AccountMenu } from "./account-menu";
 import { Avatar } from "./media";
+import { avatarLabel, profileLinkTarget } from "./nav-links";
 import styles from "./app-nav.module.css";
 
-type Viewer = { name: string; handle: string; picKey: string | null };
+type Viewer = {
+  name: string;
+  handle: string;
+  picKey: string | null;
+  pending: boolean;
+};
 
 const sections = [
   { href: "/home", label: "Home", Icon: IconHome },
@@ -27,9 +33,12 @@ function isActive(pathname: string, href: string) {
  */
 export function AppNav({ viewer }: { viewer: Viewer | null }) {
   const pathname = usePathname();
-  const profileHref = viewer
-    ? `/u/${viewer.handle}`
-    : `/sign-in?next=${encodeURIComponent(pathname)}`;
+  const profileHref = profileLinkTarget(viewer, pathname);
+  const profileAriaLabel = viewer
+    ? viewer.pending
+      ? "Complete onboarding"
+      : "Your profile"
+    : "Sign in";
   const onProfile =
     isActive(pathname, profileHref) || pathname === "/profile/edit";
 
@@ -74,13 +83,13 @@ export function AppNav({ viewer }: { viewer: Viewer | null }) {
           <Link
             href={profileHref}
             className={styles.me}
-            aria-label={viewer ? "Your profile" : "Sign in"}
+            aria-label={profileAriaLabel}
             aria-current={onProfile ? "page" : undefined}
           >
             {viewer ? (
               <Avatar
                 picKey={viewer.picKey}
-                name={viewer.name || viewer.handle}
+                name={avatarLabel(viewer)}
                 size={40}
               />
             ) : (
@@ -113,13 +122,13 @@ export function AppNav({ viewer }: { viewer: Viewer | null }) {
         <Link
           href={profileHref}
           className={styles.tab}
-          aria-label={viewer ? "Profile" : "Sign in"}
+          aria-label={viewer ? profileAriaLabel : "Sign in"}
           aria-current={onProfile ? "page" : undefined}
         >
           {viewer ? (
             <Avatar
               picKey={viewer.picKey}
-              name={viewer.name || viewer.handle}
+              name={avatarLabel(viewer)}
               size={30}
             />
           ) : (
