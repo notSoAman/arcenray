@@ -620,7 +620,7 @@ export function OnboardingFlow({
                       className={styles.vibeCard}
                       data-tone={choice.color}
                       aria-pressed={selected}
-                      disabled={saving}
+                      disabled={saving || (!selected && choices.length >= VIBE_MAX)}
                       onClick={() => {
                         setSaveError(null);
                         setChoices((current) =>
