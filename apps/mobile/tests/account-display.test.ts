@@ -32,7 +32,7 @@ test("completed profiles retain their public identity", () => {
 });
 
 test("account actions clear the floating tab bar and gesture area", () => {
-  assert.equal(accountScrollPadding(0), 144);
-  assert.equal(accountScrollPadding(34), 178);
-  assert.equal(accountScrollPadding(-1), 144);
+  assert.equal(accountScrollPadding(0), 102);
+  assert.equal(accountScrollPadding(34), 136);
+  assert.equal(accountScrollPadding(-1), 102);
 });

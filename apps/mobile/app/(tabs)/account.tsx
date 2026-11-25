@@ -159,7 +159,11 @@ export default function Account() {
     <Gate onboarding={false}>
       <View style={{ flex: 1, backgroundColor: colors.void }}>
         <ScrollView
-          contentContainerStyle={{ padding: 20, paddingBottom: 120, gap: 24 }}
+          contentContainerStyle={{
+            padding: 20,
+            paddingBottom: accountScrollPadding(insets.bottom),
+            gap: 24,
+          }}
         >
           <View style={{ borderRadius: radius.card, overflow: "hidden" }}>
             <View style={{ height: 120 }}>

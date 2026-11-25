@@ -1,3 +1,4 @@
+import { accountIdentity } from "../../src/account-display";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Tabs, router } from "expo-router";
 import { BlurView } from "expo-blur";
@@ -172,7 +173,7 @@ export default function TabLayout() {
               >
                 <Avatar
                   picKey={me.profile_pic_key}
-                  name={me.full_name || me.handle}
+                  name={accountIdentity(me).avatarName}
                   size={25}
                 />
               </View>

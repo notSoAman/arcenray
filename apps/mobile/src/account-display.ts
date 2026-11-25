@@ -1,3 +1,5 @@
+import { floatingTabBarLayout } from "./native-layout.ts";
+
 type AccountProfile = {
   id: string;
   handle: string;
@@ -26,5 +28,6 @@ export function accountIdentity(profile: AccountProfile) {
 }
 
 export function accountScrollPadding(bottomInset: number) {
-  return 144 + Math.max(0, bottomInset);
+  const { height, marginBottom } = floatingTabBarLayout(bottomInset);
+  return height + marginBottom + 24;
 }
