@@ -9,11 +9,12 @@
     "./contracts": "./src/contracts.ts",
     "./media": "./src/media/multipart.ts",
     "./media-preflight": "./src/media/preflight.ts",
-    "./media-upload": "./src/media/upload.ts"
+    "./media-upload": "./src/media/upload.ts",
+    "./locations": "./src/locations.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/contracts.test.ts src/media/preflight.test.ts src/collaboration.test.ts"
+    "test": "node --experimental-strip-types --test src/contracts.test.ts src/media/preflight.test.ts src/collaboration.test.ts src/locations.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.3",
