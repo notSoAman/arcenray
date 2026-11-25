@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePushSignOut } from "../../src/chat-push";
 import { useSession, Gate } from "../../src/session";
 import {
@@ -16,6 +17,10 @@ import { LogoTile } from "../../src/brand";
 import { personRole } from "../../src/data";
 import { IconChevron, IconPlus, IconSettings } from "../../src/icons";
 import { colors, fonts, radius } from "../../src/theme";
+import {
+  accountIdentity,
+  accountScrollPadding,
+} from "../../src/account-display";
 
 function Row({
   title,
@@ -82,12 +87,18 @@ function Row({
 export default function Account() {
   const { me, signedIn } = useSession();
   const signOut = usePushSignOut();
+  const insets = useSafeAreaInsets();
+  const identity = me ? accountIdentity(me) : null;
 
   if (!signedIn)
     return (
       <View style={{ flex: 1, backgroundColor: colors.void }}>
         <ScrollView
-          contentContainerStyle={{ padding: 20, paddingBottom: 120, gap: 24 }}
+          contentContainerStyle={{
+            padding: 20,
+            paddingBottom: accountScrollPadding(insets.bottom),
+            gap: 24,
+          }}
         >
           <View style={{ borderRadius: 30, overflow: "hidden", height: 260 }}>
             <Spectrum
@@ -191,7 +202,7 @@ export default function Account() {
               >
                 <Avatar
                   picKey={me?.profile_pic_key}
-                  name={me?.full_name || me?.handle || "a"}
+                  name={identity?.avatarName ?? "Arcenray creator"}
                   size={92}
                   style={{ borderWidth: 4, borderColor: colors.graphite }}
                 />
@@ -207,19 +218,34 @@ export default function Account() {
                       letterSpacing: -0.9,
                     }}
                   >
-                    {me?.full_name || `@${me?.handle}`}
+                    {identity?.title}
                   </Text>
-                  <Text
-                    style={{
-                      color: colors.faint,
-                      fontFamily: fonts.regular,
-                      fontSize: 13,
-                    }}
-                  >
-                    @{me?.handle}
-                  </Text>
+                  {identity?.handle ? (
+                    <Text
+                      style={{
+                        color: colors.faint,
+                        fontFamily: fonts.regular,
+                        fontSize: 13,
+                      }}
+                    >
+                      {identity.handle}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
+              {!me?.onboarding_completed ? (
+                <Text
+                  style={{
+                    color: colors.muted,
+                    fontFamily: fonts.regular,
+                    fontSize: 14,
+                    lineHeight: 20,
+                  }}
+                >
+                  Add your name, creative roles and visual taste to make your
+                  profile ready to share.
+                </Text>
+              ) : null}
               {me?.roles?.length ? (
                 <Text
                   style={{
@@ -242,17 +268,17 @@ export default function Account() {
                   {me.location_city}
                 </Text>
               ) : null}
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Edit profile"
-                    variant="ghost"
-                    size="md"
-                    block
-                    onPress={() => router.push("/onboarding")}
-                  />
-                </View>
-                {me?.onboarding_completed ? (
+              {me?.onboarding_completed ? (
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      title="Edit profile"
+                      variant="ghost"
+                      size="md"
+                      block
+                      onPress={() => router.push("/onboarding")}
+                    />
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Button
                       title="View profile"
@@ -267,15 +293,14 @@ export default function Account() {
                       }
                     />
                   </View>
-                ) : null}
-              </View>
-              {!me?.onboarding_completed ? (
+                </View>
+              ) : (
                 <Button
-                  title="Complete onboarding"
+                  title="Complete your profile"
                   block
                   onPress={() => router.push("/onboarding")}
                 />
-              ) : null}
+              )}
             </View>
           </View>
 
@@ -301,8 +326,17 @@ export default function Account() {
 
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Sign out of Arcenray"
             onPress={() => void signOut()}
-            style={{ minHeight: 44, justifyContent: "center" }}
+            style={({ pressed }) => ({
+              minHeight: 48,
+              justifyContent: "center",
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: colors.line,
+              borderRadius: radius.pill,
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
             <Text
               style={{
