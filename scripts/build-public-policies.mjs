@@ -24,7 +24,7 @@ copyFileSync(
   new URL("../apps/web/public/brand/arcenray-mark.webp", import.meta.url),
   new URL("policy-assets/mark.webp", directory),
 );
-const footer = `<footer><span>Find your people, make your art.</span><nav aria-label="Legal and support"><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a><a href="mailto:${legalContact.email}">Contact</a></nav></footer>`;
+const footer = `<footer><span>Find your people, make your art.</span><nav aria-label="Legal and support"><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a><a href="mailto:${legalContact.email}">Contact</a></nav><span>City suggestions use a filtered index of <a href="https://www.geonames.org/">GeoNames</a> data under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</span></footer>`;
 function document(title, path, description, body) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Arcenray</title><meta name="description" content="${escape(description)}"><link rel="canonical" href="https://arcenray.com${path}"><link rel="icon" href="/policy-assets/mark.webp"><link rel="stylesheet" href="/policy-assets/styles.css"></head><body><header><a class="brand" href="/">arcenray.</a><a href="mailto:${legalContact.email}">Contact</a></header>${body}${footer}</body></html>`;
 }
