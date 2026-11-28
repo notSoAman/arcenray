@@ -6,6 +6,7 @@ import { LoopPreview } from "./loop-preview";
 import { IconPlay } from "../../../components/icons";
 import { Avatar, Poster } from "../../../components/media";
 import { browserApi } from "../../../lib/client-api";
+import { personRole } from "../../../lib/roles";
 import { formatDuration, withCreators, type FeedFilm } from "../../../lib/feed";
 import styles from "./loop.module.css";
 
@@ -155,10 +156,7 @@ export function LoopFeed({
   }
 
   async function savePreference(film: FeedFilm, preference: Preference) {
-    if (!viewerId) {
-      window.location.assign(`/sign-in?next=${encodeURIComponent("/loop")}`);
-      return;
-    }
+    if (!viewerId) return;
     if (feedbackBusy.current.has(film.id)) return;
     feedbackBusy.current.add(film.id);
     setPending((previous) => ({ ...previous, [film.id]: true }));
@@ -272,8 +270,9 @@ export function LoopFeed({
                   <span>
                     {film.creator.full_name}
                     <span className={styles.handle}>
-                      {" "}
-                      @{film.creator.handle}
+                      {" · "}
+                      {film.creator.roles.map(personRole).find(Boolean) ||
+                        `@${film.creator.handle}`}
                     </span>
                   </span>
                 </Link>
@@ -287,29 +286,35 @@ export function LoopFeed({
                 <Link href={`/watch/${film.id}`} className="btn btn-film-play">
                   <IconPlay size={15} /> Watch film
                 </Link>
-                <div
-                  className={styles.feedback}
-                  role="group"
-                  aria-label={`Shape recommendations for ${film.title}`}
-                  aria-busy={Boolean(pending[film.id])}
-                >
-                  <button
-                    type="button"
-                    aria-pressed={preferences[film.id] === "more"}
-                    disabled={pending[film.id]}
-                    onClick={() => void savePreference(film, "more")}
+                {viewerId ? (
+                  <div
+                    className={styles.feedback}
+                    role="group"
+                    aria-label={`Shape recommendations for ${film.title}`}
+                    aria-busy={Boolean(pending[film.id])}
                   >
-                    More like this
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={preferences[film.id] === "less"}
-                    disabled={pending[film.id]}
-                    onClick={() => void savePreference(film, "less")}
-                  >
-                    Less like this
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      aria-pressed={preferences[film.id] === "more"}
+                      disabled={pending[film.id]}
+                      onClick={() => void savePreference(film, "more")}
+                    >
+                      More like this
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={preferences[film.id] === "less"}
+                      disabled={pending[film.id]}
+                      onClick={() => void savePreference(film, "less")}
+                    >
+                      Less like this
+                    </button>
+                  </div>
+                ) : (
+                  <Link href="/sign-in?next=%2Floop" className="btn btn-ghost">
+                    Sign in to tune your Loop
+                  </Link>
+                )}
               </div>
             </div>
           </article>

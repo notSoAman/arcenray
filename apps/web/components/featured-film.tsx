@@ -27,7 +27,7 @@ export function FeaturedFilm({
           hookKey={film.hook_key}
           posterKey={film.poster_key}
           title={film.title}
-          sizes="(max-width: 720px) 60vw, 300px"
+          sizes="(max-width: 720px) 176px, 300px"
         />
       </div>
       <div className={styles.copy}>
@@ -48,7 +48,11 @@ export function FeaturedFilm({
           </ul>
         ) : null}
         <div className={styles.actions}>
-          <Link href={`/watch/${film.id}`} className="btn btn-film-play">
+          <Link
+            href={`/watch/${film.id}`}
+            className="btn btn-film-play"
+            aria-label={`Play ${film.title}`}
+          >
             <IconPlay size={16} />
             Play
           </Link>

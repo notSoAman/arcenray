@@ -142,18 +142,12 @@ export default async function SearchPage({
         <div className={styles.intro}>
           <h2>Find your next collaborator.</h2>
           <p>
-            Browse people by craft and city, explore their films and listed
-            credits, then message them about what you want to make. Public
-            profiles are open to browse; sign in to start a private
-            conversation.
+            Browse by role and city, explore films and credits, and message
+            people about your next project.
           </p>
           <Link href="/search?kind=profile" className="btn btn-primary">
             Find collaborators
           </Link>
-          <p>
-            Project listings and interest submissions aren&apos;t available yet.
-            For now, introduce your project in a message.
-          </p>
         </div>
         <form
           action="/search"

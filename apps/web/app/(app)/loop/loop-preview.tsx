@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { newId, recordEvent } from "../../../lib/client-api";
 import { mediaUrl } from "../../../lib/feed";
+import { IconPause, IconPlay, IconVolume } from "../../../components/icons";
 import { Poster } from "../../../components/media";
 import styles from "./loop.module.css";
 
@@ -109,7 +110,9 @@ export function LoopPreview({
               else element.pause();
             }}
           >
-            <span className={styles.playHint}>{playing ? "Ⅱ" : "▶"}</span>
+            <span className={styles.playHint} data-playing={playing}>
+              {playing ? <IconPause size={20} /> : <IconPlay size={20} />}
+            </span>
           </button>
           <button
             type="button"
@@ -117,7 +120,7 @@ export function LoopPreview({
             onClick={onMute}
             aria-label={muted ? "Turn preview sound on" : "Mute preview"}
           >
-            {muted ? "Sound off" : "Sound on"}
+            <IconVolume size={19} muted={muted} />
           </button>
           <div className={styles.progress} aria-hidden="true">
             <span style={{ transform: `scaleX(${progress})` }} />

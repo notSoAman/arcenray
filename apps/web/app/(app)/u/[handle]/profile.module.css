@@ -48,7 +48,7 @@
   font-size: clamp(34px, 4vw, 56px);
   font-weight: 800;
   letter-spacing: -0.04em;
-  line-height: 0.95;
+  line-height: 1.03;
   overflow-wrap: anywhere;
 }
 
@@ -276,15 +276,24 @@
 
 @media (max-width: 720px) {
   .banner {
+    height: 150px;
     border-radius: 22px 22px 0 0;
   }
   .card {
     border-radius: 0 0 22px 22px;
+    align-items: flex-start;
+    gap: 16px;
   }
   .avatar {
-    width: 112px !important;
-    height: 112px !important;
-    margin-top: -56px;
+    width: 104px !important;
+    height: 104px !important;
+    margin-top: -36px;
+  }
+  .identity {
+    flex: 1 1 0;
+  }
+  .name {
+    font-size: clamp(24px, 7vw, 34px);
   }
   .actions {
     justify-content: flex-start;
@@ -311,7 +320,6 @@
   flex-wrap: wrap;
 }
 @media (max-width: 720px) {
-  .identity,
   .actions,
   .main,
   .side {

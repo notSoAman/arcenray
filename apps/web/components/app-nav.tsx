@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Lockup } from "./brand";
-import { IconChat, IconLoop, IconHome, IconSearch } from "./icons";
+import { IconChat, IconLoop, IconHome, IconSearch, IconUser } from "./icons";
 import { AccountMenu } from "./account-menu";
 import { Avatar } from "./media";
 import { avatarLabel, profileLinkTarget } from "./nav-links";
@@ -69,6 +69,7 @@ export function AppNav({ viewer }: { viewer: Viewer | null }) {
           <Link
             href="/search"
             className={styles.searchPill}
+            aria-label="Search films and people"
             aria-current={isActive(pathname, "/search") ? "page" : undefined}
           >
             <IconSearch size={18} />
@@ -122,18 +123,20 @@ export function AppNav({ viewer }: { viewer: Viewer | null }) {
         <Link
           href={profileHref}
           className={styles.tab}
-          aria-label={viewer ? profileAriaLabel : "Sign in"}
+          aria-label={viewer ? profileAriaLabel : "You, sign in"}
           aria-current={onProfile ? "page" : undefined}
         >
           {viewer ? (
             <Avatar
               picKey={viewer.picKey}
               name={avatarLabel(viewer)}
-              size={30}
+              size={24}
+              className={styles.tabAvatar}
             />
           ) : (
-            <span>Sign in</span>
+            <IconUser size={22} />
           )}
+          <span>You</span>
         </Link>
       </nav>
     </>

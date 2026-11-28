@@ -333,9 +333,12 @@
 .embedNote {
   padding: 10px 14px;
   font-size: 12px;
-  color: var(--text-faint);
+  color: var(--text-soft);
   background: var(--graphite);
   border-radius: 0 0 24px 24px;
+}
+.embedNote a {
+  text-decoration: underline;
 }
 .immersive .embedNote {
   position: absolute;

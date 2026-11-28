@@ -19,6 +19,7 @@ import {
   IconRewind,
   IconVolume,
 } from "./icons";
+import { Poster } from "./media";
 import styles from "./film-player.module.css";
 
 export type PlayableFilm = {
@@ -32,15 +33,15 @@ export type PlayableFilm = {
 };
 
 /** Validated provider embed URLs (IDs are validated by the shared contract). */
-function embedUrl(film: PlayableFilm, autoplay: boolean) {
+function embedUrl(film: PlayableFilm) {
   if (!film.provider_id) return null;
   if (
     film.source === "youtube_embed" &&
     /^[A-Za-z0-9_-]{11}$/.test(film.provider_id)
   )
-    return `https://www.youtube-nocookie.com/embed/${film.provider_id}?rel=0&modestbranding=1${autoplay ? "&autoplay=1" : ""}`;
+    return `https://www.youtube-nocookie.com/embed/${film.provider_id}?rel=0&modestbranding=1&autoplay=1`;
   if (film.source === "vimeo_embed" && /^\d+$/.test(film.provider_id))
-    return `https://player.vimeo.com/video/${film.provider_id}?dnt=1${autoplay ? "&autoplay=1" : ""}`;
+    return `https://player.vimeo.com/video/${film.provider_id}?dnt=1&autoplay=1`;
   return null;
 }
 
@@ -76,9 +77,10 @@ export function FilmPlayer({
   const [chrome, setChrome] = useState(true);
   const [failed, setFailed] = useState(false);
   const [waiting, setWaiting] = useState(false);
+  const [startedEmbed, setStartedEmbed] = useState(autoPlay);
 
   const src = film.source === "r2_native" ? mediaUrl(film.film_key) : null;
-  const embed = film.source !== "r2_native" ? embedUrl(film, autoPlay) : null;
+  const embed = film.source !== "r2_native" ? embedUrl(film) : null;
   const poster = mediaUrl(film.poster_key) ?? undefined;
 
   useEffect(() => {
@@ -127,7 +129,7 @@ export function FilmPlayer({
   }
 
   function onKey(e: KeyboardEvent<HTMLDivElement>) {
-    if ((e.target as HTMLElement).tagName === "INPUT") return;
+    if ((e.target as HTMLElement).closest("button, a, input")) return;
     if (e.key === " " || e.key === "k") {
       e.preventDefault();
       toggle();
@@ -159,22 +161,47 @@ export function FilmPlayer({
     ) : null;
 
   if (embed) {
+    const vimeo = film.source === "vimeo_embed";
+    const provider = vimeo ? "Vimeo" : "YouTube";
+    const providerHref = vimeo
+      ? `https://vimeo.com/${film.provider_id}`
+      : `https://www.youtube.com/watch?v=${film.provider_id}`;
     return (
       <div className={`${styles.root} ${styles[variant]}`}>
         {staticTop}
         <div className={styles.frame}>
-          <iframe
-            src={embed}
-            title={`${film.title} — external player`}
-            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-            className={styles.iframe}
-          />
+          {startedEmbed ? (
+            <iframe
+              src={embed}
+              title={`${film.title} — external player`}
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+              className={styles.iframe}
+            />
+          ) : (
+            <>
+              <Poster
+                posterKey={film.poster_key}
+                title={film.title}
+                sizes="(max-width: 720px) 100vw, 65vw"
+                eager
+              />
+              <button
+                type="button"
+                className={`${styles.posterPlay} glass`}
+                aria-label={`Play ${film.title} on ${provider}`}
+                onClick={() => setStartedEmbed(true)}
+              >
+                <IconPlay size={28} />
+              </button>
+            </>
+          )}
         </div>
         <p className={styles.embedNote}>
-          Playing from {film.source === "vimeo_embed" ? "Vimeo" : "YouTube"}.
-          Their player, controls and terms apply.
+          <a href={providerHref} target="_blank" rel="noopener noreferrer">
+            Open on {provider}
+          </a>
         </p>
       </div>
     );
