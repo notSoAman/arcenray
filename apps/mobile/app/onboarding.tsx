@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Keyboard, Linking, Pressable, Text, View } from "react-native";
+import { Keyboard, Pressable, Text, View } from "react-native";
 import { AppState } from "react-native";
 import { router } from "expo-router";
 import {
@@ -243,7 +243,7 @@ function Editor({
                     </Text>
                   </Pressable>
                 ))}
-                <Muted>
+                <Muted style={{ paddingHorizontal: 14, paddingVertical: 8 }}>
                   {cityStatus ||
                     (cities.length
                       ? citySuggestions.length
@@ -251,26 +251,6 @@ function Editor({
                         : "No matching city. You can enter it manually."
                       : "Loading city suggestions…")}
                 </Muted>
-                <Pressable
-                  accessibilityRole="link"
-                  accessibilityLabel="GeoNames city data attribution"
-                  onPress={() =>
-                    void Linking.openURL("https://www.geonames.org/").catch(
-                      () => {},
-                    )
-                  }
-                  style={{ paddingHorizontal: 12, paddingBottom: 8 }}
-                >
-                  <Text
-                    style={{
-                      color: colors.faint,
-                      fontFamily: fonts.regular,
-                      fontSize: 12,
-                    }}
-                  >
-                    City data: GeoNames · CC BY 4.0
-                  </Text>
-                </Pressable>
               </View>
             ) : null}
           </View>
