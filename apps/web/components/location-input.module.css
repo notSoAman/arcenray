@@ -40,16 +40,11 @@
 .list .active {
   background: #383838;
 }
-.hint,
-.attribution {
+.hint {
   display: block;
   padding: 5px 12px;
   color: #bbb;
   font-size: 11px;
   line-height: 1.5;
   font-weight: 400;
-}
-.attribution {
-  padding-bottom: 10px;
-  text-decoration: underline;
 }

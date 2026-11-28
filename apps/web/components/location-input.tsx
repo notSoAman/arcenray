@@ -156,14 +156,6 @@ export function LocationInput({
                   : "No matching city. You can enter it manually."
                 : "Loading city suggestions…")}
           </span>
-          <a
-            className={styles.attribution}
-            href="https://www.geonames.org/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            City data: GeoNames · CC BY 4.0
-          </a>
         </div>
       ) : null}
     </div>

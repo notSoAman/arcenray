@@ -25,6 +25,11 @@ export default function LegalLayout({
           <Link href="/terms">Terms of Service</Link>
           <a href={`mailto:${legalContact.email}`}>Contact</a>
         </nav>
+        <span>
+          City suggestions use a filtered index of{" "}
+          <a href="https://www.geonames.org/">GeoNames</a> data under{" "}
+          <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+        </span>
       </footer>
     </div>
   );
