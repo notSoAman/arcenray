@@ -42,16 +42,16 @@ was changed.
   Loop, film, search, sign-in, You, empty and offline-error states at 1080×1920, beside
   the web at 390×844. Release AAB rebuilt and verified (`jar verified.`, upload cert,
   package `com.arcenray.mobile`, `SYSTEM_ALERT_WINDOW` absent).
-- **Not approved:** visual sign-off remains the founder's. Remaining gaps: no true
-  backdrop blur (translucent approximation); wavelength "like/pass" picks and
-  nearby-people sections are not on the native home; store screenshots not regenerated.
+- **Not approved:** visual sign-off remains the founder's. Remaining gaps at the time:
+  backdrop blur used a translucent approximation, the native Home lacked nearby people,
+  and store screenshots had yet to be regenerated.
 
 ## Second visual/playback/auth pass — 10 November 2026
 
 The clipped page-title bug (`lineHeight: 1` on 34–40px display text) is fixed, and the mobile
 UI now reuses the web's full kit: Bone/Ember/Ghost/film-play buttons, glass icon buttons, tags,
 scope tabs, sheets, skeletons and safe-area/bottom-tab insets. Home gained the spectrum featured
-preview and real wavelength picks; Loop is a full-bleed deck; the film page follows the web's
+preview; Loop is a full-bleed deck; the film page follows the web's
 player → title → creator → actions order; Search, profiles, chats, account, onboarding, sign-in
 and 404 were rebuilt on the same components. See
 [`docs/architecture/mobile-parity.md`](../../docs/architecture/mobile-parity.md) for the exact

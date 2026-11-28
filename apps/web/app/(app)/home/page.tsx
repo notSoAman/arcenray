@@ -3,7 +3,6 @@ import Link from "next/link";
 import { FeaturedFilm } from "../../../components/featured-film";
 import { PosterCard } from "../../../components/film-cards";
 import { Avatar } from "../../../components/media";
-import { WavelengthPicks } from "../../../components/wavelength";
 import { loadFeedPage, PROFILE_CARD_COLUMNS } from "../../../lib/feed";
 import { personRole } from "../../../lib/roles";
 import { getViewer } from "../../../lib/session";
@@ -17,8 +16,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/home" },
 };
 export const dynamic = "force-dynamic";
-
-const PICKS = 5;
 
 export default async function HomePage() {
   const { supabase, user, profile } = await getViewer();
@@ -46,8 +43,7 @@ export default async function HomePage() {
 
   const films = page.ok ? page.films : [];
   const featured = films[0];
-  const picks = films.slice(1, 1 + PICKS);
-  const rest = films.slice(1 + PICKS);
+  const rest = films.slice(1);
 
   return (
     <main className="app-main">
@@ -87,9 +83,6 @@ export default async function HomePage() {
       ) : (
         <>
           <FeaturedFilm film={featured} kicker="Tonight's pick" />
-          {picks.length > 0 ? (
-            <WavelengthPicks films={picks} viewerId={user?.id ?? null} />
-          ) : null}
           {rest.length > 0 || page.hasMore ? (
             <section className={styles.section} aria-labelledby="more-films">
               <div className={styles.sectionHead}>

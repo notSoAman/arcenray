@@ -358,7 +358,7 @@ export default async function FilmPage({
       {relatedFilms.length > 0 ? (
         <section className={styles.section} aria-labelledby="related-title">
           <h2 id="related-title" className="section-title">
-            On the same wavelength
+            Related films
           </h2>
           <div className={styles.related}>
             {relatedFilms.map((r) => (
