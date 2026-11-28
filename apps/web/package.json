@@ -17,7 +17,7 @@
     "@repo/ui": "workspace:*",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.3",
-    "next": "16.4.1",
+    "next": "16.4.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1"
